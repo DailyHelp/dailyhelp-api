@@ -24,7 +24,7 @@ import {
   SignupStepOneDto,
   VerifyOtpDto,
 } from './auth.dto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { v4 } from 'uuid';
 import { nanoid } from 'nanoid';
 import { generateOtp } from 'src/utils';
