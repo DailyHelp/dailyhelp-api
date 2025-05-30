@@ -20,9 +20,6 @@ export class DatabaseConfigService {
     return this.config.get(prefix('password'));
   }
   get name(): string {
-    console.log(prefix('name'));
-    const s = this.config.get(prefix('name'));
-    console.log('s', s);
-    return s;
+    return this.config.get(prefix('name'));
   }
 }

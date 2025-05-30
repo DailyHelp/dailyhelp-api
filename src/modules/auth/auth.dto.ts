@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, Length } from 'class-validator';
+import { IsEmail, IsEnum, IsString, Length, ValidateIf } from 'class-validator';
 import { OTPActionType } from 'src/types';
 
 export class SignupStepOneDto {
@@ -59,6 +59,10 @@ export class SendOtpDto {
 
   @IsEnum(OTPActionType)
   otpActionType: OTPActionType;
+
+  @IsString()
+  @ValidateIf((o) => o.otpActionType === OTPActionType.VERIFY_PHONE)
+  phone: string;
 }
 
 export class ResetPasswordDto {

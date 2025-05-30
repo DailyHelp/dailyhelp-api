@@ -12,7 +12,6 @@ export class DatabaseModule {
       imports: [
         MikroOrmModule.forRootAsync({
           useFactory: (databaseConfig: DatabaseConfigService) => {
-            console.log(databaseConfig.name)
             return defineConfig({
               driver: MySqlDriver,
               host: databaseConfig.host,

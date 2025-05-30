@@ -8,6 +8,8 @@ import { AddCorrelationIdInterceptor } from './lib/add-correlation-id-intercepto
 import { TimeoutInterceptor } from './lib/timeout.interceptor';
 import { RequestLoggerMiddleware } from './middleware/request-logger-middleware';
 import { SharedModule } from './modules/shared/shared.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { SharedModule } from './modules/shared/shared.module';
     }),
     DatabaseModule.forRoot(),
     SharedModule,
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [

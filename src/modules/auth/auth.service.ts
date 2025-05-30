@@ -274,9 +274,15 @@ export class AuthService {
       await this.em.flush();
       throw new UnauthorizedException('OTP has expired');
     }
+    let user: Users;
     switch (otpActionType) {
+      case OTPActionType.VERIFY_PHONE:
+        user = await this.usersRepository.findOne({ uuid: userUuid });
+        user.phoneVerified = true;
+        await this.em.flush();
+        break;
       case OTPActionType.VERIFY_ACCOUNT:
-        const user = await this.usersRepository.findOne({ uuid: userUuid });
+        user = await this.usersRepository.findOne({ uuid: userUuid });
         user.emailVerified = true;
         await this.em.flush();
         break;
@@ -295,17 +301,30 @@ export class AuthService {
     return true;
   }
 
-  async sendOtp({ userUuid }: SendOtpDto) {
+  async sendOtp({ userUuid, phone, otpActionType }: SendOtpDto) {
     const pinId = nanoid();
     const otp = generateOtp();
     const user = await this.usersRepository.findOne({ uuid: userUuid });
     if (!user) throw new NotFoundException('User does not exist');
-    await this.sharedService.sendOtp(otp, null, {
-      templateCode: 'verify_account',
-      subject: 'Verify Email',
-      data: {},
-      to: user.email,
-    });
+    if (phone) {
+      await this.sharedService.sendOtp(otp, phone, {} as any);
+    } else {
+      if (otpActionType === OTPActionType.VERIFY_ACCOUNT) {
+        await this.sharedService.sendOtp(otp, null, {
+          templateCode: 'verify_account',
+          subject: 'Verify Email',
+          data: {},
+          to: user.email,
+        });
+      } else {
+        await this.sharedService.sendOtp(otp, null, {
+          templateCode: 'reset_password',
+          subject: 'Password Reset',
+          data: {},
+          to: user.email,
+        });
+      }
+    }
     const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
     this.em.persist(otpModel);
     await this.em.flush();
@@ -318,8 +337,8 @@ export class AuthService {
     const pinId = nanoid();
     const otp = generateOtp();
     await this.sharedService.sendOtp(otp, null, {
-      templateCode: 'verify_account',
-      subject: 'Verify Email',
+      templateCode: 'reset_password',
+      subject: 'Password Reset',
       data: {},
       to: user.email,
     });

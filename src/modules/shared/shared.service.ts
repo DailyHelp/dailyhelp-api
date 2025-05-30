@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -77,6 +78,28 @@ export class SharedService {
     phone: string,
     { templateCode, subject, data, to }: IEmailDto,
   ) {
+    let smsOtpResponse: any;
+    try {
+      smsOtpResponse = await axios.post(
+        `${this.termiiConfig.baseUrl}/api/sms/send`,
+        {
+          to: phone,
+          from: 'N-Alert',
+          sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
+          type: 'plain',
+          channel: 'dnd',
+          api_key: this.termiiConfig.apiKey,
+        },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error occurred while sending SMS OTP to: ${phone}. Error: ${error}`,
+      );
+      throw error;
+    }
+    if (smsOtpResponse.data.code !== 'ok') {
+      throw new InternalServerErrorException(smsOtpResponse.data.message);
+    }
     if (to) {
       await this.sendEmail({ templateCode, to, subject, data });
     }
