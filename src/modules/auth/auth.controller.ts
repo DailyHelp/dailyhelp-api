@@ -18,6 +18,7 @@ import { Users } from '../users/users.entity';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { Request } from 'express';
 import { extractTokenFromReq } from 'src/utils';
+import { LoginResponseDto } from '../users/users.dto';
 
 @Controller('auth')
 @ApiTags('auth')
@@ -38,14 +39,7 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @ApiCreatedResponse({
     description: 'User logged in successfully',
-    schema: {
-      example: {
-        accessToken: 'string',
-        expiresIn: 0,
-        refreshToken: 'string',
-        user: Users,
-      },
-    },
+    type: LoginResponseDto,
   })
   login(@Body() _body: LoginDTO, @Req() req: any) {
     return this.authService.login(req.user);
@@ -54,14 +48,7 @@ export class AuthController {
   @Post('google')
   @ApiCreatedResponse({
     description: 'User logged in successfully',
-    schema: {
-      example: {
-        accessToken: 'string',
-        expiresIn: 0,
-        refreshToken: 'string',
-        user: Users,
-      },
-    },
+    type: LoginResponseDto,
   })
   async loginWithGoogle(@Body() { idToken }: LoginWithGoogleDto) {
     return this.authService.loginWithGoogle(idToken);
@@ -70,14 +57,7 @@ export class AuthController {
   @Post('apple')
   @ApiCreatedResponse({
     description: 'User logged in successfully',
-    schema: {
-      example: {
-        accessToken: 'string',
-        expiresIn: 0,
-        refreshToken: 'string',
-        user: Users,
-      },
-    },
+    type: LoginResponseDto,
   })
   async loginWithApple(@Body() { idToken }: LoginWithGoogleDto) {
     return this.authService.loginWithApple(idToken);

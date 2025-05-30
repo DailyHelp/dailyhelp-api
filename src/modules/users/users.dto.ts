@@ -1,27 +1,35 @@
-import { IsString } from "class-validator";
+import { IsString } from 'class-validator';
+import { Users } from './users.entity';
 
 export class VerifyIdentityDto {
-    @IsString()
-    firstname: string;
+  @IsString()
+  firstname: string;
 
-    @IsString()
-    middlename: string;
-    
-    @IsString()
-    lastname: string;
+  @IsString()
+  middlename: string;
 
-    @IsString()
-    dob: string;
+  @IsString()
+  lastname: string;
 
-    @IsString()
-    gender: string;
+  @IsString()
+  dob: string;
 
-    @IsString()
-    nin: string;
-    
-    @IsString()
-    bvn: string;
+  @IsString()
+  gender: string;
 
-    @IsString()
-    photo: string;
+  @IsString()
+  nin: string;
+
+  @IsString()
+  bvn: string;
+
+  @IsString()
+  photo: string;
+}
+
+export class LoginResponseDto {
+  accessToken: string;
+  expiresIn: number;
+  refreshToken: string;
+  user: Users;
 }
