@@ -50,7 +50,7 @@ export class SharedService {
       host: this.smtpConfig.host,
       port: this.smtpConfig.port,
       secure: true,
-      from: 'DailyHelp <no-reply@dailyhelp.ng>',
+      from: 'DailyHelp <no-reply@fonu.com>',
       auth: {
         user: this.smtpConfig.username,
         pass: this.smtpConfig.password,
@@ -69,7 +69,7 @@ export class SharedService {
       : notificationTemplate.body;
     delete email.templateCode;
     if (!email.bcc) email.bcc = 'admin@dailyhelp.ng';
-    if (!email.from) email.from = 'DailyHelp <no-reply@dailyhelp.ng>';
+    if (!email.from) email.from = 'DailyHelp <no-reply@fonu.com>';
     sendMail(email);
   }
 
@@ -78,27 +78,29 @@ export class SharedService {
     phone: string,
     { templateCode, subject, data, to }: IEmailDto,
   ) {
-    let smsOtpResponse: any;
-    try {
-      smsOtpResponse = await axios.post(
-        `${this.termiiConfig.baseUrl}/api/sms/send`,
-        {
-          to: phone,
-          from: 'N-Alert',
-          sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
-          type: 'plain',
-          channel: 'dnd',
-          api_key: this.termiiConfig.apiKey,
-        },
-      );
-    } catch (error) {
-      this.logger.error(
-        `Error occurred while sending SMS OTP to: ${phone}. Error: ${error}`,
-      );
-      throw error;
-    }
-    if (smsOtpResponse.data.code !== 'ok') {
-      throw new InternalServerErrorException(smsOtpResponse.data.message);
+    if (phone) {
+      let smsOtpResponse: any;
+      try {
+        smsOtpResponse = await axios.post(
+          `${this.termiiConfig.baseUrl}/api/sms/send`,
+          {
+            to: phone,
+            from: 'N-Alert',
+            sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
+            type: 'plain',
+            channel: 'dnd',
+            api_key: this.termiiConfig.apiKey,
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Error occurred while sending SMS OTP to: ${phone}. Error: ${error}`,
+        );
+        throw error;
+      }
+      if (smsOtpResponse.data.code !== 'ok') {
+        throw new InternalServerErrorException(smsOtpResponse.data.message);
+      }
     }
     if (to) {
       await this.sendEmail({ templateCode, to, subject, data });
@@ -115,3 +117,13 @@ export class SharedService {
     return accessToken;
   }
 }
+
+// lagos
+// osun
+// ogun
+// ondo
+// ekiti
+// kwara
+// edo
+// fct
+// oyo

@@ -22,3 +22,9 @@ export interface IAuthContext {
   lastname: string;
   phone: string;
 }
+
+export interface IAdminAuthContext {
+  name: string;
+  email: string;
+  uuid: string;
+}

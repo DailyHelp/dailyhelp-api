@@ -74,10 +74,13 @@ export class AuthService {
     await this.sharedService.sendOtp(otp, null, {
       templateCode: 'verify_account',
       subject: 'Verify Email',
-      data: {},
+      data: {
+        firstname: user.firstname,
+        otp,
+      },
       to: user.email,
     });
-    const otpModel = this.otpRepository.create({ otp, pinId });
+    const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
     this.em.persist(otpModel);
     const userUuid = v4();
     const userModel = this.usersRepository.create({
@@ -108,7 +111,10 @@ export class AuthService {
         await this.sharedService.sendOtp(otp, null, {
           templateCode: 'verify_account',
           subject: 'Verify Email',
-          data: {},
+          data: {
+            firstname: user.firstname,
+            otp,
+          },
           to: user.email,
         });
         const otpModel = this.otpRepository.create({ otp, pinId });
@@ -313,14 +319,20 @@ export class AuthService {
         await this.sharedService.sendOtp(otp, null, {
           templateCode: 'verify_account',
           subject: 'Verify Email',
-          data: {},
+          data: {
+            firstname: user.firstname,
+            otp,
+          },
           to: user.email,
         });
       } else {
         await this.sharedService.sendOtp(otp, null, {
           templateCode: 'reset_password',
           subject: 'Password Reset',
-          data: {},
+          data: {
+            firstname: user.firstname,
+            otp,
+          },
           to: user.email,
         });
       }
@@ -339,7 +351,10 @@ export class AuthService {
     await this.sharedService.sendOtp(otp, null, {
       templateCode: 'reset_password',
       subject: 'Password Reset',
-      data: {},
+      data: {
+        firstname: user.firstname,
+        otp,
+      },
       to: user.email,
     });
     const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
