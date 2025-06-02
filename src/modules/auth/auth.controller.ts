@@ -29,7 +29,9 @@ export class AuthController {
   @Post('signup')
   @ApiCreatedResponse({
     description: 'User created successfully',
-    schema: { example: { pinId: 'string', uuid: 'string' } },
+    schema: {
+      example: { status: true, data: { pinId: 'string', uuid: 'string' } },
+    },
   })
   signupStepOne(@Body() body: SignupStepOneDto) {
     return this.authService.signupStepOne(body);
@@ -68,9 +70,12 @@ export class AuthController {
     description: 'Token refreshed successfully',
     schema: {
       example: {
-        accessToken: 'string',
-        expiresIn: 0,
-        refreshToken: 'string',
+        status: true,
+        data: {
+          accessToken: 'string',
+          expiresIn: 0,
+          refreshToken: 'string',
+        },
       },
     },
   })
@@ -81,14 +86,22 @@ export class AuthController {
   @Post('verify-otp')
   @ApiCreatedResponse({
     description: 'OTP verified successfully',
-    type: 'string',
+    schema: {
+      example: {
+        status: true,
+        data: 'string',
+      },
+    },
   })
   verifyOtp(@Body() body: VerifyOtpDto) {
     return this.authService.verifyOtp(body);
   }
 
   @Post('send-otp')
-  @ApiCreatedResponse({ description: 'OTP sent successfully', type: 'string' })
+  @ApiCreatedResponse({
+    description: 'OTP sent successfully',
+    schema: { example: { status: true, data: 'string' } },
+  })
   sendOtp(@Body() body: SendOtpDto) {
     return this.authService.sendOtp(body);
   }
@@ -96,7 +109,9 @@ export class AuthController {
   @Post('initiate-reset-password')
   @ApiCreatedResponse({
     description: 'Password reset initiated successfully',
-    schema: { example: { pinId: 'string', userUuid: 'string' } },
+    schema: {
+      example: { status: true, data: { pinId: 'string', userUuid: 'string' } },
+    },
   })
   initiateResetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.initiateResetPassword(body);

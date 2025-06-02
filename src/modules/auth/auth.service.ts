@@ -95,7 +95,7 @@ export class AuthService {
     });
     this.em.persist(userModel);
     await this.em.flush();
-    return { pinId, uuid: userUuid };
+    return { status: true, data: { pinId, uuid: userUuid } };
   }
 
   async validateUser(email: string, password: string) {
@@ -144,10 +144,13 @@ export class AuthService {
     delete clonedUser.createdAt;
     delete clonedUser.updatedAt;
     return {
-      accessToken: this.jwtService.sign(payload),
-      expiresIn: 1.2e6,
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
-      user,
+      status: true,
+      data: {
+        accessToken: this.jwtService.sign(payload),
+        expiresIn: 1.2e6,
+        refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+        user,
+      },
     };
   }
 
@@ -178,10 +181,13 @@ export class AuthService {
       phone: user.phone,
     };
     return {
-      accessToken: this.jwtService.sign(payload),
-      expiresIn: 1.2e6,
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
-      user,
+      status: true,
+      data: {
+        accessToken: this.jwtService.sign(payload),
+        expiresIn: 1.2e6,
+        refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+        user,
+      },
     };
   }
 
@@ -230,10 +236,13 @@ export class AuthService {
       phone: user.phone,
     };
     return {
-      accessToken: this.jwtService.sign(payload),
-      expiresIn: 1.2e6,
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
-      user,
+      status: true,
+      data: {
+        accessToken: this.jwtService.sign(payload),
+        expiresIn: 1.2e6,
+        refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+        user,
+      },
     };
   }
 
@@ -294,17 +303,23 @@ export class AuthService {
         break;
       case OTPActionType.RESET_PASSWORD:
         const payload = { id: userUuid };
-        return this.jwtService.sign(payload, {
-          expiresIn: 600,
-          secret: this.jwtConfig.resetPwdSecretKey,
-        });
+        return {
+          status: true,
+          data: this.jwtService.sign(payload, {
+            expiresIn: 600,
+            secret: this.jwtConfig.resetPwdSecretKey,
+          }),
+        };
       case OTPActionType.ADMIN_RESET_PASSWORD:
-        return this.jwtService.sign(
-          { id: userUuid },
-          { expiresIn: 600, secret: this.jwtConfig.adminResetPwdSecretKey },
-        );
+        return {
+          status: true,
+          data: this.jwtService.sign(
+            { id: userUuid },
+            { expiresIn: 600, secret: this.jwtConfig.adminResetPwdSecretKey },
+          ),
+        };
     }
-    return true;
+    return { status: true };
   }
 
   async sendOtp({ userUuid, phone, otpActionType }: SendOtpDto) {
@@ -340,7 +355,7 @@ export class AuthService {
     const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
     this.em.persist(otpModel);
     await this.em.flush();
-    return pinId;
+    return { status: true, data: pinId };
   }
 
   async initiateResetPassword({ email }: ResetPasswordDto) {
@@ -360,7 +375,7 @@ export class AuthService {
     const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
     this.em.persist(otpModel);
     await this.em.flush();
-    return { pinId, userUuid: user.uuid };
+    return { status: true, data: { pinId, userUuid: user.uuid } };
   }
 
   async changePassword(
@@ -375,6 +390,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
     await this.em.flush();
+    return { status: true };
   }
 
   async resetPassword({ password }: NewResetPasswordDto, token: string) {
@@ -398,6 +414,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 12);
     user.password = hashedPassword;
     await this.em.flush();
+    return { status: true };
   }
 
   async logout({ accessToken, refreshToken }: LogoutDto) {
@@ -433,5 +450,6 @@ export class AuthService {
       em.persist(blacklistedAccessToken);
       await em.flush();
     });
+    return { status: true };
   }
 }

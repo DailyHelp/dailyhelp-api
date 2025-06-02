@@ -28,8 +28,11 @@ export class VerifyIdentityDto {
 }
 
 export class LoginResponseDto {
-  accessToken: string;
-  expiresIn: number;
-  refreshToken: string;
-  user: Users;
+  status: boolean;
+  data: {
+    accessToken: string;
+    expiresIn: number;
+    refreshToken: string;
+    user: Users;
+  };
 }
