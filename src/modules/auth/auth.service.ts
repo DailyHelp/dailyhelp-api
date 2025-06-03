@@ -299,7 +299,7 @@ export class AuthService {
       case OTPActionType.VERIFY_ACCOUNT:
         user = await this.usersRepository.findOne({ uuid: userUuid });
         user.emailVerified = true;
-        await this.em.flush();
+        return this.login(user);
         break;
       case OTPActionType.RESET_PASSWORD:
         const payload = { id: userUuid };
