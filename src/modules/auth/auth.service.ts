@@ -99,7 +99,7 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string) {
-    const user = await this.usersService.findByEmailOrPhone(email);
+    const user = (await this.usersService.findByEmailOrPhone(email))?.data;
     if (!user) throw new NotFoundException('User not found');
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (passwordMatch) {
@@ -117,7 +117,7 @@ export class AuthService {
           },
           to: user.email,
         });
-        const otpModel = this.otpRepository.create({ otp, pinId });
+        const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
         this.em.persist(otpModel);
         await this.em.flush();
         return { pinId, uuid: user.uuid };
@@ -128,7 +128,7 @@ export class AuthService {
   }
 
   async login(user: any) {
-    if (user.pinId) return user;
+    if (user.pinId) return { status: true, data: user };
     const payload: IAuthContext = {
       email: user.email,
       uuid: user.uuid,

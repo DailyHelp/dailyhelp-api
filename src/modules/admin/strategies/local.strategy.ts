@@ -13,7 +13,7 @@ export class AdminLocalStrategy extends PassportStrategy(
   }
 
   async validate(email: string, password: string) {
-    // const user = await this.service.validateUser(email, password);
-    // return user;
+    const user = await this.service.validateUser(email, password);
+    return user;
   }
 }

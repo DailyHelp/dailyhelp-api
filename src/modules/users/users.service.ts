@@ -34,9 +34,10 @@ export class UsersService {
     } catch (error) {
       username = emailOrPhone;
     } finally {
-      return this.usersRepository.findOne({
+      const user = await this.usersRepository.findOne({
         $or: [{ email: username }, { phone: username }],
       });
+      return { status: true, data: user };
     }
   }
 
@@ -73,5 +74,6 @@ export class UsersService {
     userExists.bvnData = JSON.stringify(bvnResponse.data);
     userExists.ninData = JSON.stringify(ninResponse.data);
     userExists.identityVerified = true;
+    return { status: true };
   }
 }
