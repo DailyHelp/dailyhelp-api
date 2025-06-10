@@ -1,5 +1,6 @@
 import {
   Entity,
+  Enum,
   Filter,
   ManyToOne,
   OneToMany,
@@ -7,6 +8,7 @@ import {
   Property,
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
+import { ReasonCategoryType } from '../../types';
 
 @Filter({
   name: 'notDeleted',
@@ -41,6 +43,9 @@ export class MainCategory extends Timestamp {
   @Property({ nullable: true })
   name: string;
 
+  @Property({ nullable: true })
+  icon: string;
+
   @OneToMany(() => SubCategory, (sc) => sc.mainCategory, {
     lazy: true,
   })
@@ -67,4 +72,24 @@ export class SubCategory extends Timestamp {
     nullable: true,
   })
   mainCategory: MainCategory;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'reason_category' })
+export class ReasonCategory extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @Property({ nullable: true })
+  name: string;
+
+  @Enum({
+    items: () => ReasonCategoryType,
+    nullable: true,
+  })
+  type: ReasonCategoryType;
 }

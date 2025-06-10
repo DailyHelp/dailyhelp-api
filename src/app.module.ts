@@ -11,6 +11,8 @@ import { SharedModule } from './modules/shared/shared.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { AllExceptionsFilter } from './all-exceptions.filter';
+import { AdminModule } from './modules/admin/admin.module';
+import { ListModule } from './modules/lists/lists.module';
 
 @Module({
   imports: [
@@ -23,12 +25,14 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
     SharedModule,
     AuthModule,
     UsersModule,
+    AdminModule,
+    ListModule,
   ],
   controllers: [AppController],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AddCorrelationIdInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
-    { provide: APP_FILTER, useClass: AllExceptionsFilter }
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
 export class AppModule implements NestModule {

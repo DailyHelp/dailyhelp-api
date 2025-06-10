@@ -92,13 +92,14 @@ export class AuthService {
       phone: user.phone,
       phoneVerified: false,
       lastLoggedIn: new Date(),
+      deviceToken: user.deviceToken,
     });
     this.em.persist(userModel);
     await this.em.flush();
     return { status: true, data: { pinId, uuid: userUuid } };
   }
 
-  async validateUser(email: string, password: string) {
+  async validateUser(email: string, password: string, deviceToken: string) {
     const user = (await this.usersService.findByEmailOrPhone(email))?.data;
     if (!user) throw new NotFoundException('User not found');
     const passwordMatch = await bcrypt.compare(password, user.password);
@@ -106,6 +107,7 @@ export class AuthService {
       if (user.deletedAt)
         throw new ForbiddenException('This account is disabled');
       if (!user.emailVerified) {
+        user.deviceToken = deviceToken;
         const pinId = nanoid();
         const otp = generateOtp();
         await this.sharedService.sendOtp(otp, null, {
@@ -300,7 +302,6 @@ export class AuthService {
         user = await this.usersRepository.findOne({ uuid: userUuid });
         user.emailVerified = true;
         return this.login(user);
-        break;
       case OTPActionType.RESET_PASSWORD:
         const payload = { id: userUuid };
         return {

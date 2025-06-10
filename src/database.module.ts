@@ -19,8 +19,8 @@ export class DatabaseModule {
               user: databaseConfig.user,
               password: databaseConfig.password,
               dbName: databaseConfig.name,
-              entitiesTs: ['./src/**/*.entity.ts'],
-              entities: ['./dist/**/*.entity.js'],
+              entitiesTs: ['./src/**/*.entity.ts', './src/**/*.entities.ts'],
+              entities: ['./dist/**/*.entity.js', './dist/**/*.entities.js'],
               discovery: {
                 warnWhenNoEntities: false,
               },

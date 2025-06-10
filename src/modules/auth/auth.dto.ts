@@ -19,6 +19,9 @@ export class SignupStepOneDto {
 
   @IsString()
   password: string;
+
+  @IsString()
+  deviceToken: string;
 }
 
 export class LoginDTO {
@@ -27,6 +30,9 @@ export class LoginDTO {
 
   @IsString()
   password: string;
+
+  @IsString()
+  deviceToken: string;
 }
 
 export class LoginWithGoogleDto {
