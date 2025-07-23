@@ -1,5 +1,5 @@
 import { IsEmail, IsEnum, IsString, Length, ValidateIf } from 'class-validator';
-import { OTPActionType } from 'src/types';
+import { OTPActionType, UserType } from 'src/types';
 
 export class SignupStepOneDto {
   @IsString()
@@ -22,6 +22,9 @@ export class SignupStepOneDto {
 
   @IsString()
   deviceToken: string;
+
+  @IsEnum(UserType)
+  type: UserType;
 }
 
 export class LoginDTO {

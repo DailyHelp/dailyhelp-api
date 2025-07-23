@@ -167,14 +167,71 @@ export default class ReasonCategorySeed implements ISeeder {
         type: ReasonCategoryType.REPORT_CLIENT,
       },
       { name: 'Other', type: ReasonCategoryType.REPORT_CLIENT },
+      {
+        name: 'Not finding the right service',
+        type: [
+          ReasonCategoryType.ACCOUNT_DELETION_CLIENT,
+          ReasonCategoryType.ACCOUNT_DELETION_PROVIDER,
+        ],
+      },
+      {
+        name: 'I have safety or trust concerns',
+        type: [
+          ReasonCategoryType.ACCOUNT_DELETION_CLIENT,
+          ReasonCategoryType.ACCOUNT_DELETION_PROVIDER,
+        ],
+      },
+      {
+        name: "I'm switching platforms",
+        type: [
+          ReasonCategoryType.ACCOUNT_DELETION_CLIENT,
+          ReasonCategoryType.ACCOUNT_DELETION_PROVIDER,
+        ],
+      },
+      {
+        name: 'I have a second account',
+        type: [
+          ReasonCategoryType.ACCOUNT_DELETION_CLIENT,
+          ReasonCategoryType.ACCOUNT_DELETION_PROVIDER,
+        ],
+      },
+      {
+        name: "I'm just taking a break",
+        type: [
+          ReasonCategoryType.ACCOUNT_DELETION_CLIENT,
+          ReasonCategoryType.ACCOUNT_DELETION_PROVIDER,
+        ],
+      },
+      {
+        name: 'Other',
+        type: [
+          ReasonCategoryType.ACCOUNT_DELETION_CLIENT,
+          ReasonCategoryType.ACCOUNT_DELETION_PROVIDER,
+        ],
+      },
     ];
-    const entries = reasons.map((r) =>
-      forkedEm.create(ReasonCategory, {
-        uuid: v4(),
-        name: r.name,
-        type: r.type,
-      }),
-    );
+    const entries: ReasonCategory[] = [];
+    for (const r of reasons) {
+      if (Array.isArray(r.type)) {
+        for (const type of r.type) {
+          entries.push(
+            forkedEm.create(ReasonCategory, {
+              uuid: v4(),
+              name: r.name,
+              type,
+            }),
+          );
+        }
+      } else {
+        entries.push(
+          forkedEm.create(ReasonCategory, {
+            uuid: v4(),
+            name: r.name,
+            type: r.type,
+          }),
+        );
+      }
+    }
     await forkedEm.persistAndFlush(entries);
     console.log('Reason categories seeded');
   }

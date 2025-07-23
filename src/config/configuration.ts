@@ -3,6 +3,7 @@ import { SmtpConfig } from './types/smtp.config';
 import { TermiiConfig } from './types/termii.config';
 import { JwtAuthConfig } from './types/jwt-auth.config';
 import { QoreIDConfig } from './types/qoreid.config';
+import { PaystackConfig } from './types/paystack.config';
 
 export const SmtpConfiguration = registerAs(
   'smtpConfig',
@@ -40,5 +41,13 @@ export const QoreIDConfiguration = registerAs(
     clientId: process.env.QOREID_CLIENT_ID,
     secretKey: process.env.QOREID_SECRET_KEY,
     baseUrl: process.env.QOREID_BASE_URL,
+  }),
+);
+
+export const PaystackConfiguration = registerAs(
+  'paystackConfig',
+  (): PaystackConfig => ({
+    baseUrl: process.env.PAYSTACK_BASE_URL,
+    secretKey: process.env.PAYSTACK_SECRET_KEY,
   }),
 );

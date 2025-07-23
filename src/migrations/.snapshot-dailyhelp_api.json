@@ -406,17 +406,17 @@
         },
         "pictures": {
           "name": "pictures",
-          "type": "text",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "length": null,
-          "mappedType": "text"
+          "mappedType": "unknown"
         },
         "status": {
           "name": "status",
-          "type": "enum('PENDING','ACCEPTED','DECLINED','COUNTERED')",
+          "type": "enum('PENDING','CANCELLED','ACCEPTED','DECLINED','COUNTERED')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
@@ -424,6 +424,7 @@
           "default": "'PENDING'",
           "enumItems": [
             "PENDING",
+            "CANCELLED",
             "ACCEPTED",
             "DECLINED",
             "COUNTERED"
@@ -452,6 +453,26 @@
         },
         "declined_reason_category": {
           "name": "declined_reason_category",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "cancelled_reason": {
+          "name": "cancelled_reason",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "cancelled_reason_category": {
+          "name": "cancelled_reason_category",
           "type": "varchar(255)",
           "unsigned": false,
           "autoincrement": false,
@@ -648,6 +669,145 @@
           "length": null,
           "mappedType": "datetime"
         },
+        "transaction_id": {
+          "name": "transaction_id",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "channel": {
+          "name": "channel",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "type": {
+          "name": "type",
+          "type": "enum('INCOMING','OUTGOING')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "enumItems": [
+            "INCOMING",
+            "OUTGOING"
+          ],
+          "mappedType": "enum"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "enum('NGN')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "'NGN'",
+          "enumItems": [
+            "NGN"
+          ],
+          "mappedType": "enum"
+        }
+      },
+      "name": "payments",
+      "indexes": [
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {},
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
         "name": {
           "name": "name",
           "type": "varchar(255)",
@@ -660,7 +820,7 @@
         },
         "type": {
           "name": "type",
-          "type": "enum('JOB_PROVIDER','OFFER_PROVIDER','DISPUTE_PROVIDER','REPORT_PROVIDER','JOB_CLIENT','OFFER_CLIENT','DISPUTE_CLIENT','REPORT_CLIENT')",
+          "type": "enum('JOB_PROVIDER','OFFER_PROVIDER','DISPUTE_PROVIDER','REPORT_PROVIDER','ACCOUNT_DELETION_PROVIDER','JOB_CLIENT','OFFER_CLIENT','DISPUTE_CLIENT','REPORT_CLIENT','ACCOUNT_DELETION_CLIENT')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
@@ -670,10 +830,12 @@
             "OFFER_PROVIDER",
             "DISPUTE_PROVIDER",
             "REPORT_PROVIDER",
+            "ACCOUNT_DELETION_PROVIDER",
             "JOB_CLIENT",
             "OFFER_CLIENT",
             "DISPUTE_CLIENT",
-            "REPORT_CLIENT"
+            "REPORT_CLIENT",
+            "ACCOUNT_DELETION_CLIENT"
           ],
           "mappedType": "enum"
         }
@@ -1038,6 +1200,16 @@
           "length": 255,
           "mappedType": "string"
         },
+        "provider_address": {
+          "name": "provider_address",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
         "primary_job_role": {
           "name": "primary_job_role",
           "type": "varchar(255)",
@@ -1050,23 +1222,23 @@
         },
         "service_description": {
           "name": "service_description",
-          "type": "varchar(255)",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
-          "length": 255,
-          "mappedType": "string"
+          "length": null,
+          "mappedType": "unknown"
         },
         "service_images": {
           "name": "service_images",
-          "type": "varchar(255)",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
-          "length": 255,
-          "mappedType": "string"
+          "length": null,
+          "mappedType": "unknown"
         },
         "offer_starting_price": {
           "name": "offer_starting_price",
@@ -1137,6 +1309,36 @@
           "nullable": true,
           "length": null,
           "mappedType": "integer"
+        },
+        "user_types": {
+          "name": "user_types",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "provider_onboarding": {
+          "name": "provider_onboarding",
+          "type": "json",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "json"
+        },
+        "utility_bill": {
+          "name": "utility_bill",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
         }
       },
       "name": "users",
@@ -1147,6 +1349,16 @@
           ],
           "composite": false,
           "keyName": "users_default_location_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "provider_address"
+          ],
+          "composite": false,
+          "keyName": "users_provider_address_index",
           "constraint": false,
           "primary": false,
           "unique": false
@@ -1187,6 +1399,19 @@
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
+        "users_provider_address_foreign": {
+          "constraintName": "users_provider_address_foreign",
+          "columnNames": [
+            "provider_address"
+          ],
+          "localTableName": "users",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "locations",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
         "users_primary_job_role_foreign": {
           "constraintName": "users_primary_job_role_foreign",
           "columnNames": [
@@ -1197,132 +1422,6 @@
             "uuid"
           ],
           "referencedTableName": "sub_categories",
-          "deleteRule": "set null",
-          "updateRule": "cascade"
-        }
-      },
-      "nativeEnums": {}
-    },
-    {
-      "columns": {
-        "uuid": {
-          "name": "uuid",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 255,
-          "mappedType": "string"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "datetime",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": null,
-          "default": "CURRENT_TIMESTAMP",
-          "mappedType": "datetime"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "datetime",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": null,
-          "default": "CURRENT_TIMESTAMP",
-          "mappedType": "datetime"
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "datetime",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "length": null,
-          "mappedType": "datetime"
-        },
-        "report_category": {
-          "name": "report_category",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "length": 255,
-          "mappedType": "string"
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "length": null,
-          "mappedType": "text"
-        },
-        "pictures": {
-          "name": "pictures",
-          "type": "text",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "length": null,
-          "mappedType": "text"
-        },
-        "submitted_by": {
-          "name": "submitted_by",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "length": 255,
-          "mappedType": "string"
-        }
-      },
-      "name": "reports",
-      "indexes": [
-        {
-          "columnNames": [
-            "submitted_by"
-          ],
-          "composite": false,
-          "keyName": "reports_submitted_by_index",
-          "constraint": false,
-          "primary": false,
-          "unique": false
-        },
-        {
-          "keyName": "PRIMARY",
-          "columnNames": [
-            "uuid"
-          ],
-          "composite": false,
-          "constraint": true,
-          "primary": true,
-          "unique": true
-        }
-      ],
-      "checks": [],
-      "foreignKeys": {
-        "reports_submitted_by_foreign": {
-          "constraintName": "reports_submitted_by_foreign",
-          "columnNames": [
-            "submitted_by"
-          ],
-          "localTableName": "reports",
-          "referencedColumnNames": [
-            "uuid"
-          ],
-          "referencedTableName": "users",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1405,13 +1504,13 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "length": null,
-          "mappedType": "text"
+          "mappedType": "unknown"
         },
         "lat": {
           "name": "lat",
@@ -1453,6 +1552,19 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
+        },
+        "user_type": {
+          "name": "user_type",
+          "type": "enum('PROVIDER','CUSTOMER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "enumItems": [
+            "PROVIDER",
+            "CUSTOMER"
+          ],
+          "mappedType": "enum"
         }
       },
       "name": "locations",
@@ -1619,23 +1731,23 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "length": null,
-          "mappedType": "text"
+          "mappedType": "unknown"
         },
         "pictures": {
           "name": "pictures",
-          "type": "text",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "length": null,
-          "mappedType": "text"
+          "mappedType": "unknown"
         },
         "code": {
           "name": "code",
@@ -1667,8 +1779,28 @@
           "length": 255,
           "mappedType": "string"
         },
+        "payment": {
+          "name": "payment",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
         "accepted_at": {
           "name": "accepted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
           "type": "datetime",
           "unsigned": false,
           "autoincrement": false,
@@ -1696,6 +1828,19 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
+        },
+        "user_type": {
+          "name": "user_type",
+          "type": "enum('PROVIDER','CUSTOMER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "enumItems": [
+            "PROVIDER",
+            "CUSTOMER"
+          ],
+          "mappedType": "enum"
         }
       },
       "name": "jobs",
@@ -1736,6 +1881,16 @@
           ],
           "composite": false,
           "keyName": "jobs_review_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "payment"
+          ],
+          "composite": false,
+          "keyName": "jobs_payment_index",
           "constraint": false,
           "primary": false,
           "unique": false
@@ -1802,6 +1957,19 @@
             "uuid"
           ],
           "referencedTableName": "job_reviews",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "jobs_payment_foreign": {
+          "constraintName": "jobs_payment_foreign",
+          "columnNames": [
+            "payment"
+          ],
+          "localTableName": "jobs",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "payments",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2195,23 +2363,23 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "length": null,
-          "mappedType": "text"
+          "mappedType": "unknown"
         },
         "pictures": {
           "name": "pictures",
-          "type": "text",
+          "type": "longtext",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "length": null,
-          "mappedType": "text"
+          "mappedType": "unknown"
         },
         "status": {
           "name": "status",
@@ -2237,6 +2405,29 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
+        },
+        "submitted_for": {
+          "name": "submitted_for",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "user_type": {
+          "name": "user_type",
+          "type": "enum('PROVIDER','CUSTOMER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "enumItems": [
+            "PROVIDER",
+            "CUSTOMER"
+          ],
+          "mappedType": "enum"
         }
       },
       "name": "job_disputes",
@@ -2257,6 +2448,16 @@
           ],
           "composite": false,
           "keyName": "job_disputes_submitted_by_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "submitted_for"
+          ],
+          "composite": false,
+          "keyName": "job_disputes_submitted_for_index",
           "constraint": false,
           "primary": false,
           "unique": false
@@ -2293,6 +2494,148 @@
             "submitted_by"
           ],
           "localTableName": "job_disputes",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "job_disputes_submitted_for_foreign": {
+          "constraintName": "job_disputes_submitted_for_foreign",
+          "columnNames": [
+            "submitted_for"
+          ],
+          "localTableName": "job_disputes",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "user": {
+          "name": "user",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "description": {
+          "name": "description",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "user_type": {
+          "name": "user_type",
+          "type": "enum('PROVIDER','CUSTOMER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "enumItems": [
+            "PROVIDER",
+            "CUSTOMER"
+          ],
+          "mappedType": "enum"
+        }
+      },
+      "name": "feedbacks",
+      "indexes": [
+        {
+          "columnNames": [
+            "user"
+          ],
+          "composite": false,
+          "keyName": "feedbacks_user_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "feedbacks_user_foreign": {
+          "constraintName": "feedbacks_user_foreign",
+          "columnNames": [
+            "user"
+          ],
+          "localTableName": "feedbacks",
           "referencedColumnNames": [
             "uuid"
           ],
@@ -2397,6 +2740,17 @@
           "nullable": false,
           "length": 1,
           "default": "true",
+          "mappedType": "boolean"
+        },
+        "blocked": {
+          "name": "blocked",
+          "type": "tinyint(1)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 1,
+          "default": "false",
           "mappedType": "boolean"
         },
         "cancellation_chances": {
@@ -2552,6 +2906,165 @@
           "length": null,
           "mappedType": "datetime"
         },
+        "report_category": {
+          "name": "report_category",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "description": {
+          "name": "description",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "pictures": {
+          "name": "pictures",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "submitted_by": {
+          "name": "submitted_by",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "conversation": {
+          "name": "conversation",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        }
+      },
+      "name": "reports",
+      "indexes": [
+        {
+          "columnNames": [
+            "submitted_by"
+          ],
+          "composite": false,
+          "keyName": "reports_submitted_by_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "conversation"
+          ],
+          "composite": false,
+          "keyName": "reports_conversation_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "reports_submitted_by_foreign": {
+          "constraintName": "reports_submitted_by_foreign",
+          "columnNames": [
+            "submitted_by"
+          ],
+          "localTableName": "reports",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "reports_conversation_foreign": {
+          "constraintName": "reports_conversation_foreign",
+          "columnNames": [
+            "conversation"
+          ],
+          "localTableName": "reports",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "conversations",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
         "conversation": {
           "name": "conversation",
           "type": "varchar(255)",
@@ -2603,6 +3116,21 @@
           "enumItems": [
             "TEXT",
             "OFFER"
+          ],
+          "mappedType": "enum"
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('SENT','DELIVERED','SEEN')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "'SENT'",
+          "enumItems": [
+            "SENT",
+            "DELIVERED",
+            "SEEN"
           ],
           "mappedType": "enum"
         },
@@ -2721,6 +3249,460 @@
             "uuid"
           ],
           "referencedTableName": "offers",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "user": {
+          "name": "user",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        }
+      },
+      "name": "account_deletion_requests",
+      "indexes": [
+        {
+          "columnNames": [
+            "user"
+          ],
+          "composite": false,
+          "keyName": "account_deletion_requests_user_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "account_deletion_requests_user_foreign": {
+          "constraintName": "account_deletion_requests_user_foreign",
+          "columnNames": [
+            "user"
+          ],
+          "localTableName": "account_deletion_requests",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "total_balance": {
+          "name": "total_balance",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "available_balance": {
+          "name": "available_balance",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "user": {
+          "name": "user",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "user_type": {
+          "name": "user_type",
+          "type": "enum('PROVIDER','CUSTOMER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "enumItems": [
+            "PROVIDER",
+            "CUSTOMER"
+          ],
+          "mappedType": "enum"
+        }
+      },
+      "name": "wallets",
+      "indexes": [
+        {
+          "columnNames": [
+            "user"
+          ],
+          "composite": false,
+          "keyName": "wallets_user_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "wallets_user_foreign": {
+          "constraintName": "wallets_user_foreign",
+          "columnNames": [
+            "user"
+          ],
+          "localTableName": "wallets",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "type": {
+          "name": "type",
+          "type": "enum('credit','debit')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "enumItems": [
+            "credit",
+            "debit"
+          ],
+          "mappedType": "enum"
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "wallet": {
+          "name": "wallet",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "job": {
+          "name": "job",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "payment": {
+          "name": "payment",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "remark": {
+          "name": "remark",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "locked": {
+          "name": "locked",
+          "type": "tinyint(1)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 1,
+          "default": "true",
+          "mappedType": "boolean"
+        }
+      },
+      "name": "transactions",
+      "indexes": [
+        {
+          "columnNames": [
+            "wallet"
+          ],
+          "composite": false,
+          "keyName": "transactions_wallet_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "job"
+          ],
+          "composite": false,
+          "keyName": "transactions_job_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "payment"
+          ],
+          "composite": false,
+          "keyName": "transactions_payment_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "transactions_wallet_foreign": {
+          "constraintName": "transactions_wallet_foreign",
+          "columnNames": [
+            "wallet"
+          ],
+          "localTableName": "transactions",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "wallets",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "transactions_job_foreign": {
+          "constraintName": "transactions_job_foreign",
+          "columnNames": [
+            "job"
+          ],
+          "localTableName": "transactions",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "jobs",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "transactions_payment_foreign": {
+          "constraintName": "transactions_payment_foreign",
+          "columnNames": [
+            "payment"
+          ],
+          "localTableName": "transactions",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "payments",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }

@@ -8,7 +8,7 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { Users } from '../users/users.entity';
-import { MessageType, OfferStatus } from '../../types';
+import { Currencies, OfferStatus, PaymentType } from '../../types';
 import { Message } from '../../entities/message.entity';
 
 @Filter({
@@ -46,6 +46,17 @@ export class Conversation extends Timestamp {
   @Property({ default: true })
   restricted: boolean;
 
+  @ManyToOne(() => Users, {
+    fieldName: 'blocked_by',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  blockedBy: Users;
+
+  @Property({ default: false })
+  blocked: boolean;
+
   @Property({ default: 3 })
   cancellationChances: number;
 
@@ -56,6 +67,38 @@ export class Conversation extends Timestamp {
     nullable: true,
   })
   lastMessage: Message;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'payments' })
+export class Payment extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @Property({ nullable: true })
+  transactionId: string;
+
+  @Property({ nullable: true })
+  status: string;
+
+  @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  amount: number;
+
+  @Property({ nullable: true })
+  channel: string;
+
+  @Property({ type: 'longtext', nullable: true })
+  metadata: string;
+
+  @Enum({ items: () => PaymentType })
+  type: PaymentType;
+
+  @Enum({ items: () => Currencies, default: Currencies.NGN })
+  currency: Currencies;
 }
 
 @Filter({
@@ -74,7 +117,7 @@ export class Offer extends Timestamp {
   @Property({ nullable: true })
   description: string;
 
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'longtext', nullable: true })
   pictures: string;
 
   @Enum({ items: () => OfferStatus, default: OfferStatus.PENDING })
@@ -95,6 +138,12 @@ export class Offer extends Timestamp {
   declinedReasonCategory: string;
 
   @Property({ nullable: true })
+  cancelledReason: string;
+
+  @Property({ nullable: true })
+  cancelledReasonCategory: string;
+
+  @Property({ nullable: true })
   counterReason: string;
 }
 
@@ -111,10 +160,10 @@ export class Report extends Timestamp {
   @Property({ nullable: true })
   reportCategory: string;
 
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'longtext', nullable: true })
   description: string;
 
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'longtext', nullable: true })
   pictures: string;
 
   @ManyToOne(() => Users, {
@@ -124,4 +173,12 @@ export class Report extends Timestamp {
     nullable: true,
   })
   submittedBy: Users;
+
+  @ManyToOne(() => Conversation, {
+    fieldName: 'conversation',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  conversation: Conversation;
 }

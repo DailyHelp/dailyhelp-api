@@ -1,14 +1,18 @@
 import {
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsNumberString,
   IsOptional,
   IsString,
+  Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Users } from './users.entity';
 import { Type } from 'class-transformer';
 import { PaginationInput } from 'src/base/dto';
+import { PaymentPurpose, UserType } from 'src/types';
 
 export class VerifyIdentityDto {
   @IsString()
@@ -60,13 +64,20 @@ export class SaveLocationDto {
   description: string;
 
   @IsNumber()
+  @IsOptional()
   lat: number;
 
   @IsNumber()
+  @IsOptional()
   lng: number;
 
   @IsBoolean()
+  @IsOptional()
   default: boolean;
+
+  @IsString()
+  @IsOptional()
+  utilityBill: string;
 }
 
 export class SavePricesDto {
@@ -75,6 +86,17 @@ export class SavePricesDto {
 
   @IsNumber()
   minimumOfferPrice: number;
+}
+
+export class SaveProviderDetails {
+  @IsString()
+  subCategoryUuid: string;
+
+  @IsString()
+  serviceDescription: string;
+
+  @IsString()
+  serviceImages: string;
 }
 
 export class PriceFilter {
@@ -138,6 +160,23 @@ export class ClientDashboardQuery {
   pagination?: PaginationInput;
 }
 
+export class DisputeFilter {
+  @IsString()
+  @IsOptional()
+  status?: string;
+}
+
+export class DisputeQuery {
+  @ValidateNested()
+  @Type(() => DisputeFilter)
+  @IsOptional()
+  filter?: DisputeFilter;
+
+  @ValidateNested()
+  @Type(() => PaginationInput)
+  pagination?: PaginationInput;
+}
+
 export class PaginationQuery {
   @ValidateNested()
   @Type(() => PaginationInput)
@@ -153,4 +192,69 @@ export class SendOfferDto {
 
   @IsString({ each: true })
   attachments: string[];
+}
+
+export class SendMessageDto {
+  @IsString()
+  message: string;
+}
+
+export class ReportConversationDto {
+  @IsString()
+  reportCategory: string;
+
+  @IsString()
+  description: string;
+
+  @IsString({ each: true })
+  pictures: string[];
+}
+
+export class CancelOfferDto {
+  @IsString()
+  reason: string;
+
+  @IsString()
+  reasonCategory: string;
+}
+
+export class PaymentInfo {
+  @IsString()
+  @ValidateIf((p) => p.purpose === PaymentPurpose.JOB_OFFER)
+  offerUuid: string;
+
+  @IsString()
+  @ValidateIf((p) => p.purpose === PaymentPurpose.JOB_OFFER)
+  description: string;
+
+  @IsNumber()
+  @Min(1)
+  @ValidateIf((p) => p.purpose === PaymentPurpose.FUND_WALLET)
+  amount: number;
+
+  @IsEnum(PaymentPurpose)
+  purpose: PaymentPurpose;
+}
+
+export class SwitchUserType {
+  @IsEnum(UserType)
+  userType: UserType;
+}
+
+export class FeedbackDto {
+  @IsString()
+  title: string;
+
+  @IsString()
+  description: string;
+}
+
+export class CreateDeletionRequestDto {
+  @IsString()
+  reason: string;
+}
+
+export class ConfirmDeletionRequestDto {
+  @IsString()
+  password: string;
 }

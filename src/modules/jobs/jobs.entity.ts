@@ -8,9 +8,10 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { Users } from '../users/users.entity';
-import { JobStatus } from '../../types';
+import { JobStatus, UserType } from '../../types';
 import { JobDispute } from './job-dispute.entity';
 import { JobReview } from '../../entities/job-review.entity';
+import { Payment } from '../conversations/conversations.entity';
 
 @Filter({
   name: 'notDeleted',
@@ -53,10 +54,10 @@ export class Job extends Timestamp {
   @Property({ nullable: true })
   endDate: Date;
 
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'longtext', nullable: true })
   description: string;
 
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'longtext', nullable: true })
   pictures: string;
 
   @Property({ nullable: true })
@@ -75,11 +76,23 @@ export class Job extends Timestamp {
     referenceColumnName: 'uuid',
     columnType: 'varchar(255)',
     nullable: true,
+    eager: true,
   })
   review: JobReview;
 
+  @ManyToOne(() => Payment, {
+    fieldName: 'payment',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  payment: Payment;
+
   @Property({ nullable: true })
   acceptedAt: Date;
+
+  @Property({ nullable: true })
+  cancelledAt: Date;
 
   @Property({ nullable: true })
   cancellationReason: string;

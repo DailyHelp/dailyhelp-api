@@ -13,6 +13,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { AdminModule } from './modules/admin/admin.module';
 import { ListModule } from './modules/lists/lists.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ListModule } from './modules/lists/lists.module';
     UsersModule,
     AdminModule,
     ListModule,
+    WalletModule,
   ],
   controllers: [AppController],
   providers: [

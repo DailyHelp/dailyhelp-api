@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { LocalStrategy } from 'src/strategies/local.strategy';
 import { JwtStrategy } from 'src/strategies/jwt.strategy';
 import { AuthController } from './auth.controller';
+import { Wallet } from '../wallet/wallet.entity';
 
 @Module({
   imports: [
@@ -21,12 +22,12 @@ import { AuthController } from './auth.controller';
       imports: [ConfigModule.forFeature(JwtAuthConfiguration)],
       useFactory: (jwtAuthConfig: ConfigType<typeof JwtAuthConfiguration>) => ({
         secret: jwtAuthConfig.secretKey,
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '24h' },
       }),
       inject: [JwtAuthConfiguration.KEY],
     }),
     MikroOrmModule.forFeature({
-      entities: [Users, OTP, BlacklistedTokens],
+      entities: [Users, OTP, BlacklistedTokens, Wallet],
     }),
     SharedModule,
   ],

@@ -2,7 +2,7 @@ import { Entity, Enum, Filter, ManyToOne, PrimaryKey, Property } from "@mikro-or
 import { Timestamp } from "../base/timestamp.entity";
 import { Conversation, Offer } from "../modules/conversations/conversations.entity";
 import { Users } from "../modules/users/users.entity";
-import { MessageType } from "../types";
+import { MessageStatus, MessageType } from "../types";
 
 @Filter({
   name: 'notDeleted',
@@ -43,6 +43,9 @@ export class Message extends Timestamp {
 
   @Enum({ items: () => MessageType, default: MessageType.TEXT })
   type: MessageType;
+
+  @Enum({ items: () => MessageStatus, default: MessageStatus.SENT })
+  status: MessageStatus;
 
   @ManyToOne(() => Offer, {
     fieldName: 'offer',

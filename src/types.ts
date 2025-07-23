@@ -19,6 +19,11 @@ export enum JobStatus {
   CANCELED = 'CANCELED',
 }
 
+export enum PaymentPurpose {
+  JOB_OFFER = 'JOB_OFFER',
+  FUND_WALLET = 'FUND_WALLET',
+}
+
 export enum DisputeStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -30,10 +35,12 @@ export enum ReasonCategoryType {
   OFFER_PROVIDER = 'OFFER_PROVIDER',
   DISPUTE_PROVIDER = 'DISPUTE_PROVIDER',
   REPORT_PROVIDER = 'REPORT_PROVIDER',
+  ACCOUNT_DELETION_PROVIDER = 'ACCOUNT_DELETION_PROVIDER',
   JOB_CLIENT = 'JOB_CLIENT',
   OFFER_CLIENT = 'OFFER_CLIENT',
   DISPUTE_CLIENT = 'DISPUTE_CLIENT',
   REPORT_CLIENT = 'REPORT_CLIENT',
+  ACCOUNT_DELETION_CLIENT = 'ACCOUNT_DELETION_CLIENT',
 }
 
 export enum MessageType {
@@ -41,16 +48,42 @@ export enum MessageType {
   OFFER = 'OFFER',
 }
 
+export enum MessageStatus {
+  SENT = 'SENT',
+  DELIVERED = 'DELIVERED',
+  SEEN = 'SEEN',
+}
+
 export enum OfferStatus {
   PENDING = 'PENDING',
+  CANCELLED = 'CANCELLED',
   ACCEPTED = 'ACCEPTED',
   DECLINED = 'DECLINED',
   COUNTERED = 'COUNTERED',
 }
 
+export enum PaymentType {
+  INCOMING = 'INCOMING',
+  OUTGOING = 'OUTGOING',
+}
+
+export enum TransactionType {
+  CREDIT = 'credit',
+  DEBIT = 'debit',
+}
+
+export enum Currencies {
+  NGN = 'NGN',
+}
+
 export enum OrderDir {
   ASC = 'ASC',
   DESC = 'DESC',
+}
+
+export enum UserType {
+  PROVIDER = 'PROVIDER',
+  CUSTOMER = 'CUSTOMER',
 }
 
 export interface IEmailDto {
@@ -69,10 +102,17 @@ export interface IAuthContext {
   firstname: string;
   lastname: string;
   phone: string;
+  userType: UserType;
 }
 
 export interface IAdminAuthContext {
   name: string;
   email: string;
   uuid: string;
+}
+
+export interface IProviderOnboarding {
+  step1: boolean;
+  step2: boolean;
+  step3: boolean;
 }

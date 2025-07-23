@@ -1,5 +1,6 @@
 import {
   Entity,
+  Enum,
   Filter,
   ManyToOne,
   PrimaryKey,
@@ -7,6 +8,7 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../base/timestamp.entity';
 import { Users } from '../modules/users/users.entity';
+import { UserType } from '../types';
 
 @Filter({
   name: 'notDeleted',
@@ -27,7 +29,7 @@ export class Location extends Timestamp {
   @Property({ nullable: true })
   lga: string;
 
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'longtext', nullable: true })
   description: string;
 
   @Property({ nullable: true })
@@ -46,4 +48,7 @@ export class Location extends Timestamp {
     nullable: true,
   })
   user: Users;
+
+  @Enum({ items: () => UserType })
+  userType: UserType;
 }

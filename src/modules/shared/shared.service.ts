@@ -117,13 +117,3 @@ export class SharedService {
     return accessToken;
   }
 }
-
-// lagos
-// osun
-// ogun
-// ondo
-// ekiti
-// kwara
-// edo
-// fct
-// oyo

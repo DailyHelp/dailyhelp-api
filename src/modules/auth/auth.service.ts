@@ -28,10 +28,11 @@ import bcrypt from 'bcryptjs';
 import { v4 } from 'uuid';
 import { nanoid } from 'nanoid';
 import { generateOtp } from 'src/utils';
-import { IAuthContext, OTPActionType } from 'src/types';
+import { IAuthContext, OTPActionType, UserType } from 'src/types';
 import axios from 'axios';
 import * as jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
+import { Wallet } from '../wallet/wallet.entity';
 
 @Injectable()
 export class AuthService {
@@ -43,6 +44,8 @@ export class AuthService {
     private readonly otpRepository: EntityRepository<OTP>,
     @InjectRepository(BlacklistedTokens)
     private readonly blacklistedTokensRepository: EntityRepository<BlacklistedTokens>,
+    @InjectRepository(Wallet)
+    private readonly walletRepository: EntityRepository<Wallet>,
     private readonly sharedService: SharedService,
     private readonly jwtService: JwtService,
     @Inject(JwtAuthConfiguration.KEY)
@@ -93,8 +96,17 @@ export class AuthService {
       phoneVerified: false,
       lastLoggedIn: new Date(),
       deviceToken: user.deviceToken,
+      userTypes: user.type,
+    });
+    const walletModel = this.walletRepository.create({
+      uuid: v4(),
+      totalBalance: 0,
+      availableBalance: 0,
+      user: this.usersRepository.getReference(userUuid),
+      userType: user.type
     });
     this.em.persist(userModel);
+    this.em.persist(walletModel);
     await this.em.flush();
     return { status: true, data: { pinId, uuid: userUuid } };
   }
@@ -129,7 +141,7 @@ export class AuthService {
     throw new UnauthorizedException('Invalid details');
   }
 
-  async login(user: any) {
+  async login(user: Partial<Users> & { pinId?: string }) {
     if (user.pinId) return { status: true, data: user };
     const payload: IAuthContext = {
       email: user.email,
@@ -137,11 +149,12 @@ export class AuthService {
       firstname: user.firstname,
       lastname: user.lastname,
       phone: user.phone,
+      userType: user.userTypes.split(',')[0] as UserType,
     };
     const userModel = await this.usersRepository.findOne({ uuid: user.uuid });
     userModel.lastLoggedIn = new Date();
     await this.em.flush();
-    const clonedUser = { ...user };
+    const clonedUser = { ...user, primaryJobRole: user.primaryJobRole?.name };
     delete clonedUser.password;
     delete clonedUser.createdAt;
     delete clonedUser.updatedAt;
@@ -149,9 +162,9 @@ export class AuthService {
       status: true,
       data: {
         accessToken: this.jwtService.sign(payload),
-        expiresIn: 1.2e6,
+        expiresIn: 8.64e7,
         refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
-        user,
+        user: clonedUser,
       },
     };
   }
@@ -181,6 +194,7 @@ export class AuthService {
       firstname: user.firstname,
       lastname: user.lastname,
       phone: user.phone,
+      userType: user.userTypes.split(',')[0] as UserType,
     };
     return {
       status: true,
@@ -236,6 +250,7 @@ export class AuthService {
       firstname: user.firstname,
       lastname: user.lastname,
       phone: user.phone,
+      userType: user.userTypes.split(',')[0] as UserType,
     };
     return {
       status: true,
