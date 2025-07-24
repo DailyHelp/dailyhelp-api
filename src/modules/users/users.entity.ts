@@ -124,18 +124,15 @@ export class Users extends Timestamp {
   tier: AccountTier;
 
   @Enum({ items: () => AccountTier, default: AccountTier.BRONZE })
-  eligibleTier: AccountTier;
-
-  @Enum({ items: () => AccountTier, default: AccountTier.BRONZE })
   nextTier: AccountTier;
 
   @Property({ nullable: true })
   avgRating: number;
 
-  @Property({ nullable: true })
+  @Property({ nullable: true, default: 0 })
   completedJobs: number;
 
-  @Property({ nullable: true })
+  @Property({ nullable: true, default: 0 })
   ratedCompletedJobs: number;
 
   @Property({ nullable: true })

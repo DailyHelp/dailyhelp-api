@@ -29,6 +29,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/schedule": "^6.0.0",
     "@nestjs/schematics": "^11.0.5",
     "@nestjs/swagger": "^11.1.6",
     "@types/dotenv": "^6.1.1",

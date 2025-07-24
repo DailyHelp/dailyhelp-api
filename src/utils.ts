@@ -49,3 +49,11 @@ export const buildResponseDataWithPagination = <T>(
     },
   };
 };
+
+export const appendCondition = (sql: string, params: any[], value?: any) => {
+  if (value !== undefined && value !== null && value !== '') {
+    params.push(value);
+    return `${sql} ?`;
+  }
+  return '';
+};

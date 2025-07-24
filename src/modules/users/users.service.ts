@@ -1,4 +1,9 @@
-import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
+import {
+  Connection,
+  EntityManager,
+  EntityRepository,
+  FilterQuery,
+} from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
@@ -49,7 +54,11 @@ import { ConfigType } from '@nestjs/config';
 import { v4 } from 'uuid';
 import { Location } from 'src/entities/location.entity';
 import { PaginationInput } from 'src/base/dto';
-import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
+import {
+  appendCondition,
+  buildResponseDataWithPagination,
+  generateOtp,
+} from 'src/utils';
 import {
   Conversation,
   Offer,
@@ -291,20 +300,12 @@ export class UsersService {
   async fetchProviderDashboard({ uuid }: IAuthContext) {
     const user = await this.usersRepository.findOne({ uuid });
     if (!user) throw new NotFoundException('User not found');
+
     return { status: true, data: { user } };
   }
 
-  async fetchClientDashboard(
-    pagination: PaginationInput,
-    filter: ClientDashboardFilter,
-    { uuid }: IAuthContext,
-  ) {
-    const user = await this.usersRepository.findOne({ uuid });
-    if (!user) throw new NotFoundException(`User not found`);
-    const { page = 1, limit = 20 } = pagination;
-    const search = filter?.search?.toLowerCase().trim() ?? '';
-    const hasLocation = user.defaultLocation?.lat && user.defaultLocation?.lng;
-    const topRatedProviders = await this.em.getConnection().execute(`
+  async fetchTopRatedProviders(conn: Connection) {
+    const topRatedProviders = await conn.execute(`
       SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
       u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
       u.tier, u.picture, u.service_images
@@ -327,30 +328,30 @@ export class UsersService {
       u.last_logged_in DESC
       LIMIT 10
     `);
-    const topRatedUuids = topRatedProviders.map((u) => `'${u.uuid}'`).join(',');
-    const recommendedProviders = await this.em.getConnection().execute(`
+    return topRatedProviders;
+  }
+
+  async fetchRecommendedProviders(
+    conn: Connection,
+    locationSelect: string,
+    topRatedPlaceholders: string,
+    hasLocation: boolean,
+    lat: number,
+    lng: number,
+    topRatedUuids: string[],
+  ) {
+    const recommendedProviders = await conn.execute(
+      `
       SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
       u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
       u.tier, u.picture, u.service_images,
-      ${
-        hasLocation
-          ? `
-        (
-          6371 * acos(
-            cos(radians(${user.defaultLocation?.lat}))
-            * cos(radians(l.latitude))
-            * cos(radians(l.longitude) - radians(${user.defaultLocation?.lng}))
-            + sin(radians(${user.defaultLocation?.lat})) * sin(radians(l.latitude))
-          )
-        ) AS distance`
-          : 'NULL AS distance'
-      }
+      ${locationSelect}
       FROM users u
       LEFT JOIN locations l ON l.uuid = u.default_location
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
       WHERE u.availability = true
-      AND u.uuid NOT IN (${topRatedUuids})
+      ${topRatedPlaceholders ? `AND u.uuid NOT IN (${topRatedPlaceholders})` : ''}
       GROUP BY u.uuid
       ORDER BY (
         (u.avg_rating * 2) +
@@ -367,68 +368,182 @@ export class UsersService {
       ) DESC,
       u.last_logged_in DESC
       LIMIT 10 
-    `);
-    const recommendedUuids = recommendedProviders
-      .map((u) => `'${u.uuid}'`)
-      .join(',');
-    const allProviders = await this.em.getConnection().execute(`
-      SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
-      u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
-      COUNT(jr.uuid) as totalRatings, u.tier, u.picture, u.service_images,
-      ${
-        hasLocation
-          ? `
-        (
-          6371 * acos(
-            cos(radians(${user.defaultLocation?.lat}))
-            * cos(radians(l.latitude))
-            * cos(radians(l.longitude) - radians(${user.defaultLocation?.lng}))
-            + sin(radians(${user.defaultLocation?.lat})) * sin(radians(l.latitude))
-          )
-        ) AS distance`
-          : 'NULL AS distance'
-      }
+    `,
+      hasLocation ? [lat, lng, lat, ...topRatedUuids] : [...topRatedUuids],
+    );
+    return recommendedProviders;
+  }
+
+  async fetchAllProviders(
+    conn: Connection,
+    locationSelect: string,
+    hasLocation: boolean,
+    notInPlaceholders: string,
+    filtersSql: string,
+    allProvidersParams: any[],
+  ) {
+    const baseProvidersQuery = `
       FROM users u
-      LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
+      LEFT JOIN sub_categories r ON u.primary_job_role = r.uuid
       LEFT JOIN main_categories mc ON r.main_category = mc.uuid
-      LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
-      LEFT JOIN job_reviews jr on jr.reviewed_for = u.uuid
-      LEFT JOIN locations l on l.uuid = u.default_location
-      WHERE u.availability = true AND u.service_description IS NOT NULL AND u.primary_job_role IS NOT NULL
-      AND u.offer_starting_price iS NOT NULL 
-      AND u.uuid NOT IN (${topRatedUuids}, ${recommendedUuids})
-      ${filter?.mainCategory ? `AND mc.uuid = '${filter.mainCategory}'` : ''}
-      ${filter?.subCategory ? `AND u.primary_job_role = '${filter.subCategory}'` : ''}
-      ${filter?.priceRange?.minPrice ? `AND u.offer_starting_price >= ${filter.priceRange.minPrice}` : ''}
-      ${filter?.priceRange?.maxPrice ? `AND u.offer_starting_price <= ${filter.priceRange.maxPrice}` : ''}
-      ${filter?.minRating ? `AND u.avg_rating >= ${filter.minRating}` : ''}
-      ${filter?.address ? `AND LOWER(l.address) LIKE LOWER('%${filter.address}%')` : ''}
-      ${
-        search
-          ? `
-        AND (
-          LOWER(u.firstname) LIKE '%${search}%' OR
-          LOWER(u.lastname) LIKE '%${search}%' OR
-          LOWER(u.middlename) LIKE '%${search}%' OR
-          LOWER(mc.name) LIKE '%${search}%' OR
-          LOWER(r.name) LIKE '%${search}%' OR
-          LOWER(l.address) LIKE '%${search}%' OR
-          u.avg_rating LIKE '%${search}%' OR
-          u.offer_starting_price LIKE '%${search}%' OR
-          LOWER(u.email) LIKE '%${search}%' OR
-          u.phone LIKE '%${search}%' OR
-          LOWER(u.gender) LIKE '%${search}%'
-        )
-        `
-          : ''
-      }
+      LEFT JOIN jobs j ON j.service_provider = u.uuid AND j.status = 'completed'
+      LEFT JOIN job_reviews jr ON jr.reviewed_for = u.uuid
+      LEFT JOIN locations l ON l.uuid = u.default_location
+      WHERE u.availability = true
+        AND u.service_description IS NOT NULL
+        AND u.primary_job_role IS NOT NULL
+        AND u.offer_starting_price IS NOT NULL
+        ${notInPlaceholders ? `AND u.uuid NOT IN (${notInPlaceholders})` : ''}
+        ${filtersSql}
+    `;
+    const providersDataQuery = `
+      SELECT
+        u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating,
+        u.service_description as serviceDescription, r.name as primaryJobRole,
+        u.offer_starting_price as offerStartingPrice, u.availability, u.engaged,
+        COUNT(j.uuid) as completedJobs, COUNT(jr.uuid) as totalRatings,
+        u.tier, u.picture, u.service_images,
+        ${locationSelect}
+      ${baseProvidersQuery}
       GROUP BY u.uuid
       ORDER BY ${hasLocation ? 'distance ASC,' : ''} RAND()
-      LIMIT ${limit} OFFSET ${(page - 1) * limit}
-    `);
+      LIMIT ? OFFSET ?
+    `;
+    const providersCountQuery = `
+      SELECT COUNT(*) AS total FROM (
+        SELECT u.uuid
+        ${baseProvidersQuery}
+        GROUP BY u.uuid
+      ) AS count_subquery
+    `;
+    return Promise.all([
+      conn.execute(providersDataQuery, allProvidersParams),
+      conn.execute(
+        providersCountQuery,
+        allProvidersParams.slice(0, allProvidersParams.length - 2),
+      ),
+    ]);
+  }
+
+  async fetchClientDashboard(
+    pagination: PaginationInput,
+    filter: ClientDashboardFilter,
+    { uuid }: IAuthContext,
+  ) {
+    const user = await this.usersRepository.findOne({
+      uuid,
+    });
+    if (!user) throw new NotFoundException(`User not found`);
+    const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
+    const search = filter?.search?.toLowerCase().trim() ?? '';
+    const hasLocation =
+      user.defaultLocation?.lat != null && user.defaultLocation?.lng != null;
+    const conn = this.em.getConnection();
+    const topRatedProviders = await this.fetchTopRatedProviders(conn);
+    const topRatedUuids: string[] = topRatedProviders.map(
+      (u: { uuid: string }) => u.uuid,
+    );
+    const topRatedPlaceholders: string = topRatedUuids.length
+      ? topRatedUuids.map(() => '?').join(', ')
+      : null;
+    const locationSelect = hasLocation
+      ? `
+        (
+          6371 * acos(
+            cos(radians(?)) * cos(radians(l.latitude)) *
+            cos(radians(l.longitude) - radians(?)) +
+            sin(radians(?)) * sin(radians(l.latitude))
+          )
+        ) AS distance`
+      : 'NULL AS distance';
+    const recommendedProviders = await this.fetchRecommendedProviders(
+      conn,
+      locationSelect,
+      topRatedPlaceholders,
+      hasLocation,
+      user.defaultLocation?.lat,
+      user.defaultLocation?.lng,
+      topRatedUuids,
+    );
+    const recommendedUuids = recommendedProviders.map(
+      (u: { uuid: string }) => u.uuid,
+    );
+    const notInUuids = [...topRatedUuids, ...recommendedUuids];
+    const notInPlaceholders = notInUuids.length
+      ? notInUuids.map(() => '?').join(', ')
+      : null;
+    const allProvidersParams: any[] = [];
+    let allProvidersFiltersSql = '';
+    allProvidersFiltersSql += appendCondition(
+      'AND mc.uuid =',
+      allProvidersParams,
+      filter?.mainCategory,
+    );
+    allProvidersFiltersSql += appendCondition(
+      'AND u.primary_job_role =',
+      allProvidersParams,
+      filter?.subCategory,
+    );
+    allProvidersFiltersSql += appendCondition(
+      'AND u.offer_starting_price >=',
+      allProvidersParams,
+      filter?.priceRange?.minPrice,
+    );
+    allProvidersFiltersSql += appendCondition(
+      'AND u.offer_starting_price <=',
+      allProvidersParams,
+      filter?.priceRange?.maxPrice,
+    );
+    allProvidersFiltersSql += appendCondition(
+      'AND u.avg_rating >=',
+      allProvidersParams,
+      filter?.minRating,
+    );
+    allProvidersFiltersSql += appendCondition(
+      'AND LOWER(l.address) LIKE LOWER',
+      allProvidersParams,
+      filter?.address ? `%${filter?.address}%` : undefined,
+    );
+    if (search) {
+      allProvidersParams.push(...Array(11).fill(`%${search.toLowerCase()}%`));
+      allProvidersFiltersSql += `
+        AND (
+          LOWER(u.firstname) LIKE ? OR LOWER(u.lastname) LIKE ? OR LOWER(u.middlename) LIKE ? OR
+          LOWER(mc.name) LIKE ? OR LOWER(r.name) LIKE ? OR LOWER(l.address) LIKE ? OR
+          u.avg_rating LIKE ? OR u.offer_starting_price LIKE ? OR LOWER(u.email) LIKE ? OR
+          u.phone LIKE ? OR LOWER(u.gender) LIKE ?
+        )
+      `;
+    }
+    allProvidersParams.push(...notInUuids);
+    if (hasLocation) {
+      allProvidersParams.push(
+        user.defaultLocation?.lat,
+        user.defaultLocation?.lng,
+        user.defaultLocation?.lat,
+      );
+    }
+    allProvidersParams.push(Number(limit), Number(offset));
+    const [allProviders, totalProviders] = await this.fetchAllProviders(
+      conn,
+      locationSelect,
+      hasLocation,
+      notInPlaceholders,
+      allProvidersFiltersSql,
+      allProvidersParams,
+    );
     return {
       status: true,
-      data: { topRatedProviders, recommendedProviders, allProviders },
+      data: {
+        topRatedProviders,
+        recommendedProviders,
+        allProviders: buildResponseDataWithPagination(
+          allProviders,
+          totalProviders[0].total,
+          { page, limit },
+        ),
+      },
     };
   }
 
@@ -1086,6 +1201,7 @@ export class UsersService {
     });
     if (!deletionRequest)
       throw new NotFoundException('Account deletion request not found');
+    user.deletedAt = new Date();
     deletionRequest.confirmedAt = new Date();
     await Promise.all([
       this.em.nativeUpdate(

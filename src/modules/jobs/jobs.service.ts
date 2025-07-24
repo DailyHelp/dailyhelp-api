@@ -103,11 +103,16 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.IN_PROGRESS)
       throw new ForbiddenException(`This job is not endable`);
-    const conversation = await this.conversationRepository.findOne({
-      serviceRequestor: { uuid },
-      serviceProvider: { uuid: job.serviceProvider?.uuid },
-    });
+    const [conversation, provider] = await Promise.all([
+      this.conversationRepository.findOne({
+        serviceRequestor: { uuid },
+        serviceProvider: { uuid: job.serviceProvider?.uuid },
+      }),
+      this.usersRepository.findOne({ uuid: job.serviceProvider?.uuid }),
+    ]);
     if (!conversation) throw new NotFoundException(`Conversation not found`);
+    if (!provider) throw new NotFoundException(`Provider not found`);
+    provider.completedJobs += provider.completedJobs;
     conversation.restricted = true;
     job.status = JobStatus.COMPLETED;
     const jobTimelineModel = this.jobTimelineRepository.create({
@@ -129,6 +134,7 @@ export class JobService {
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Payment',
       locked: true,
+      lockedAt: new Date(),
     });
     this.em.persist(transactionModel);
     this.em.persist(jobTimelineModel);
@@ -196,6 +202,10 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.COMPLETED)
       throw new ForbiddenException(`This job is not reviewable`);
+    const provider = await this.usersRepository.findOne({
+      uuid: job.serviceProvider?.uuid,
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
     const reviewUuid = v4();
     const jobReviewModel = this.jobReviewRepository.create({
       uuid: reviewUuid,
@@ -246,6 +256,49 @@ export class JobService {
       this.em.persist(requestorTransactionModel);
     }
     await this.em.flush();
+    const providerProgress = await this.em.getConnection().execute(`
+      SELECT
+        u.uuid,
+        u.tier AS currentTier,
+        COUNT(j.uuid) AS ratedCompletedJobs,
+        ROUND(AVG(r.rating), 2) AS avgRating,
+
+        CASE
+          WHEN COUNT(j.uuid) >= 200 AND AVG(r.rating) >= 4 THEN 'PLATINUM'
+          WHEN COUNT(j.uuid) >= 50 AND AVG(r.rating) >= 4 THEN 'GOLD'
+          WHEN COUNT(j.uuid) >= 15 AND AVG(r.rating) >= 4 THEN 'SILVER'
+          ELSE 'BRONZE'
+        END AS eligibleTier,
+
+        CASE 
+          WHEN u.tier = 'BRONZE' AND AVG(r.rating) >= 4 THEN
+            CONCAT(LEAST(ROUND(100 * COUNT(j.uuid) / 15, 0), 100), '%')
+          WHEN u.tier = 'SILVER' AND AVG(r.rating) >= 4 THEN
+            CONCAT(LEAST(ROUND(100 * (COUNT(j.uuid) - 15) / (50 - 15), 0), 100), '%')
+          WHEN u.tier = 'GOLD' AND AVG(r.rating) >= 4 THEN
+            CONCAT(LEAST(ROUND(100 * (COUNT(j.uuid) - 50) / (200 - 50), 0), 100), '%')
+          ELSE '0%'
+        END AS progressToNextTier,
+
+        CASE 
+          WHEN u.tier = 'BRONZE' THEN 'SILVER'
+          WHEN u.tier = 'SILVER' THEN 'GOLD'
+          WHEN u.tier = 'GOLD' THEN 'PLATINUM'
+          ELSE NULL
+        END AS nextTier
+
+      FROM users u
+      LEFT JOIN jobs j ON j.service_provider = u.uuid AND j.status = 'completed'
+      LEFT JOIN job_reviews r ON r.job = j.uuid AND r.reviewed_for = u.uuid
+      WHERE u.uuid = '${job.serviceProvider?.uuid}'
+      GROUP BY u.uuid, u.tier;
+    `);
+    provider.tier = providerProgress[0].eligibleTier;
+    provider.ratedCompletedJobs = providerProgress[0].ratedCompletedJobs;
+    provider.avgRating = providerProgress[0].avgRating;
+    provider.progressToNextTier = providerProgress[0].progressToNextTier;
+    provider.nextTier = providerProgress[0].nextTier;
+    this.em.flush();
     return { status: true };
   }
 
@@ -261,13 +314,18 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.IN_PROGRESS)
       throw new ForbiddenException(`This job is not disputable`);
-    const conversation = await this.conversationRepository.findOne({
-      serviceRequestor: { uuid },
-      serviceProvider: { uuid: job.serviceProvider?.uuid },
-    });
+    const [conversation, provider] = await Promise.all([
+      this.conversationRepository.findOne({
+        serviceRequestor: { uuid },
+        serviceProvider: { uuid: job.serviceProvider?.uuid },
+      }),
+      this.usersRepository.findOne({ uuid: job.serviceProvider?.uuid }),
+    ]);
     if (!conversation) throw new NotFoundException(`Conversation not found`);
+    if (!provider) throw new NotFoundException(`Provider not found`);
+    provider.completedJobs += provider.completedJobs;
     conversation.restricted = true;
-    job.status = JobStatus.COMPLETED;
+    job.status = JobStatus.DISPUTED;
     const disputeModel = this.jobDisputeRepository.create({
       uuid: v4(),
       job: this.jobRepository.getReference(jobUuid),

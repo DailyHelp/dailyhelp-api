@@ -14,6 +14,7 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 import { AdminModule } from './modules/admin/admin.module';
 import { ListModule } from './modules/lists/lists.module';
 import { WalletModule } from './modules/wallet/wallet.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
       envFilePath: '.env',
     }),
     DatabaseModule.forRoot(),
+    ScheduleModule.forRoot(),
     SharedModule,
     AuthModule,
     UsersModule,

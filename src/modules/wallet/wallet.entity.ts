@@ -85,4 +85,10 @@ export class Transaction extends Timestamp {
 
   @Property({ default: true })
   locked: boolean;
+
+  @Property({ nullable: true })
+  lockedAt: Date;
+
+  @Property({ nullable: true })
+  releasedAt: Date;
 }
