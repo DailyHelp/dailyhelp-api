@@ -34,6 +34,7 @@ import {
   VerifyIdentityDto,
 } from './users.dto';
 import {
+  AccountTier,
   Currencies,
   DisputeStatus,
   IAuthContext,
@@ -300,15 +301,49 @@ export class UsersService {
   async fetchProviderDashboard({ uuid }: IAuthContext) {
     const user = await this.usersRepository.findOne({ uuid });
     if (!user) throw new NotFoundException('User not found');
+    const providerStats = await this.em.getConnection().execute(
+      `
+      SELECT 
+        COALESCE(SUM(DISTINCT CASE 
+          WHEN DATE(t.created_at) = CURDATE() AND t.locked = FALSE THEN t.amount 
+          ELSE 0 END), 0) AS todaysEarnings,
 
-    return { status: true, data: { user } };
+        SUM(CASE WHEN o.status IN ('ACCEPTED', 'DECLINED', 'COUNTERED') THEN 1 ELSE 0 END) AS totalDecisions,
+        SUM(CASE WHEN o.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS acceptedOffers,
+
+        CASE 
+          WHEN SUM(CASE WHEN o.status IN ('ACCEPTED', 'DECLINED', 'COUNTERED') THEN 1 ELSE 0 END) = 0 THEN 0
+          ELSE ROUND(
+            (SUM(CASE WHEN o.status = 'ACCEPTED' THEN 1 ELSE 0 END) /
+            SUM(CASE WHEN o.status IN ('ACCEPTED', 'DECLINED', 'COUNTERED') THEN 1 ELSE 0 END)) * 100, 2)
+        END AS acceptanceRate
+      FROM users u
+      LEFT JOIN wallets w ON w.user = u.uuid
+      LEFT JOIN transactions t ON t.wallet = w.uuid
+      LEFT JOIN conversations c ON c.service_provider = u.uuid
+      LEFT JOIN messages m ON m.conversation = c.uuid
+      LEFT JOIN offers o ON o.uuid = m.offer
+      WHERE u.uuid = ?,
+    `,
+      [uuid],
+    );
+    let jobGoal = 15;
+    switch (user.tier) {
+      case AccountTier.SILVER:
+        jobGoal = 50;
+        break;
+      case AccountTier.GOLD:
+        jobGoal = 200;
+        break;
+    }
+    return { status: true, data: { user, ...providerStats[0], jobGoal } };
   }
 
   async fetchTopRatedProviders(conn: Connection) {
     const topRatedProviders = await conn.execute(`
       SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
       u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
-      u.tier, u.picture, u.service_images
+      u.tier, u.picture, u.service_images as serviceImages
       FROM users u
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
@@ -344,7 +379,7 @@ export class UsersService {
       `
       SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
       u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
-      u.tier, u.picture, u.service_images,
+      u.tier, u.picture, u.service_images as serviceImages,
       ${locationSelect}
       FROM users u
       LEFT JOIN locations l ON l.uuid = u.default_location
@@ -402,7 +437,7 @@ export class UsersService {
         u.service_description as serviceDescription, r.name as primaryJobRole,
         u.offer_starting_price as offerStartingPrice, u.availability, u.engaged,
         COUNT(j.uuid) as completedJobs, COUNT(jr.uuid) as totalRatings,
-        u.tier, u.picture, u.service_images,
+        u.tier, u.picture, u.service_images as serviceImages,
         ${locationSelect}
       ${baseProvidersQuery}
       GROUP BY u.uuid

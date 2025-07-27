@@ -32,10 +32,10 @@ export class Location extends Timestamp {
   @Property({ type: 'longtext', nullable: true })
   description: string;
 
-  @Property({ nullable: true })
+  @Property({ nullable: true, type: 'decimal', precision: 10, scale: 6 })
   lat: number;
 
-  @Property({ nullable: true })
+  @Property({ nullable: true, type: 'decimal', precision: 10, scale: 6 })
   lng: number;
 
   @Property({ default: false })

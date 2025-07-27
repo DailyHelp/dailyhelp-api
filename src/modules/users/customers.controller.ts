@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -21,6 +23,7 @@ import { IAuthContext } from 'src/types';
 import { Users } from './users.entity';
 import {
   CancelOfferDto,
+  ClientDashboardDto,
   ClientDashboardQuery,
   ConfirmDeletionRequestDto,
   CreateDeletionRequestDto,
@@ -40,11 +43,11 @@ import {
 import { Location } from 'src/entities/location.entity';
 import { ExpiredJwtAuthGuard } from 'src/guards/expired-jwt-auth-guard';
 
-@Controller('users')
-@ApiTags('users')
+@Controller('customers')
+@ApiTags('customers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-export class UsersController {
+export class CustomersController {
   constructor(private readonly userService: UsersService) {}
 
   @Get()
@@ -58,9 +61,13 @@ export class UsersController {
     );
   }
 
-  @Get('client-dashboard')
+  @Get('dashboard')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiOkResponse({
+    type: ClientDashboardDto,
+    description: 'Client dashboard fetched successfully',
+  })
   async fetchClientDashboard(
     @Query() query: ClientDashboardQuery,
     @Req() req: Request,
@@ -72,16 +79,11 @@ export class UsersController {
     );
   }
 
-  @Get('provider-dashboard')
-  async fetchProviderDashboard(@Req() req: Request) {
-    return this.userService.fetchProviderDashboard(req.user as any);
-  }
-
-  @Get(':uuid/reviews')
+  @Get(':providerUuid/reviews')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
   async fetchUserReviews(
-    @Param('uuid') uuid: string,
+    @Param('providerUuid') uuid: string,
     @Query() query: PaginationQuery,
   ) {
     return this.userService.fetchUserReviews(uuid, query.pagination);
@@ -110,27 +112,14 @@ export class UsersController {
     return this.userService.fetchLocations(defaultOnly, request.user as any);
   }
 
-  @Post('location/:uuid/set-default')
+  @Patch('location/:uuid/set-default')
   setLocationAsDefault(@Param('uuid') uuid: string, @Req() request: Request) {
     return this.userService.setLocationAsDefault(uuid, request.user as any);
   }
 
-  @Post('location/:uuid/delete')
+  @Delete('location/:uuid/delete')
   deleteLocation(@Param('uuid') uuid: string, @Req() request: Request) {
     return this.userService.deleteLocation(uuid, request.user as any);
-  }
-
-  @Post('save-prices')
-  async savePrices(@Body() body: SavePricesDto, @Req() request: Request) {
-    return this.userService.savePrices(body, request.user as any);
-  }
-
-  @Post('save-provider-details')
-  async saveProviderDetails(
-    @Body() body: SaveProviderDetails,
-    @Req() request: Request,
-  ) {
-    return this.userService.saveProviderDetails(body, request.user as any);
   }
 
   @Post(':uuid/send-offer')
@@ -160,7 +149,7 @@ export class UsersController {
     return this.userService.reportConversation(uuid, body, request.user as any);
   }
 
-  @Post('offer/:uuid/update')
+  @Patch('offer/:uuid/update')
   async updateOffer(
     @Param('uuid') uuid: string,
     @Body() body: Partial<SendOfferDto>,
@@ -169,7 +158,7 @@ export class UsersController {
     return this.userService.updateOffer(uuid, body, request.user as any);
   }
 
-  @Post('offer/:uuid/cancel')
+  @Patch('offer/:uuid/cancel')
   async cancelOffer(
     @Param('uuid') uuid: string,
     @Body() body: CancelOfferDto,
@@ -217,7 +206,7 @@ export class UsersController {
     return this.userService.fetchSimilarProviders(selectedUserUuid);
   }
 
-  @Post('switch-user-type')
+  @Patch('switch-user-type')
   async switchUserType(@Body() body: SwitchUserType, @Req() req: Request) {
     return this.userService.switchUserType(body.userType, req.user as any);
   }
@@ -263,7 +252,7 @@ export class UsersController {
     return this.userService.createDeletionRequest(body, request.user as any);
   }
 
-  @Post('deletion-request/:uuid/confirm-deletion')
+  @Delete('deletion-request/:uuid/confirm-deletion')
   async confirmAccountDeletion(
     @Param('uuid') uuid: string,
     @Body() body: ConfirmDeletionRequestDto,

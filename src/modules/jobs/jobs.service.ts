@@ -1,6 +1,7 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotAcceptableException,
@@ -83,6 +84,13 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.PENDING)
       throw new ForbiddenException(`This job is not startable`);
+    const provider = await this.usersRepository.findOne({
+      uuid: job.serviceProvider?.uuid,
+    });
+    if (!provider) throw new NotFoundException(`Provider not found`);
+    if (provider.engaged)
+      throw new ConflictException(`Provider is currently engaged`);
+    provider.engaged = true;
     job.status = JobStatus.IN_PROGRESS;
     const jobTimelineModel = this.jobTimelineRepository.create({
       uuid: v4(),
@@ -113,6 +121,7 @@ export class JobService {
     if (!conversation) throw new NotFoundException(`Conversation not found`);
     if (!provider) throw new NotFoundException(`Provider not found`);
     provider.completedJobs += provider.completedJobs;
+    provider.engaged = false;
     conversation.restricted = true;
     job.status = JobStatus.COMPLETED;
     const jobTimelineModel = this.jobTimelineRepository.create({
@@ -323,6 +332,7 @@ export class JobService {
     ]);
     if (!conversation) throw new NotFoundException(`Conversation not found`);
     if (!provider) throw new NotFoundException(`Provider not found`);
+    provider.engaged = false;
     provider.completedJobs += provider.completedJobs;
     conversation.restricted = true;
     job.status = JobStatus.DISPUTED;

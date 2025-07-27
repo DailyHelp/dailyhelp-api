@@ -8,7 +8,7 @@ import {
   Users,
 } from './users.entity';
 import { SharedModule } from '../shared/shared.module';
-import { UsersController } from './users.controller';
+import { CustomersController } from './customers.controller';
 import {
   JwtAuthConfiguration,
   PaystackConfiguration,
@@ -23,7 +23,6 @@ import {
   Payment,
   Report,
 } from '../conversations/conversations.entity';
-import { PublicUsersController } from './public-users.controller';
 import { Message } from 'src/entities/message.entity';
 import { JobReview } from 'src/entities/job-review.entity';
 import { ExpiredJwtStrategy } from 'src/strategies/expired-jwt.strategy';
@@ -32,6 +31,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { SubCategory } from '../admin/admin.entities';
 import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
+import { ProvidersController } from './providers.controller';
 
 @Module({
   imports: [
@@ -69,7 +69,7 @@ import { JobDispute } from '../jobs/job-dispute.entity';
     }),
     SharedModule,
   ],
-  controllers: [UsersController, PublicUsersController],
+  controllers: [CustomersController, ProvidersController],
   providers: [UsersService, JwtStrategy, ExpiredJwtStrategy],
   exports: [UsersService],
 })

@@ -11,8 +11,9 @@ import {
 } from 'class-validator';
 import { Users } from './users.entity';
 import { Type } from 'class-transformer';
-import { PaginationInput } from 'src/base/dto';
-import { PaymentPurpose, UserType } from 'src/types';
+import { createPaginatedSwaggerDto, PaginationInput } from 'src/base/dto';
+import { AccountTier, PaymentPurpose, UserType } from 'src/types';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyIdentityDto {
   @IsString()
@@ -257,4 +258,78 @@ export class CreateDeletionRequestDto {
 export class ConfirmDeletionRequestDto {
   @IsString()
   password: string;
+}
+
+export class TopRatedProvider {
+  @ApiProperty()
+  uuid: string;
+
+  @ApiProperty()
+  firstname: string;
+
+  @ApiProperty()
+  lastname: string;
+
+  @ApiProperty()
+  avgRating: number;
+
+  @ApiProperty()
+  serviceDescription: string;
+
+  @ApiProperty()
+  primaryJobRole: string;
+
+  @ApiProperty()
+  offerStartingPrice: number;
+
+  @ApiProperty()
+  availability: boolean;
+
+  @ApiProperty()
+  engaged: boolean;
+
+  @ApiProperty()
+  completedJobs: number;
+
+  @ApiProperty({ enum: AccountTier })
+  tier: AccountTier;
+
+  @ApiProperty()
+  picture: string;
+
+  @ApiProperty()
+  serviceImages: string;
+
+  @ApiProperty()
+  distance: string;
+}
+
+const PaginatedAllProvidersDto = createPaginatedSwaggerDto(TopRatedProvider);
+
+export class ClientDashboardDto {
+  @ApiProperty({ type: TopRatedProvider, isArray: true })
+  topRatedProviders: TopRatedProvider[];
+
+  @ApiProperty({ type: TopRatedProvider, isArray: true })
+  recommendedProviders: TopRatedProvider[];
+
+  @ApiProperty({ type: PaginatedAllProvidersDto })
+  allProviders: InstanceType<typeof PaginatedAllProvidersDto>;
+}
+
+export class ProvidersDashboardDto {
+  @ApiProperty({ type: Users })
+  user: Users;
+
+  @ApiProperty()
+  jobGoal: number;
+
+  @ApiProperty()
+  todaysEarnings: number;
+
+  @ApiProperty()
+  acceptedOffers: number;
+
+  @ApiProperty()
+  acceptanceRate: number;
 }
