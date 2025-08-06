@@ -12,8 +12,11 @@ import {
 import { Users } from './users.entity';
 import { Type } from 'class-transformer';
 import { createPaginatedSwaggerDto, PaginationInput } from 'src/base/dto';
-import { AccountTier, PaymentPurpose, UserType } from 'src/types';
+import { AccountTier, OfferStatus, PaymentPurpose, UserType } from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
+import { JobDispute } from '../jobs/job-dispute.entity';
+import { JobReview } from 'src/entities/job-review.entity';
+import { Message } from 'src/entities/message.entity';
 
 export class VerifyIdentityDto {
   @IsString()
@@ -219,6 +222,14 @@ export class CancelOfferDto {
   reasonCategory: string;
 }
 
+export class CounterOfferDto {
+  @IsNumber()
+  amount: number;
+
+  @IsString()
+  reason: string;
+}
+
 export class PaymentInfo {
   @IsString()
   @ValidateIf((p) => p.purpose === PaymentPurpose.JOB_OFFER)
@@ -304,7 +315,69 @@ export class TopRatedProvider {
   distance: string;
 }
 
+export class ConversationDto {
+  @ApiProperty()
+  conversationId: string;
+
+  @ApiProperty()
+  serviceProviderId: string;
+
+  @ApiProperty({ required: false })
+  spFirstname: string;
+
+  @ApiProperty({ required: false })
+  spLastname: string;
+
+  @ApiProperty({ required: false })
+  spMiddlename: string;
+
+  @ApiProperty({ required: false })
+  rqFirstname: string;
+
+  @ApiProperty({ required: false })
+  rqLastname: string;
+
+  @ApiProperty({ required: false })
+  rqMiddlename: string;
+
+  @ApiProperty()
+  lastMessageId: string;
+
+  @ApiProperty()
+  lastMessage: string;
+
+  @ApiProperty()
+  offerDescription: string;
+
+  @ApiProperty({ enum: OfferStatus })
+  status: OfferStatus;
+
+  @ApiProperty()
+  lastLockedAt: Date;
+
+  @ApiProperty()
+  locked: boolean;
+
+  @ApiProperty()
+  restricted: boolean;
+
+  @ApiProperty()
+  cancellationChances: number;
+
+  @ApiProperty()
+  createdAt: Date;
+}
+
 const PaginatedAllProvidersDto = createPaginatedSwaggerDto(TopRatedProvider);
+
+export const PaginatedDisputesDto = createPaginatedSwaggerDto(JobDispute);
+
+export const PaginatedReviewsDto = createPaginatedSwaggerDto(JobReview);
+
+export const PaginatedConversationsDto =
+  createPaginatedSwaggerDto(ConversationDto);
+
+export const PaginatedMessageDto = createPaginatedSwaggerDto(Message);
 
 export class ClientDashboardDto {
   @ApiProperty({ type: TopRatedProvider, isArray: true })

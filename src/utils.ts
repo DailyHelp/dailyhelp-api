@@ -50,10 +50,23 @@ export const buildResponseDataWithPagination = <T>(
   };
 };
 
-export const appendCondition = (sql: string, params: any[], value?: any) => {
-  if (value !== undefined && value !== null && value !== '') {
-    params.push(value);
-    return `${sql} ?`;
+export const appendCondition = (sql: string, params: any[], value?: string | number) => {
+  if (value === undefined || value === null || value === '') {
+    return '';
   }
-  return '';
+
+  if (typeof value === 'string' && value.includes(',')) {
+    const values = value
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => v !== '');
+    if (values.length === 0) return '';
+
+    params.push(...values);
+    const placeholders = values.map(() => '?').join(', ');
+    return `${sql} IN (${placeholders})`;
+  }
+
+  params.push(value);
+  return `${sql} = ?`;
 };

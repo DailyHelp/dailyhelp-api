@@ -8,7 +8,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { JobService } from './jobs.service';
 import {
@@ -19,19 +24,24 @@ import {
   VerifyJobDto,
 } from './jobs.dto';
 import { Request } from 'express';
+import { Job } from './jobs.entity';
 
-@Controller('jobs')
-@ApiTags('jobs')
+@Controller('customer/jobs')
+@ApiTags('customer-jobs')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-export class JobsController {
+export class CustomerJobsController {
   constructor(private readonly jobService: JobService) {}
 
   @Get()
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiOkResponse({
+    type: Job,
+    description: 'Jobs fetched successfully',
+  })
   async fetchJobs(@Query() query: JobQuery, @Req() request: Request) {
-    return this.jobService.fetchRequestorJobs(
+    return this.jobService.fetchJobs(
       query.pagination,
       query.filter,
       request.user as any,

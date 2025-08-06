@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JobsController } from './jobs.controller';
+import { CustomerJobsController } from './customer-jobs.controller';
 import { JobService } from './jobs.service';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Job, JobTimeline } from './jobs.entity';
@@ -8,6 +8,7 @@ import { Users } from '../users/users.entity';
 import { JobReview } from 'src/entities/job-review.entity';
 import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
+import { ProviderJobsController } from './provider-jobs.controller';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { Conversation } from '../conversations/conversations.entity';
       ],
     }),
   ],
-  controllers: [JobsController],
+  controllers: [CustomerJobsController, ProviderJobsController],
   providers: [JobService],
   exports: [JobService],
 })

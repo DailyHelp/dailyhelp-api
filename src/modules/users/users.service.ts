@@ -21,6 +21,7 @@ import {
   CancelOfferDto,
   ClientDashboardFilter,
   ConfirmDeletionRequestDto,
+  CounterOfferDto,
   CreateDeletionRequestDto,
   DisputeFilter,
   FeedbackDto,
@@ -486,9 +487,9 @@ export class UsersService {
       ? `
         (
           6371 * acos(
-            cos(radians(?)) * cos(radians(l.latitude)) *
-            cos(radians(l.longitude) - radians(?)) +
-            sin(radians(?)) * sin(radians(l.latitude))
+            cos(radians(?)) * cos(radians(l.lat)) *
+            cos(radians(l.lng) - radians(?)) +
+            sin(radians(?)) * sin(radians(l.lat))
           )
         ) AS distance`
       : 'NULL AS distance';
@@ -511,12 +512,12 @@ export class UsersService {
     const allProvidersParams: any[] = [];
     let allProvidersFiltersSql = '';
     allProvidersFiltersSql += appendCondition(
-      'AND mc.uuid =',
+      'AND mc.uuid',
       allProvidersParams,
       filter?.mainCategory,
     );
     allProvidersFiltersSql += appendCondition(
-      'AND u.primary_job_role =',
+      'AND u.primary_job_role',
       allProvidersParams,
       filter?.subCategory,
     );
@@ -640,6 +641,78 @@ export class UsersService {
       conversation.lastLockedAt = new Date();
       conversation.cancellationChances = 3;
     }
+    const messageModel = this.messageRepository.create({
+      uuid: v4(),
+      conversation: this.conversationRepository.getReference(conversation.uuid),
+      from: this.usersRepository.getReference(uuid),
+      to: this.usersRepository.getReference(messageExists.to?.uuid),
+      type: MessageType.OFFER,
+      offer: this.offerRepository.getReference(offerExists.uuid),
+      message: dto.reason,
+    });
+    conversation.lastMessage = this.messageRepository.getReference(
+      messageModel.uuid,
+    );
+    this.em.persist(messageModel);
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async acceptOffer(offerUuid: string, { uuid }: IAuthContext) {
+    const messageExists = await this.messageRepository.findOne({
+      to: { uuid },
+      offer: { uuid },
+    });
+    if (!messageExists) throw new NotFoundException('Message does not exist');
+    const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
+    if (!offerExists) throw new NotFoundException(`Offer does not exist`);
+    if (offerExists.status !== OfferStatus.PENDING)
+      throw new ForbiddenException(`Offer status cannot be updated`);
+    offerExists.status = OfferStatus.ACCEPTED;
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async counterOffer(
+    offerUuid: string,
+    dto: CounterOfferDto,
+    { uuid }: IAuthContext,
+  ) {
+    const messageExists = await this.messageRepository.findOne({
+      to: { uuid },
+      offer: { uuid },
+    });
+    if (!messageExists) throw new NotFoundException('Message does not exist');
+    const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
+    if (!offerExists) throw new NotFoundException(`Offer does not exist`);
+    if (offerExists.status !== OfferStatus.PENDING)
+      throw new ForbiddenException(`Offer status cannot be updated`);
+    offerExists.status = OfferStatus.COUNTERED;
+    const newOfferUuid = v4();
+    const offerModel = this.offerRepository.create({
+      ...offerExists,
+      uuid: newOfferUuid,
+      price: dto.amount,
+      counterReason: dto.reason,
+      currentOffer: this.offerRepository.getReference(offerUuid),
+      status: OfferStatus.PENDING,
+    });
+    const conversation = await this.conversationRepository.findOne({
+      uuid: messageExists.conversation.uuid,
+    });
+    const messageModel = this.messageRepository.create({
+      uuid: v4(),
+      conversation: this.conversationRepository.getReference(conversation.uuid),
+      from: this.usersRepository.getReference(uuid),
+      to: this.usersRepository.getReference(messageExists.from?.uuid),
+      type: MessageType.OFFER,
+      offer: this.offerRepository.getReference(offerModel.uuid),
+    });
+    conversation.lastMessage = this.messageRepository.getReference(
+      messageModel.uuid,
+    );
+    this.em.persist(offerModel);
+    this.em.persist(messageModel);
     await this.em.flush();
     return { status: true };
   }
@@ -670,6 +743,19 @@ export class UsersService {
       conversation.lastLockedAt = new Date();
       conversation.cancellationChances = 3;
     }
+    const messageModel = this.messageRepository.create({
+      uuid: v4(),
+      conversation: this.conversationRepository.getReference(conversation.uuid),
+      from: this.usersRepository.getReference(uuid),
+      to: this.usersRepository.getReference(messageExists.from?.uuid),
+      type: MessageType.OFFER,
+      offer: this.offerRepository.getReference(offerExists.uuid),
+      message: dto.reason,
+    });
+    conversation.lastMessage = this.messageRepository.getReference(
+      messageModel.uuid,
+    );
+    this.em.persist(messageModel);
     await this.em.flush();
     return { status: true };
   }
@@ -822,7 +908,7 @@ export class UsersService {
     return { status: true };
   }
 
-  async fetchUserConversations(
+  async fetchProviderConversations(
     pagination: PaginationInput,
     { uuid }: IAuthContext,
     search?: string,
@@ -830,8 +916,105 @@ export class UsersService {
     const { page = 1, limit = 20 } = pagination;
     const offset = (page - 1) * limit;
     const searchTerm = `%${(search || '').toLowerCase().trim()}%`;
-    const data = await this.em.getConnection().execute(
-      `
+
+    const baseWhere = `c.service_provider = ?`;
+    const searchConditions = `
+      LOWER(m.message) LIKE ? OR
+      LOWER(rq.firstname) LIKE ? OR
+      LOWER(rq.lastname) LIKE ? OR
+      LOWER(rq.middlename) LIKE ? OR
+      LOWER(rq.phone) LIKE ? OR
+      LOWER(rq.email) LIKE ? OR
+      LOWER(o.description) LIKE ? OR
+      CAST(o.price AS CHAR) LIKE ?
+    `;
+
+    const whereClause = search
+      ? `${baseWhere} AND (${searchConditions})`
+      : baseWhere;
+
+    const params = [uuid];
+    if (search) {
+      for (let i = 0; i < 8; i++) params.push(searchTerm);
+    }
+
+    const dataQuery = `
+      SELECT
+        c.uuid AS conversationId,
+        rq.uuid AS requestorId,
+        rq.firstname AS rqFirstname,
+        rq.lastname AS rqLastname,
+        rq.middlename AS rqMiddlename,
+        m.uuid AS lastMessageId,
+        m.message AS lastMessage,
+        o.description AS offerDescription,
+        o.status AS offerStatus,
+        c.last_locked_at AS lastLockedAt,
+        c.locked,
+        c.restricted,
+        c.cancellation_chances AS cancellationChances,
+        c.created_at AS createdAt
+      FROM conversations c
+      LEFT JOIN users rq ON c.service_requestor = rq.uuid
+      LEFT JOIN messages m ON c.last_message = m.uuid
+      LEFT JOIN offers o ON m.offer = o.uuid
+      WHERE ${whereClause}
+      ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const data = await this.em
+      .getConnection()
+      .execute(dataQuery, [...params, limit, offset]);
+
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM conversations c
+      LEFT JOIN users rq ON c.service_requestor = rq.uuid
+      LEFT JOIN messages m ON c.last_message = m.uuid
+      LEFT JOIN offers o ON m.offer = o.uuid
+      WHERE ${whereClause}
+    `;
+
+    const totalResult = await this.em
+      .getConnection()
+      .execute(countQuery, params);
+    const total = totalResult[0]?.total ?? 0;
+
+    return buildResponseDataWithPagination(data, total, { page, limit });
+  }
+
+  async fetchCustomerConversations(
+    pagination: PaginationInput,
+    { uuid }: IAuthContext,
+    search?: string,
+  ) {
+    const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
+    const searchTerm = `%${(search || '').toLowerCase().trim()}%`;
+    const baseWhere = `c.service_requestor = ?`;
+    const searchConditions = `
+      LOWER(m.message) LIKE ? OR
+      LOWER(sp.firstname) LIKE ? OR
+      LOWER(sp.lastname) LIKE ? OR
+      LOWER(sp.middlename) LIKE ? OR
+      LOWER(sp.phone) LIKE ? OR
+      LOWER(sp.email) LIKE ? OR
+      LOWER(o.description) LIKE ? OR
+      CAST(o.price AS CHAR) LIKE ?
+    `;
+
+    const whereClause = search
+      ? `${baseWhere} AND (${searchConditions})`
+      : baseWhere;
+
+    const params = [uuid];
+    if (search) {
+      for (let i = 0; i < 8; i++) params.push(searchTerm);
+    }
+
+    // Data query
+    const dataQuery = `
       SELECT
         c.uuid AS conversationId,
         sp.uuid AS serviceProviderId,
@@ -851,79 +1034,28 @@ export class UsersService {
       LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o ON m.offer = o.uuid
-      WHERE c.service_requestor = ?
-        ${
-          search
-            ? `
-        AND (
-          LOWER(m.message) LIKE ? OR
-          LOWER(sp.firstname) LIKE ? OR
-          LOWER(sp.lastname) LIKE ? OR
-          LOWER(sp.middlename) LIKE ? OR
-          LOWER(sp.phone) LIKE ? OR
-          LOWER(sp.email) LIKE ? OR
-          LOWER(o.description) LIKE ? OR
-          CAST(o.price AS CHAR) LIKE ?
-        )`
-            : ''
-        }
+      WHERE ${whereClause}
       ORDER BY m.created_at DESC
       LIMIT ? OFFSET ?
-    `,
-      search
-        ? [
-            uuid,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            limit,
-            offset,
-          ]
-        : [uuid, limit, offset],
-    );
-    const totalResult = await this.em.getConnection().execute(
-      `
+    `;
+
+    const data = await this.em
+      .getConnection()
+      .execute(dataQuery, [...params, limit, offset]);
+
+    // Count query
+    const countQuery = `
       SELECT COUNT(*) as total
       FROM conversations c
       LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o ON m.offer = o.uuid
-      WHERE c.service_requestor = ?
-        ${
-          search
-            ? `
-        AND (
-          LOWER(m.message) LIKE ? OR
-          LOWER(sp.firstname) LIKE ? OR
-          LOWER(sp.lastname) LIKE ? OR
-          LOWER(sp.middlename) LIKE ? OR
-          LOWER(sp.phone) LIKE ? OR
-          LOWER(sp.email) LIKE ? OR
-          LOWER(o.description) LIKE ? OR
-          CAST(o.price AS CHAR) LIKE ?
-        )`
-            : ''
-        }
-    `,
-      search
-        ? [
-            uuid,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-            searchTerm,
-          ]
-        : [uuid],
-    );
+      WHERE ${whereClause}
+    `;
+
+    const totalResult = await this.em
+      .getConnection()
+      .execute(countQuery, params);
     const total = totalResult[0]?.total ?? 0;
     return buildResponseDataWithPagination(data, total, { page, limit });
   }

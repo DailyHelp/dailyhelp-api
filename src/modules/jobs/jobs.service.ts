@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Job, JobTimeline } from './jobs.entity';
 import { PaginationInput } from 'src/base/dto';
-import { IAuthContext, JobStatus, TransactionType } from 'src/types';
+import { IAuthContext, JobStatus, TransactionType, UserType } from 'src/types';
 import {
   CancelJobDto,
   DisputeJobDto,
@@ -46,15 +46,20 @@ export class JobService {
     private readonly conversationRepository: EntityRepository<Conversation>,
   ) {}
 
-  async fetchRequestorJobs(
+  async fetchJobs(
     pagination: PaginationInput,
     filter: JobFilter,
-    { uuid }: IAuthContext,
+    { uuid, userType }: IAuthContext,
   ) {
     const { page = 1, limit = 20 } = pagination;
     const job = await this.jobRepository.find(
       {
-        serviceRequestor: { uuid },
+        ...(userType === UserType.CUSTOMER
+          ? { serviceRequestor: { uuid } }
+          : {}),
+        ...(userType === UserType.PROVIDER
+          ? { serviceProvider: { uuid } }
+          : {}),
         ...(filter?.status ? { status: filter?.status } : {}),
       },
       { limit, offset: (page - 1) * limit },
@@ -158,13 +163,15 @@ export class JobService {
   ) {
     const job = await this.jobRepository.findOne({
       uuid: jobUuid,
-      serviceRequestor: { uuid },
+      ...(userType === UserType.CUSTOMER
+        ? { serviceRequestor: { uuid } }
+        : { serviceProvider: { uuid } }),
     });
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.PENDING)
       throw new ForbiddenException(`This job is not cancellable`);
     const conversation = await this.conversationRepository.findOne({
-      serviceRequestor: { uuid },
+      serviceRequestor: { uuid: job.serviceRequestor?.uuid },
       serviceProvider: { uuid: job.serviceProvider?.uuid },
     });
     if (!conversation) throw new NotFoundException(`Conversation not found`);

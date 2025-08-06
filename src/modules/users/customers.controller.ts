@@ -29,19 +29,23 @@ import {
   CreateDeletionRequestDto,
   DisputeQuery,
   FeedbackDto,
+  PaginatedConversationsDto,
+  PaginatedDisputesDto,
+  PaginatedMessageDto,
+  PaginatedReviewsDto,
   PaginationQuery,
   PaymentInfo,
   ReportConversationDto,
   SaveLocationDto,
-  SavePricesDto,
-  SaveProviderDetails,
   SendMessageDto,
   SendOfferDto,
   SwitchUserType,
+  TopRatedProvider,
   VerifyIdentityDto,
 } from './users.dto';
 import { Location } from 'src/entities/location.entity';
 import { ExpiredJwtAuthGuard } from 'src/guards/expired-jwt-auth-guard';
+import { Wallet } from '../wallet/wallet.entity';
 
 @Controller('customers')
 @ApiTags('customers')
@@ -82,6 +86,10 @@ export class CustomersController {
   @Get(':providerUuid/reviews')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiOkResponse({
+    type: PaginatedReviewsDto,
+    description: 'Provider reviews fetched successfully',
+  })
   async fetchUserReviews(
     @Param('providerUuid') uuid: string,
     @Query() query: PaginationQuery,
@@ -179,12 +187,16 @@ export class CustomersController {
   @Get('conversations')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
-  async fetchUserConversations(
+  @ApiOkResponse({
+    type: PaginatedConversationsDto,
+    description: 'User conversations fetched successfully',
+  })
+  async fetchCustomerConversations(
     @Query() query: PaginationQuery,
     @Query('search') search: string,
     @Req() request: Request,
   ) {
-    return this.userService.fetchUserConversations(
+    return this.userService.fetchCustomerConversations(
       query.pagination,
       request.user as any,
       search,
@@ -194,6 +206,10 @@ export class CustomersController {
   @Get('conversations/:uuid/messages')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiOkResponse({
+    type: PaginatedMessageDto,
+    description: 'Conversation messages fetched successfully',
+  })
   async fetchConversationMessages(
     @Param('uuid') uuid: string,
     @Query() query: PaginationQuery,
@@ -202,6 +218,11 @@ export class CustomersController {
   }
 
   @Get(':uuid/similar-providers')
+  @ApiOkResponse({
+    type: TopRatedProvider,
+    isArray: true,
+    description: 'Similar providers fetched successfully',
+  })
   async fetchSimilarProviders(@Param('uuid') selectedUserUuid: string) {
     return this.userService.fetchSimilarProviders(selectedUserUuid);
   }
@@ -226,11 +247,21 @@ export class CustomersController {
   }
 
   @Get('wallet')
+  @ApiOkResponse({
+    type: Wallet,
+    isArray: true,
+    description: 'Wallet details fetched successfully',
+  })
   async getWallet(@Req() req: Request) {
     return this.userService.getWallet(req.user as any);
   }
 
   @Get('disputes')
+  @ApiOkResponse({
+    type: PaginatedDisputesDto,
+    isArray: true,
+    description: 'Job disputes fetched successfully',
+  })
   async getDisputes(@Query() query: DisputeQuery, @Req() request: Request) {
     return this.userService.getDisputes(
       query.pagination,

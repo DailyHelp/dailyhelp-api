@@ -47,6 +47,7 @@ export enum ReasonCategoryType {
 export enum MessageType {
   TEXT = 'TEXT',
   OFFER = 'OFFER',
+  OFFER_WITH_TEXT = 'OFFER_WITH_TEXT',
 }
 
 export enum MessageStatus {
