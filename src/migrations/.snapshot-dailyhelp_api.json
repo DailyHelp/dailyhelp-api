@@ -1300,6 +1300,22 @@
           ],
           "mappedType": "enum"
         },
+        "next_tier": {
+          "name": "next_tier",
+          "type": "enum('SILVER','BRONZE','GOLD','PLATINUM')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "'BRONZE'",
+          "enumItems": [
+            "SILVER",
+            "BRONZE",
+            "GOLD",
+            "PLATINUM"
+          ],
+          "mappedType": "enum"
+        },
         "avg_rating": {
           "name": "avg_rating",
           "type": "int",
@@ -1309,6 +1325,38 @@
           "nullable": true,
           "length": null,
           "mappedType": "integer"
+        },
+        "completed_jobs": {
+          "name": "completed_jobs",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "default": "0",
+          "mappedType": "integer"
+        },
+        "rated_completed_jobs": {
+          "name": "rated_completed_jobs",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "default": "0",
+          "mappedType": "integer"
+        },
+        "progress_to_next_tier": {
+          "name": "progress_to_next_tier",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
         },
         "user_types": {
           "name": "user_types",
@@ -1514,23 +1562,25 @@
         },
         "lat": {
           "name": "lat",
-          "type": "int",
+          "type": "numeric(10,6)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
-          "length": null,
-          "mappedType": "integer"
+          "precision": 10,
+          "scale": 6,
+          "mappedType": "decimal"
         },
         "lng": {
           "name": "lng",
-          "type": "int",
+          "type": "numeric(10,6)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
-          "length": null,
-          "mappedType": "integer"
+          "precision": 10,
+          "scale": 6,
+          "mappedType": "decimal"
         },
         "verified": {
           "name": "verified",
@@ -1695,7 +1745,7 @@
         },
         "status": {
           "name": "status",
-          "type": "enum('PENDING','IN_PROGRESS','COMPLETED','CANCELED')",
+          "type": "enum('PENDING','IN_PROGRESS','COMPLETED','DISPUTED','CANCELED')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
@@ -1705,6 +1755,7 @@
             "PENDING",
             "IN_PROGRESS",
             "COMPLETED",
+            "DISPUTED",
             "CANCELED"
           ],
           "mappedType": "enum"
@@ -1828,19 +1879,6 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
-        },
-        "user_type": {
-          "name": "user_type",
-          "type": "enum('PROVIDER','CUSTOMER')",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "enumItems": [
-            "PROVIDER",
-            "CUSTOMER"
-          ],
-          "mappedType": "enum"
         }
       },
       "name": "jobs",
@@ -2381,6 +2419,165 @@
           "length": null,
           "mappedType": "unknown"
         },
+        "submitted_by": {
+          "name": "submitted_by",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        }
+      },
+      "name": "job_reports",
+      "indexes": [
+        {
+          "columnNames": [
+            "job"
+          ],
+          "composite": false,
+          "keyName": "job_reports_job_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "submitted_by"
+          ],
+          "composite": false,
+          "keyName": "job_reports_submitted_by_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "job_reports_job_foreign": {
+          "constraintName": "job_reports_job_foreign",
+          "columnNames": [
+            "job"
+          ],
+          "localTableName": "job_reports",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "jobs",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "job_reports_submitted_by_foreign": {
+          "constraintName": "job_reports_submitted_by_foreign",
+          "columnNames": [
+            "submitted_by"
+          ],
+          "localTableName": "job_reports",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "job": {
+          "name": "job",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "description": {
+          "name": "description",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "pictures": {
+          "name": "pictures",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
         "status": {
           "name": "status",
           "type": "enum('PENDING','IN_PROGRESS','RESOLVED')",
@@ -2742,6 +2939,16 @@
           "default": "true",
           "mappedType": "boolean"
         },
+        "blocked_by": {
+          "name": "blocked_by",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
         "blocked": {
           "name": "blocked",
           "type": "tinyint(1)",
@@ -2799,6 +3006,16 @@
         },
         {
           "columnNames": [
+            "blocked_by"
+          ],
+          "composite": false,
+          "keyName": "conversations_blocked_by_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
             "last_message"
           ],
           "composite": false,
@@ -2837,6 +3054,19 @@
           "constraintName": "conversations_service_requestor_foreign",
           "columnNames": [
             "service_requestor"
+          ],
+          "localTableName": "conversations",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "conversations_blocked_by_foreign": {
+          "constraintName": "conversations_blocked_by_foreign",
+          "columnNames": [
+            "blocked_by"
           ],
           "localTableName": "conversations",
           "referencedColumnNames": [
@@ -3107,7 +3337,7 @@
         },
         "type": {
           "name": "type",
-          "type": "enum('TEXT','OFFER')",
+          "type": "enum('TEXT','OFFER','OFFER_WITH_TEXT')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
@@ -3115,7 +3345,8 @@
           "default": "'TEXT'",
           "enumItems": [
             "TEXT",
-            "OFFER"
+            "OFFER",
+            "OFFER_WITH_TEXT"
           ],
           "mappedType": "enum"
         },
@@ -3299,6 +3530,142 @@
           "length": null,
           "mappedType": "datetime"
         },
+        "account_number": {
+          "name": "account_number",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "bank_name": {
+          "name": "bank_name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "account_name": {
+          "name": "account_name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "bank_code": {
+          "name": "bank_code",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "user": {
+          "name": "user",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        }
+      },
+      "name": "bank_account",
+      "indexes": [
+        {
+          "columnNames": [
+            "user"
+          ],
+          "composite": false,
+          "keyName": "bank_account_user_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "bank_account_user_foreign": {
+          "constraintName": "bank_account_user_foreign",
+          "columnNames": [
+            "user"
+          ],
+          "localTableName": "bank_account",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
         "user": {
           "name": "user",
           "type": "varchar(255)",
@@ -3318,6 +3685,19 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
+        },
+        "user_type": {
+          "name": "user_type",
+          "type": "enum('PROVIDER','CUSTOMER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "enumItems": [
+            "PROVIDER",
+            "CUSTOMER"
+          ],
+          "mappedType": "enum"
         },
         "confirmed_at": {
           "name": "confirmed_at",
@@ -3620,6 +4000,26 @@
           "length": 1,
           "default": "true",
           "mappedType": "boolean"
+        },
+        "locked_at": {
+          "name": "locked_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
         }
       },
       "name": "transactions",

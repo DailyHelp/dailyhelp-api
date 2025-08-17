@@ -16,7 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { JobService } from './jobs.service';
-import { CancelJobDto, JobQuery } from './jobs.dto';
+import { CancelJobDto, JobQuery, ReportClientDto } from './jobs.dto';
 import { Job } from './jobs.entity';
 import { Request } from 'express';
 
@@ -49,5 +49,14 @@ export class ProviderJobsController {
     @Req() request: Request,
   ) {
     return this.jobService.cancelJob(uuid, body, request.user as any);
+  }
+
+  @Post(':uuid/report-client')
+  async reportClient(
+    @Param('uuid') uuid: string,
+    @Body() body: ReportClientDto,
+    @Req() request: Request,
+  ) {
+    return this.jobService.reportClient(uuid, body, request.user as any);
   }
 }

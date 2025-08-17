@@ -15,9 +15,15 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { AccountDeletionRequest, Feedback, Users } from './users.entity';
+import {
+  AccountDeletionRequest,
+  BankAccount,
+  Feedback,
+  Users,
+} from './users.entity';
 import { SharedService } from '../shared/shared.service';
 import {
+  BankAccountDto,
   CancelOfferDto,
   ClientDashboardFilter,
   ConfirmDeletionRequestDto,
@@ -27,11 +33,13 @@ import {
   FeedbackDto,
   PaymentInfo,
   ReportConversationDto,
+  ResolveBankAccountDto,
   SaveLocationDto,
   SavePricesDto,
   SaveProviderDetails,
   SendMessageDto,
   SendOfferDto,
+  UpdatePricesDto,
   VerifyIdentityDto,
 } from './users.dto';
 import {
@@ -113,6 +121,8 @@ export class UsersService {
     private readonly feedbackRepository: EntityRepository<Feedback>,
     @InjectRepository(AccountDeletionRequest)
     private readonly accountDeletionRepository: EntityRepository<AccountDeletionRequest>,
+    @InjectRepository(BankAccount)
+    private readonly bankAccountRepository: EntityRepository<BankAccount>,
     private readonly sharedService: SharedService,
     @Inject(QoreIDConfiguration.KEY)
     private readonly qoreidConfig: ConfigType<typeof QoreIDConfiguration>,
@@ -349,7 +359,9 @@ export class UsersService {
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
       WHERE u.avg_rating IS NOT NULL
+      AND u.primary_job_role IS NOT NULL
       AND u.availability = TRUE
+      AND u.identity_verified = TRUE
       GROUP BY u.uuid
       ORDER BY (
         (u.avg_rating * 2) +
@@ -386,7 +398,7 @@ export class UsersService {
       LEFT JOIN locations l ON l.uuid = u.default_location
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
-      WHERE u.availability = true
+      WHERE u.availability = true AND u.primary_job_role IS NOT NULL AND u.identity_verified = true
       ${topRatedPlaceholders ? `AND u.uuid NOT IN (${topRatedPlaceholders})` : ''}
       GROUP BY u.uuid
       ORDER BY (
@@ -425,7 +437,7 @@ export class UsersService {
       LEFT JOIN jobs j ON j.service_provider = u.uuid AND j.status = 'completed'
       LEFT JOIN job_reviews jr ON jr.reviewed_for = u.uuid
       LEFT JOIN locations l ON l.uuid = u.default_location
-      WHERE u.availability = true
+      WHERE u.availability = true AND u.primary_job_role IS NOT NULL AND u.identity_verified = true
         AND u.service_description IS NOT NULL
         AND u.primary_job_role IS NOT NULL
         AND u.offer_starting_price IS NOT NULL
@@ -592,6 +604,75 @@ export class UsersService {
       { limit, offset: (page - 1) * limit, orderBy: { createdAt: 'DESC' } },
     );
     return buildResponseDataWithPagination(data, total, { page, limit });
+  }
+
+  async updateServiceDescription(
+    serviceDescription: string,
+    { uuid }: IAuthContext,
+  ) {
+    const user = await this.usersRepository.findOne({ uuid });
+    user.serviceDescription = serviceDescription;
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async updatePrices(dto: UpdatePricesDto, { uuid }: IAuthContext) {
+    const user = await this.usersRepository.findOne({ uuid });
+    user.minimumOfferPrice = dto.minimumAcceptableOffer;
+    user.offerStartingPrice = dto.startingPrice;
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async addBankAccount(dto: BankAccountDto, { uuid }: IAuthContext) {
+    const duplicateExists = await this.bankAccountRepository.findOne({
+      accountNumber: dto.accountNumber,
+      bankCode: dto.bankCode,
+      user: { uuid },
+    });
+    if (duplicateExists) throw new ConflictException(`Record already exists`);
+    const bankAccountModel = this.bankAccountRepository.create({
+      uuid: v4(),
+      accountNumber: dto.accountNumber,
+      accountName: dto.accountName,
+      bankName: dto.bankName,
+      bankCode: dto.bankCode,
+      user: this.usersRepository.getReference(uuid),
+    });
+    this.em.persist(bankAccountModel);
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async getBankAccounts({ uuid }: IAuthContext) {
+    const accounts = await this.bankAccountRepository.find({
+      user: { uuid },
+    });
+    return { status: true, data: accounts };
+  }
+
+  async deleteBankAccount(bankAccountUuid: string, { uuid }: IAuthContext) {
+    const bankAccountExists = await this.bankAccountRepository.findOne({
+      uuid: bankAccountUuid,
+      user: { uuid },
+    });
+    if (!bankAccountExists)
+      throw new NotFoundException(`Bank account does not exist`);
+    bankAccountExists.deletedAt = new Date();
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async resolveBankAccount(dto: ResolveBankAccountDto) {
+    const response = await axios.get(
+      `${this.paystackConfig.baseUrl}/bank/resolve?account_number=${dto.accountNumber}&bank_code=${dto.bankCode}`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
+        },
+      },
+    );
+    return { status: true, data: response.data };
   }
 
   async updateOffer(
@@ -1013,7 +1094,6 @@ export class UsersService {
       for (let i = 0; i < 8; i++) params.push(searchTerm);
     }
 
-    // Data query
     const dataQuery = `
       SELECT
         c.uuid AS conversationId,
@@ -1041,9 +1121,8 @@ export class UsersService {
 
     const data = await this.em
       .getConnection()
-      .execute(dataQuery, [...params, limit, offset]);
+      .execute(dataQuery, [...params, Number(limit), Number(offset)]);
 
-    // Count query
     const countQuery = `
       SELECT COUNT(*) as total
       FROM conversations c

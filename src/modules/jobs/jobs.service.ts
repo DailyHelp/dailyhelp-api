@@ -16,6 +16,7 @@ import {
   DisputeJobDto,
   JobFilter,
   RateServiceProviderDto,
+  ReportClientDto,
 } from './jobs.dto';
 import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { v4 } from 'uuid';
@@ -23,6 +24,7 @@ import { Users } from '../users/users.entity';
 import { JobReview } from 'src/entities/job-review.entity';
 import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
+import { JobReport } from './job-reports.entity';
 
 @Injectable()
 export class JobService {
@@ -44,6 +46,8 @@ export class JobService {
     private readonly jobDisputeRepository: EntityRepository<JobDispute>,
     @InjectRepository(Conversation)
     private readonly conversationRepository: EntityRepository<Conversation>,
+    @InjectRepository(JobReport)
+    private readonly jobReportRepository: EntityRepository<JobReport>,
   ) {}
 
   async fetchJobs(
@@ -363,6 +367,26 @@ export class JobService {
     });
     this.em.persist(jobTimelineModel);
     this.em.persist(disputeModel);
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async reportClient(
+    jobUuid: string,
+    dto: ReportClientDto,
+    { uuid }: IAuthContext,
+  ) {
+    const job = await this.jobRepository.findOne({ uuid: jobUuid });
+    if (!job) throw new NotFoundException(`Job not found`);
+    const jobReport = this.jobReportRepository.create({
+      uuid: v4(),
+      job: this.jobRepository.getReference(jobUuid),
+      category: dto.reportCategory,
+      description: dto.description,
+      pictures: dto.pictures.join(','),
+      submittedBy: this.usersRepository.getReference(uuid),
+    });
+    this.em.persist(jobReport);
     await this.em.flush();
     return { status: true };
   }

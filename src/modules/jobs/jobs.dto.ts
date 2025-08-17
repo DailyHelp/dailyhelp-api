@@ -40,6 +40,17 @@ export class CancelJobDto {
   reasonCategory: string;
 }
 
+export class ReportClientDto {
+  @IsString()
+  reportCategory: string;
+
+  @IsString()
+  description: string;
+
+  @IsString({ each: true })
+  pictures: string[];
+}
+
 export class DisputeJobDto {
   @IsString()
   reason: string;

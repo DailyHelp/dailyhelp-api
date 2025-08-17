@@ -173,6 +173,37 @@ export class OTP extends Timestamp {
   cond: { deletedAt: null },
   default: true,
 })
+@Entity({ tableName: 'bank_account' })
+export class BankAccount extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @Property({ nullable: true })
+  accountNumber: string;
+
+  @Property({ nullable: true })
+  bankName: string;
+
+  @Property({ nullable: true })
+  accountName: string;
+
+  @Property({ nullable: true })
+  bankCode: string;
+
+  @ManyToOne(() => Users, {
+    fieldName: 'user',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  user: Users;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
 @Entity({ tableName: 'blacklisted_tokens' })
 export class BlacklistedTokens extends Timestamp {
   @PrimaryKey()

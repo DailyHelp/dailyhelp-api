@@ -31,4 +31,21 @@ export class ListsController {
   async fetchReasonCategories(@Query() query: ReasonCategoryQuery) {
     return this.listService.fetchReasonCategories(query.type);
   }
+
+  @Get('banks')
+  @ApiOkResponse({
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          name: { type: 'string' },
+        },
+      },
+    },
+  })
+  async fetchBanks() {
+    return this.listService.fetchBanks();
+  }
 }

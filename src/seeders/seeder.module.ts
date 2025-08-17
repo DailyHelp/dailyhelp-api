@@ -7,12 +7,13 @@ import {
   SubCategory,
 } from '../modules/admin/admin.entities';
 import { ISeederConstructor } from './seeder.interface';
+import { Users } from '../modules/users/users.entity';
 
 @Module({
   imports: [
     DatabaseModule.forRoot(),
     MikroOrmModule.forFeature({
-      entities: [MainCategory, SubCategory, ReasonCategory],
+      entities: [MainCategory, SubCategory, ReasonCategory, Users],
     }),
   ],
 })

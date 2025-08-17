@@ -9,6 +9,7 @@ import { JobReview } from 'src/entities/job-review.entity';
 import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
 import { ProviderJobsController } from './provider-jobs.controller';
+import { JobReport } from './job-reports.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ProviderJobsController } from './provider-jobs.controller';
         JobReview,
         JobDispute,
         Conversation,
+        JobReport
       ],
     }),
   ],

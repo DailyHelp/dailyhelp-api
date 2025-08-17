@@ -57,7 +57,7 @@ export class PaginationInput {
 
 export function createPaginatedSwaggerDto<
   TModel extends new (...args: any[]) => any,
->(model: TModel) {
+>(model: TModel, name?: string) {
   class PaginatedDto {
     @ApiProperty({ type: [model] })
     @Type(() => model)
@@ -67,6 +67,10 @@ export function createPaginatedSwaggerDto<
     @Type(() => PaginationDto)
     pagination: PaginationDto;
   }
+
+  Object.defineProperty(PaginatedDto, 'name', {
+    value: name ?? `Paginated${model.name}Dto`,
+  });
 
   return PaginatedDto;
 }

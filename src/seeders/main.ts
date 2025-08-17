@@ -5,12 +5,14 @@ import MainCategorySeed from './seeds/main-category.seed';
 import { startSeeding } from './seed-functions';
 import SubCategorySeed from './seeds/sub-category.seed';
 import ReasonCategorySeed from './seeds/reason-category.seed';
+import ProviderSeed from './seeds/provider-seed';
 
 const SeederModuleRegister = (): DynamicModule => {
   return SeederModule.forRoot([
     MainCategorySeed,
     SubCategorySeed,
     ReasonCategorySeed,
+    ProviderSeed,
   ]);
 };
 

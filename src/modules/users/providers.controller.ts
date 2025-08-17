@@ -12,16 +12,18 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { UsersService } from './users.service';
-import { Users } from './users.entity';
+import { BankAccount, Users } from './users.entity';
 import { IAuthContext } from 'src/types';
 import { Request } from 'express';
 import {
+  BankAccountDto,
   CancelOfferDto,
   ConfirmDeletionRequestDto,
   CounterOfferDto,
@@ -30,15 +32,20 @@ import {
   FeedbackDto,
   PaginatedConversationsDto,
   PaginatedDisputesDto,
+  PaginatedReviewsDto,
   PaginationQuery,
   ProvidersDashboardDto,
   ReportConversationDto,
+  ResolveBankAccountDto,
   SaveLocationDto,
   SavePricesDto,
   SaveProviderDetails,
   SendMessageDto,
   SwitchUserType,
+  UpdatePricesDto,
+  UpdateServiceDescriptionDto,
   VerifyIdentityDto,
+  WithdrawFundsDto,
 } from './users.dto';
 import { Location } from 'src/entities/location.entity';
 import { Wallet } from '../wallet/wallet.entity';
@@ -59,6 +66,34 @@ export class ProvidersController {
     return this.userService.findByEmailOrPhone(
       (request.user as IAuthContext).email,
     );
+  }
+
+  @Get('reviews')
+  @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
+  @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiOkResponse({
+    type: PaginatedReviewsDto,
+    description: 'Provider reviews fetched successfully',
+  })
+  async fetchUserReviews(@Query() query: PaginationQuery, @Req() req: Request) {
+    const { uuid } = req.user as any as IAuthContext;
+    return this.userService.fetchUserReviews(uuid, query.pagination);
+  }
+
+  @Patch('service-description')
+  async updateServiceDescription(
+    @Body() body: UpdateServiceDescriptionDto,
+    @Req() req: Request,
+  ) {
+    return this.userService.updateServiceDescription(
+      body.description,
+      req.user as any,
+    );
+  }
+
+  @Patch('prices')
+  async updatePrices(@Body() body: UpdatePricesDto, @Req() req: Request) {
+    return this.userService.updatePrices(body, req.user as any);
   }
 
   @Get('dashboard')
@@ -129,6 +164,36 @@ export class ProvidersController {
   })
   async getWallet(@Req() req: Request) {
     return this.userService.getWallet(req.user as any);
+  }
+
+  @Post('bank-account')
+  async addBankAccount(@Body() body: BankAccountDto, @Req() req: Request) {
+    return this.userService.addBankAccount(body, req.user as any);
+  }
+
+  @Get('bank-account')
+  @ApiOkResponse({
+    type: BankAccount,
+    isArray: true,
+    description: 'Bank accounts fetched successfully',
+  })
+  async getBankAccounts(@Req() req: Request) {
+    return this.userService.getBankAccounts(req.user as any);
+  }
+
+  @Delete('bank-account/:uuid')
+  async deleteBankAccount(@Param('uuid') uuid: string, @Req() req: Request) {
+    return this.userService.deleteBankAccount(uuid, req.user as any);
+  }
+
+  @Post('bank-account/resolve')
+  async resolveBankAccount(@Body() body: ResolveBankAccountDto) {
+    return this.userService.resolveBankAccount(body);
+  }
+
+  @Post('wallet/withdraw')
+  async withdrawFunds(@Body() body: WithdrawFundsDto) {
+    // return this.userService.withdrawFunds(body);
   }
 
   @Get('disputes')
@@ -231,3 +296,12 @@ export class ProvidersController {
     return this.userService.reportConversation(uuid, body, request.user as any);
   }
 }
+
+// 200k
+// 60k => CAC
+// 20 ~ 30k => Whogohost
+// 110k => (maybe 40k) (play store) (maybe 160k) (app store)
+// qoreid (1k), zoho (1k ~ 5k) termii (1k)
+
+// -97k
+

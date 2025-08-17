@@ -187,6 +187,7 @@ export class CustomersController {
   @Get('conversations')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiQuery({ name: 'search', required: false })
   @ApiOkResponse({
     type: PaginatedConversationsDto,
     description: 'User conversations fetched successfully',

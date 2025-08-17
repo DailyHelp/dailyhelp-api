@@ -214,6 +214,41 @@ export class ReportConversationDto {
   pictures: string[];
 }
 
+export class UpdateServiceDescriptionDto {
+  @IsString()
+  description: string;
+}
+
+export class UpdatePricesDto {
+  @IsNumber()
+  startingPrice: number;
+
+  @IsNumber()
+  minimumAcceptableOffer: number;
+}
+
+export class BankAccountDto {
+  @IsString()
+  accountNumber: string;
+
+  @IsString()
+  bankName: string;
+
+  @IsString()
+  accountName: string;
+
+  @IsString()
+  bankCode: string;
+}
+
+export class ResolveBankAccountDto {
+  @IsString()
+  accountNumber: string;
+
+  @IsString()
+  bankCode: string;
+}
+
 export class CancelOfferDto {
   @IsString()
   reason: string;
@@ -368,16 +403,30 @@ export class ConversationDto {
   createdAt: Date;
 }
 
-const PaginatedAllProvidersDto = createPaginatedSwaggerDto(TopRatedProvider);
+const PaginatedAllProvidersDto = createPaginatedSwaggerDto(
+  TopRatedProvider,
+  'PaginatedAllProvidersDto',
+);
 
-export const PaginatedDisputesDto = createPaginatedSwaggerDto(JobDispute);
+export const PaginatedDisputesDto = createPaginatedSwaggerDto(
+  JobDispute,
+  'PaginatedDisputesDto',
+);
 
-export const PaginatedReviewsDto = createPaginatedSwaggerDto(JobReview);
+export const PaginatedReviewsDto = createPaginatedSwaggerDto(
+  JobReview,
+  'PaginatedReviewsDto',
+);
 
-export const PaginatedConversationsDto =
-  createPaginatedSwaggerDto(ConversationDto);
+export const PaginatedConversationsDto = createPaginatedSwaggerDto(
+  ConversationDto,
+  'PaginatedConversationsDto',
+);
 
-export const PaginatedMessageDto = createPaginatedSwaggerDto(Message);
+export const PaginatedMessageDto = createPaginatedSwaggerDto(
+  Message,
+  'PaginatedMessageDto',
+);
 
 export class ClientDashboardDto {
   @ApiProperty({ type: TopRatedProvider, isArray: true })
@@ -405,4 +454,12 @@ export class ProvidersDashboardDto {
 
   @ApiProperty()
   acceptanceRate: number;
+}
+
+export class WithdrawFundsDto {
+  @IsNumber()
+  amount: number;
+
+  @IsString()
+  bankAccountUuid: string;
 }

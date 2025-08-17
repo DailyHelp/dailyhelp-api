@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import {
   AccountDeletionRequest,
+  BankAccount,
   BlacklistedTokens,
   Feedback,
   Users,
@@ -57,6 +58,7 @@ import { ProvidersController } from './providers.controller';
         JobDispute,
         Feedback,
         AccountDeletionRequest,
+        BankAccount,
       ],
     }),
     JwtModule.registerAsync({
