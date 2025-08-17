@@ -181,6 +181,7 @@ export class UsersService {
     userExists.ninData = JSON.stringify(ninResponse?.data);
     userExists.identityVerified = true;
     userExists.picture = identity.photo;
+    await this.em.flush();
     return { status: true };
   }
 
