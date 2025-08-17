@@ -488,7 +488,7 @@ export class UsersService {
     const hasLocation =
       user.defaultLocation?.lat != null && user.defaultLocation?.lng != null;
     const conn = this.em.getConnection();
-    const hasFilterValues = Object.values(filter).length > 0;
+    const hasFilterValues = filter && Object.values(filter).length > 0;
     const topRatedProviders = hasFilterValues
       ? []
       : await this.fetchTopRatedProviders(conn);
