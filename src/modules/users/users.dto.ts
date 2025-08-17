@@ -366,6 +366,9 @@ export class ConversationDto {
   @ApiProperty({ required: false })
   spMiddlename: string;
 
+  @ApiProperty({ enum: AccountTier })
+  spTier: AccountTier;
+
   @ApiProperty({ required: false })
   rqFirstname: string;
 
@@ -386,6 +389,9 @@ export class ConversationDto {
 
   @ApiProperty({ enum: OfferStatus })
   status: OfferStatus;
+
+  @ApiProperty()
+  offerPrice: number;
 
   @ApiProperty()
   lastLockedAt: Date;

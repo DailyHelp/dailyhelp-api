@@ -109,7 +109,7 @@ export default class ProviderSeed implements ISeeder {
           emailVerified: false,
           phoneVerified: false,
           picture: null,
-          identityVerified: false,
+          identityVerified: true,
           lastLoggedIn: null,
           nin: null,
           bvn: null,
@@ -120,10 +120,7 @@ export default class ProviderSeed implements ISeeder {
           providerAddress: null,
           primaryJobRole: fork.getReference(SubCategory, sub.uuid),
           serviceDescription: `${sub.name} services with reliable scheduling, transparent pricing, and great customer support.`,
-          serviceImages: JSON.stringify([
-            `https://picsum.photos/seed/provider-${i}-1/800/600`,
-            `https://picsum.photos/seed/provider-${i}-2/800/600`,
-          ]),
+          serviceImages: `https://picsum.photos/seed/provider-${i}-1/800/600,https://picsum.photos/seed/provider-${i}-2/800/600`,
 
           offerStartingPrice: startPrice,
           minimumOfferPrice: minPrice,

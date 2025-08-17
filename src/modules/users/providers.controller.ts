@@ -196,6 +196,19 @@ export class ProvidersController {
     // return this.userService.withdrawFunds(body);
   }
 
+  @Get('analytics')
+  async getAnalytics(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Req() req: Request,
+  ) {
+    return this.userService.getAnalytics(
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+      req.user as any,
+    );
+  }
+
   @Get('disputes')
   @ApiOkResponse({
     type: PaginatedDisputesDto,
@@ -305,3 +318,8 @@ export class ProvidersController {
 
 // -97k
 
+// verify identity
+// conversation and message read status
+// websockets
+// payment acceptance refactoring
+// admin

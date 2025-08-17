@@ -77,7 +77,7 @@ import {
 } from '../conversations/conversations.entity';
 import { Message } from 'src/entities/message.entity';
 import { JobReview } from 'src/entities/job-review.entity';
-import { differenceInHours } from 'date-fns';
+import { differenceInHours, startOfDay } from 'date-fns';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { JwtService } from '@nestjs/jwt';
 import { SubCategory } from '../admin/admin.entities';
@@ -154,18 +154,18 @@ export class UsersService {
     let ninResponse: AxiosResponse<any, any>;
     try {
       const token = await this.sharedService.getQoreIDToken();
-      [bvnResponse, ninResponse] = await Promise.all([
-        axios.post(
-          `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/bvn`,
-          { idNumber: identity.bvn, photoUrl: identity.photo },
-          { headers: { Authorization: `Bearer ${token}` } },
-        ),
-        axios.post(
-          `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/nin`,
-          { idNumber: identity.nin, photoUrl: identity.photo },
-          { headers: { Authorization: `Bearer ${token}` } },
-        ),
-      ]);
+      ninResponse = await axios.post(
+        `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/nin`,
+        { idNumber: identity.nin, photoUrl: identity.photo },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      // [bvnResponse, ninResponse] = await Promise.all([
+      //   axios.post(
+      //     `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/bvn`,
+      //     { idNumber: identity.bvn, photoUrl: identity.photo },
+      //     { headers: { Authorization: `Bearer ${token}` } },
+      //   ),
+      // ]);
     } catch (error) {
       console.log('Identity verification failed', error);
       throw new InternalServerErrorException(error?.response?.data?.message);
@@ -177,8 +177,8 @@ export class UsersService {
     userExists.gender = identity.gender;
     userExists.nin = identity.nin;
     userExists.bvn = identity.bvn;
-    userExists.bvnData = JSON.stringify(bvnResponse.data);
-    userExists.ninData = JSON.stringify(ninResponse.data);
+    userExists.bvnData = JSON.stringify(bvnResponse?.data);
+    userExists.ninData = JSON.stringify(ninResponse?.data);
     userExists.identityVerified = true;
     userExists.picture = identity.photo;
     return { status: true };
@@ -398,7 +398,7 @@ export class UsersService {
       LEFT JOIN locations l ON l.uuid = u.default_location
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
-      WHERE u.availability = true AND u.primary_job_role IS NOT NULL AND u.identity_verified = true
+      WHERE u.availability = true AND u.identity_verified = true AND u.primary_job_role IS NOT NULL
       ${topRatedPlaceholders ? `AND u.uuid NOT IN (${topRatedPlaceholders})` : ''}
       GROUP BY u.uuid
       ORDER BY (
@@ -437,7 +437,7 @@ export class UsersService {
       LEFT JOIN jobs j ON j.service_provider = u.uuid AND j.status = 'completed'
       LEFT JOIN job_reviews jr ON jr.reviewed_for = u.uuid
       LEFT JOIN locations l ON l.uuid = u.default_location
-      WHERE u.availability = true AND u.primary_job_role IS NOT NULL AND u.identity_verified = true
+      WHERE u.availability = true AND u.identity_verified = true
         AND u.service_description IS NOT NULL
         AND u.primary_job_role IS NOT NULL
         AND u.offer_starting_price IS NOT NULL
@@ -488,7 +488,10 @@ export class UsersService {
     const hasLocation =
       user.defaultLocation?.lat != null && user.defaultLocation?.lng != null;
     const conn = this.em.getConnection();
-    const topRatedProviders = await this.fetchTopRatedProviders(conn);
+    const hasFilterValues = Object.values(filter).length > 0;
+    const topRatedProviders = hasFilterValues
+      ? []
+      : await this.fetchTopRatedProviders(conn);
     const topRatedUuids: string[] = topRatedProviders.map(
       (u: { uuid: string }) => u.uuid,
     );
@@ -505,15 +508,17 @@ export class UsersService {
           )
         ) AS distance`
       : 'NULL AS distance';
-    const recommendedProviders = await this.fetchRecommendedProviders(
-      conn,
-      locationSelect,
-      topRatedPlaceholders,
-      hasLocation,
-      user.defaultLocation?.lat,
-      user.defaultLocation?.lng,
-      topRatedUuids,
-    );
+    const recommendedProviders = hasFilterValues
+      ? []
+      : await this.fetchRecommendedProviders(
+          conn,
+          locationSelect,
+          topRatedPlaceholders,
+          hasLocation,
+          user.defaultLocation?.lat,
+          user.defaultLocation?.lng,
+          topRatedUuids,
+        );
     const recommendedUuids = recommendedProviders.map(
       (u: { uuid: string }) => u.uuid,
     );
@@ -1101,10 +1106,12 @@ export class UsersService {
         sp.firstname AS spFirstname,
         sp.lastname AS spLastname,
         sp.middlename AS spMiddlename,
+        sp.tier AS spTier,
         m.uuid AS lastMessageId,
         m.message AS lastMessage,
         o.description AS offerDescription,
         o.status AS offerStatus,
+        o.price AS offerPrice,
         c.last_locked_at AS lastLockedAt,
         c.locked,
         c.restricted,
@@ -1151,6 +1158,10 @@ export class UsersService {
       { orderBy: { createdAt: OrderDir.DESC }, populate: ['offer'] },
     );
     return buildResponseDataWithPagination(data, total, { limit, page });
+  }
+
+  async getAnalytics(startDate: Date, endDate: Date, { uuid }: IAuthContext) {
+    const start = startDate ? startOfDay(startDate) : startOfDay(new Date());
   }
 
   async verifyPayment(
