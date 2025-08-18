@@ -197,6 +197,8 @@ export class ProvidersController {
   }
 
   @Get('analytics')
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
   async getAnalytics(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,

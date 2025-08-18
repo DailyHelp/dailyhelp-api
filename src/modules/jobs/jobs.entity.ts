@@ -63,6 +63,9 @@ export class Job extends Timestamp {
   @Property({ nullable: true })
   code: string;
 
+  @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  tip: number;
+
   @ManyToOne(() => JobDispute, {
     fieldName: 'dispute',
     referenceColumnName: 'uuid',

@@ -820,19 +820,21 @@
         },
         "type": {
           "name": "type",
-          "type": "enum('JOB_PROVIDER','OFFER_PROVIDER','DISPUTE_PROVIDER','REPORT_PROVIDER','ACCOUNT_DELETION_PROVIDER','JOB_CLIENT','OFFER_CLIENT','DISPUTE_CLIENT','REPORT_CLIENT','ACCOUNT_DELETION_CLIENT')",
+          "type": "enum('CANCEL_JOB_PROVIDER','DECLINE_OFFER_PROVIDER','CANCEL_OFFER_PROVIDER','DISPUTE_PROVIDER','REPORT_PROVIDER','ACCOUNT_DELETION_PROVIDER','CANCEL_JOB_CLIENT','CANCEL_OFFER_CLIENT','DECLINE_OFFER_CLIENT','DISPUTE_CLIENT','REPORT_CLIENT','ACCOUNT_DELETION_CLIENT')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
           "enumItems": [
-            "JOB_PROVIDER",
-            "OFFER_PROVIDER",
+            "CANCEL_JOB_PROVIDER",
+            "DECLINE_OFFER_PROVIDER",
+            "CANCEL_OFFER_PROVIDER",
             "DISPUTE_PROVIDER",
             "REPORT_PROVIDER",
             "ACCOUNT_DELETION_PROVIDER",
-            "JOB_CLIENT",
-            "OFFER_CLIENT",
+            "CANCEL_JOB_CLIENT",
+            "CANCEL_OFFER_CLIENT",
+            "DECLINE_OFFER_CLIENT",
             "DISPUTE_CLIENT",
             "REPORT_CLIENT",
             "ACCOUNT_DELETION_CLIENT"
@@ -1809,6 +1811,18 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
+        },
+        "tip": {
+          "name": "tip",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "precision": 10,
+          "scale": 2,
+          "default": "0",
+          "mappedType": "decimal"
         },
         "dispute": {
           "name": "dispute",

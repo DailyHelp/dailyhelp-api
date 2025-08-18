@@ -47,6 +47,7 @@ import {
   Currencies,
   DisputeStatus,
   IAuthContext,
+  JobStatus,
   MessageType,
   OfferStatus,
   OrderDir,
@@ -77,7 +78,7 @@ import {
 } from '../conversations/conversations.entity';
 import { Message } from 'src/entities/message.entity';
 import { JobReview } from 'src/entities/job-review.entity';
-import { differenceInHours, startOfDay } from 'date-fns';
+import { differenceInHours, endOfDay, startOfDay } from 'date-fns';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { JwtService } from '@nestjs/jwt';
 import { SubCategory } from '../admin/admin.entities';
@@ -1163,6 +1164,143 @@ export class UsersService {
 
   async getAnalytics(startDate: Date, endDate: Date, { uuid }: IAuthContext) {
     const start = startDate ? startOfDay(startDate) : startOfDay(new Date());
+    const end = endDate ? endOfDay(endDate) : endOfDay(new Date());
+    const jobsSql = `
+      SELECT
+        SUM(CASE WHEN j.created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS totalJobs,
+        SUM(CASE WHEN j.status = ? AND j.created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS completedJobs,
+        SUM(CASE WHEN j.status = ? AND j.created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS canceledJobs,
+        SUM(CASE WHEN j.status = ? AND j.created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS disputedJobs,
+        COALESCE(SUM(CASE WHEN j.status = ? AND j.end_date BETWEEN ? AND ? THEN j.price ELSE 0 END), 0) AS jobPayment,
+        COALESCE(SUM(CASE WHEN j.status = ? AND j.end_date BETWEEN ? AND ? THEN j.tip ELSE 0 END), 0) AS tips,
+        COALESCE(SUM(CASE WHEN j.status = ? AND j.end_date BETWEEN ? AND ? THEN j.price * ? ELSE 0 END), 0) AS commission
+      FROM jobs j
+      WHERE j.service_provider = ?
+    `;
+    const jobsParams = [
+      start,
+      end,
+      JobStatus.COMPLETED,
+      start,
+      end,
+      JobStatus.CANCELED,
+      start,
+      end,
+      JobStatus.DISPUTED,
+      start,
+      end,
+      JobStatus.COMPLETED,
+      start,
+      end,
+      JobStatus.COMPLETED,
+      start,
+      end,
+      JobStatus.COMPLETED,
+      start,
+      end,
+      0.1,
+      uuid,
+    ];
+    const offersSql = `
+      WITH scoped AS (
+        SELECT DISTINCT
+          o.uuid,
+          o.status,
+          LOWER(o.declined_reason_category) AS dec_cat,
+          LOWER(o.cancelled_reason_category) AS can_cat,
+          m.from AS from_user,
+          m.to AS to_user,
+          m.created_at AS created_at
+        FROM messages m
+        JOIN offers o ON o.uuid = m.offer
+        WHERE (m.from = ? OR m.to = ?)
+          AND m.created_at BETWEEN ? AND ?
+      ),
+      latest AS (
+        SELECT s.*
+        FROM scoped s 
+        LEFT JOIN offers nx ON nx.current_offer = s.uuid
+        WHERE nx.uuid IS NULL
+      )
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'ACCEPTED' AND to_user = ? THEN 1 ELSE 0 END) AS youAccepted,
+        SUM(CASE WHEN status = 'DECLINED' AND (dec_cat = 'provider' OR (dec_cat IS NULL AND to_user = ?)) THEN 1 ELSE 0 END) AS youDeclined,
+        SUM(CASE WHEN status = 'CANCELLED' AND (can_cat = 'provider' OR (can_cat IS NULL AND from_user = ?)) THEN 1 ELSE 0 END) AS youCancelled,
+        SUM(CASE WHEN status = 'DECLINED' AND (dec_cat = 'client' OR (dec_cat IS NULL AND from_user = ?)) THEN 1 ELSE 0 END) AS clientDeclined,
+        SUM(CASE WHEN status = 'CANCELLED' AND (can_cat = 'client' OR (can_cat IS NULL AND from_user <> ?)) THEN 1 ELSE 0 END) AS clientCancelled
+      FROM latest
+    `;
+    const offersParams = [uuid, uuid, start, end, uuid, uuid, uuid, uuid, uuid];
+    const [jobsRows, offersRows] = await Promise.all([
+      this.em.getConnection().execute(jobsSql, jobsParams),
+      this.em.getConnection().execute(offersSql, offersParams),
+    ]);
+    const j = jobsRows?.[0] ?? {};
+    const o = offersRows?.[0] ?? {};
+    const jobPayment = Number(j.jobPayment || 0);
+    const tips = Number(j.tips || 0);
+    const income = jobPayment + tips;
+    const commission = Number(j.commission || 0);
+    const earnings = income - commission;
+    const totalOffers = Number(o.total || 0);
+    const youAccepted = Number(o.youAccepted || 0);
+    const youDeclined = Number(o.youDeclined || 0);
+    const youCancelled = Number(o.youCancelled || 0);
+    const clientDeclined = Number(o.clientDeclined || 0);
+    const clientCancelled = Number(o.clientCancelled || 0);
+    const pct = (n: number, d: number) => (d ? +((n / d) * 100).toFixed(1) : 0);
+    const acceptanceRate = pct(youAccepted, totalOffers);
+    return {
+      range: { start, end },
+      revenue: {
+        rings: { earnings, tips, commission: -commission },
+        breakdown: {
+          jobPayment,
+          tips,
+          income,
+          commissionRate:
+            income > 0
+              ? +((commission / income) * 100).toFixed(2)
+              : +(0.1 * 100).toFixed(2),
+          deductions: commission,
+          yourEarnings: earnings,
+        },
+      },
+      jobs: {
+        total: Number(j.totalJobs || 0),
+        completed: Number(j.completedJobs || 0),
+        canceled: Number(j.canceledJobs || 0),
+        disputed: Number(j.disputedJobs || 0),
+      },
+      offers: {
+        total: totalOffers,
+        accepted: youAccepted,
+        acceptanceRate,
+        breakdown: {
+          youAccepted: {
+            count: youAccepted,
+            percent: acceptanceRate,
+          },
+          youDeclined: {
+            count: youDeclined,
+            percent: pct(youDeclined, totalOffers),
+          },
+          youCancelled: {
+            count: youCancelled,
+            percent: pct(youCancelled, totalOffers),
+          },
+          clientDeclined: {
+            count: clientDeclined,
+            percent: pct(clientDeclined, totalOffers),
+          },
+          clientCancelled: {
+            count: clientCancelled,
+            percent: pct(clientCancelled, totalOffers),
+          },
+        },
+      },
+    };
   }
 
   async verifyPayment(

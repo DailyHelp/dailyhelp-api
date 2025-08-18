@@ -143,11 +143,11 @@ export class JobService {
       user: { uuid: job.serviceProvider?.uuid },
       userType,
     });
-    providerWallet.totalBalance += job.price;
+    providerWallet.totalBalance += job.price * 0.10;
     const transactionModel = this.transactionRepository.create({
       uuid: v4(),
       type: TransactionType.CREDIT,
-      amount: job.price,
+      amount: job.price * 0.10,
       wallet: this.walletRepository.getReference(providerWallet.uuid),
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Payment',
@@ -254,6 +254,7 @@ export class JobService {
       providerWallet.totalBalance += dto.tip;
       requestorWallet.availableBalance -= dto.tip;
       requestorWallet.totalBalance -= dto.tip;
+      job.tip = dto.tip;
       const providerTransactionModel = this.transactionRepository.create({
         uuid: v4(),
         type: TransactionType.CREDIT,

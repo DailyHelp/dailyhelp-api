@@ -14,27 +14,63 @@ export default class ReasonCategorySeed implements ISeeder {
     const existing = await forkedEm.findAll(ReasonCategory);
     if (existing.length) return;
     const reasons = [
-      { name: 'Location too far', type: ReasonCategoryType.JOB_PROVIDER },
-      { name: 'Unavailable', type: ReasonCategoryType.JOB_PROVIDER },
+      {
+        name: 'Location too far',
+        type: ReasonCategoryType.CANCEL_JOB_PROVIDER,
+      },
+      { name: 'Unavailable', type: ReasonCategoryType.CANCEL_JOB_PROVIDER },
       {
         name: 'Unsafe or inaccessible area',
-        type: ReasonCategoryType.JOB_PROVIDER,
+        type: ReasonCategoryType.CANCEL_JOB_PROVIDER,
       },
-      { name: 'Emergency', type: ReasonCategoryType.JOB_PROVIDER },
-      { name: 'Felt unsafe', type: ReasonCategoryType.JOB_PROVIDER },
+      { name: 'Emergency', type: ReasonCategoryType.CANCEL_JOB_PROVIDER },
+      { name: 'Felt unsafe', type: ReasonCategoryType.CANCEL_JOB_PROVIDER },
       {
-        name: 'Client refused to start JOB_PROVIDER',
-        type: ReasonCategoryType.JOB_PROVIDER,
+        name: 'Client refused to start job',
+        type: ReasonCategoryType.CANCEL_JOB_PROVIDER,
       },
-      { name: 'Offer is too low', type: ReasonCategoryType.OFFER_PROVIDER },
+      {
+        name: 'Offer is too low',
+        type: ReasonCategoryType.DECLINE_OFFER_PROVIDER,
+      },
       {
         name: 'Job details are unclear',
-        type: ReasonCategoryType.OFFER_PROVIDER,
+        type: ReasonCategoryType.DECLINE_OFFER_PROVIDER,
       },
-      { name: "Don't offer service", type: ReasonCategoryType.OFFER_PROVIDER },
-      { name: 'Incomplete info', type: ReasonCategoryType.OFFER_PROVIDER },
-      { name: 'Not my expertise', type: ReasonCategoryType.OFFER_PROVIDER },
-      { name: 'Prefer someone else', type: ReasonCategoryType.OFFER_PROVIDER },
+      {
+        name: "Don't offer service",
+        type: ReasonCategoryType.DECLINE_OFFER_PROVIDER,
+      },
+      {
+        name: 'Incomplete info',
+        type: ReasonCategoryType.DECLINE_OFFER_PROVIDER,
+      },
+      {
+        name: 'Not my expertise',
+        type: ReasonCategoryType.DECLINE_OFFER_PROVIDER,
+      },
+      {
+        name: 'Prefer someone else',
+        type: ReasonCategoryType.DECLINE_OFFER_PROVIDER,
+      },
+      { name: 'Not available', type: ReasonCategoryType.CANCEL_OFFER_PROVIDER },
+      {
+        name: 'Client unresponsive',
+        type: ReasonCategoryType.CANCEL_OFFER_PROVIDER,
+      },
+      {
+        name: 'Prefer someone else',
+        type: ReasonCategoryType.CANCEL_OFFER_PROVIDER,
+      },
+      {
+        name: 'Changed my mind',
+        type: ReasonCategoryType.CANCEL_OFFER_PROVIDER,
+      },
+      {
+        name: 'Safety concerns',
+        type: ReasonCategoryType.CANCEL_OFFER_PROVIDER,
+      },
+      { name: 'Emergency', type: ReasonCategoryType.CANCEL_OFFER_PROVIDER },
       {
         name: 'Job details were false or misleading',
         type: ReasonCategoryType.DISPUTE_PROVIDER,
@@ -102,12 +138,45 @@ export default class ReasonCategorySeed implements ISeeder {
         type: ReasonCategoryType.REPORT_PROVIDER,
       },
       { name: 'Other', type: ReasonCategoryType.REPORT_PROVIDER },
-      { name: 'No response', type: ReasonCategoryType.OFFER_CLIENT },
-      { name: 'Price concern', type: ReasonCategoryType.OFFER_CLIENT },
-      { name: 'No longer needed', type: ReasonCategoryType.OFFER_CLIENT },
-      { name: 'Made a mistake', type: ReasonCategoryType.OFFER_CLIENT },
-      { name: 'Not available', type: ReasonCategoryType.OFFER_CLIENT },
-      { name: 'Found someone else', type: ReasonCategoryType.OFFER_CLIENT },
+      {
+        name: 'Found a better deal',
+        type: ReasonCategoryType.DECLINE_OFFER_CLIENT,
+      },
+      { name: 'Too expensive', type: ReasonCategoryType.DECLINE_OFFER_CLIENT },
+      { name: 'Slow response', type: ReasonCategoryType.DECLINE_OFFER_CLIENT },
+      {
+        name: 'Not clear enough',
+        type: ReasonCategoryType.DECLINE_OFFER_CLIENT,
+      },
+      { name: 'Wrong time', type: ReasonCategoryType.DECLINE_OFFER_CLIENT },
+      {
+        name: 'Prefer someone else',
+        type: ReasonCategoryType.DECLINE_OFFER_CLIENT,
+      },
+      { name: 'No response', type: ReasonCategoryType.CANCEL_OFFER_CLIENT },
+      { name: 'Price concern', type: ReasonCategoryType.CANCEL_OFFER_CLIENT },
+      {
+        name: 'No longer needed',
+        type: ReasonCategoryType.CANCEL_OFFER_CLIENT,
+      },
+      { name: 'Made a mistake', type: ReasonCategoryType.CANCEL_OFFER_CLIENT },
+      { name: 'Not available', type: ReasonCategoryType.CANCEL_OFFER_CLIENT },
+      {
+        name: 'Found someone else',
+        type: ReasonCategoryType.CANCEL_OFFER_CLIENT,
+      },
+      {
+        name: 'Scheduling conflict',
+        type: ReasonCategoryType.CANCEL_JOB_CLIENT,
+      },
+      { name: 'Slow response', type: ReasonCategoryType.CANCEL_JOB_CLIENT },
+      {
+        name: 'Delayed provider arrival',
+        type: ReasonCategoryType.CANCEL_JOB_CLIENT,
+      },
+      { name: 'Emergency', type: ReasonCategoryType.CANCEL_JOB_CLIENT },
+      { name: 'Felt unsafe', type: ReasonCategoryType.CANCEL_JOB_CLIENT },
+      { name: 'Change of plans', type: ReasonCategoryType.CANCEL_JOB_CLIENT },
       {
         name: "Provider didn't complete the work",
         type: ReasonCategoryType.DISPUTE_CLIENT,
