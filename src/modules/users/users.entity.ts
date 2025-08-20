@@ -190,6 +190,9 @@ export class BankAccount extends Timestamp {
   @Property({ nullable: true })
   bankCode: string;
 
+  @Property({ nullable: true })
+  recipientCode: string;
+
   @ManyToOne(() => Users, {
     fieldName: 'user',
     referenceColumnName: 'uuid',

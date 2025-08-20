@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsBooleanString,
   IsEnum,
   IsNumber,
   IsNumberString,
@@ -151,6 +152,11 @@ export class ClientDashboardFilter {
   @IsNumberString()
   @Type(() => Number)
   longitude?: number;
+
+  @IsOptional()
+  @IsBooleanString()
+  @Type(() => Boolean)
+  isSearchPage?: boolean;
 }
 
 export class ClientDashboardQuery {

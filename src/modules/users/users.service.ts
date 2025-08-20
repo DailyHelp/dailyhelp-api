@@ -85,6 +85,7 @@ import { SubCategory } from '../admin/admin.entities';
 import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import bcrypt from 'bcryptjs';
+import e from 'express';
 
 @Injectable()
 export class UsersService {
@@ -490,8 +491,8 @@ export class UsersService {
     const hasLocation =
       user.defaultLocation?.lat != null && user.defaultLocation?.lng != null;
     const conn = this.em.getConnection();
-    const hasFilterValues = filter && Object.values(filter).length > 0;
-    const topRatedProviders = hasFilterValues
+    const isSearchPage = filter && filter?.isSearchPage;
+    const topRatedProviders = isSearchPage
       ? []
       : await this.fetchTopRatedProviders(conn);
     const topRatedUuids: string[] = topRatedProviders.map(
@@ -510,7 +511,7 @@ export class UsersService {
           )
         ) AS distance`
       : 'NULL AS distance';
-    const recommendedProviders = hasFilterValues
+    const recommendedProviders = isSearchPage
       ? []
       : await this.fetchRecommendedProviders(
           conn,
@@ -638,12 +639,29 @@ export class UsersService {
       user: { uuid },
     });
     if (duplicateExists) throw new ConflictException(`Record already exists`);
+    const response = await axios.post(
+      `${this.paystackConfig.baseUrl}/transferrecipient`,
+      {
+        type: 'nuban',
+        name: dto.accountName,
+        account_number: dto.accountNumber,
+        bank_code: dto.bankCode,
+        currency: 'NGN',
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
+        },
+      },
+    );
+    const recipientCode = response.data.data.recipient_code;
     const bankAccountModel = this.bankAccountRepository.create({
       uuid: v4(),
       accountNumber: dto.accountNumber,
       accountName: dto.accountName,
       bankName: dto.bankName,
       bankCode: dto.bankCode,
+      recipientCode,
       user: this.usersRepository.getReference(uuid),
     });
     this.em.persist(bankAccountModel);
@@ -812,7 +830,7 @@ export class UsersService {
   ) {
     const messageExists = await this.messageRepository.findOne({
       to: { uuid },
-      offer: { uuid },
+      offer: { uuid: offerUuid },
     });
     if (!messageExists) throw new NotFoundException('Message does not exist');
     const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
@@ -1153,12 +1171,39 @@ export class UsersService {
     pagination: PaginationInput,
   ) {
     const { page = 1, limit = 20 } = pagination;
+    const conversation = await this.conversationRepository.findOne({
+      uuid: conversationUuid,
+    });
+    const hoursAgo = differenceInHours(new Date(), conversation.lastLockedAt);
+    if (conversation.locked && hoursAgo >= 24) {
+      conversation.locked = false;
+      conversation.lastLockedAt = null;
+    }
+    let canSendOffer = true;
+    if (conversation.lastMessage) {
+      const lastMessage = await this.messageRepository.findOne({
+        uuid: conversation.lastMessage?.uuid,
+      });
+      if (lastMessage.type === MessageType.OFFER) {
+        const lastOffer = await this.offerRepository.findOne({
+          uuid: lastMessage.offer?.uuid,
+        });
+        if (lastOffer.status === OfferStatus.PENDING) {
+          canSendOffer = false;
+        }
+      }
+    }
+    if (canSendOffer) {
+      canSendOffer =
+        !conversation.locked && conversation.restricted && !conversation.locked;
+    }
     const [data, total] = await this.messageRepository.findAndCount(
       {
         conversation: { uuid: conversationUuid },
       },
       { orderBy: { createdAt: OrderDir.DESC }, populate: ['offer'] },
     );
+    this.em.flush();
     return buildResponseDataWithPagination(data, total, { limit, page });
   }
 
