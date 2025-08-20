@@ -1195,7 +1195,9 @@ export class UsersService {
     }
     if (canSendOffer) {
       canSendOffer =
-        !conversation.locked && conversation.restricted && !conversation.locked;
+        !conversation.locked &&
+        conversation.restricted &&
+        !conversation.blocked;
     }
     const [data, total] = await this.messageRepository.findAndCount(
       {
@@ -1204,7 +1206,12 @@ export class UsersService {
       { orderBy: { createdAt: OrderDir.DESC }, populate: ['offer'] },
     );
     this.em.flush();
-    return buildResponseDataWithPagination(data, total, { limit, page });
+    return buildResponseDataWithPagination(
+      data,
+      total,
+      { limit, page },
+      { canSendOffer },
+    );
   }
 
   async getAnalytics(startDate: Date, endDate: Date, { uuid }: IAuthContext) {

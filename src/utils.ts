@@ -29,11 +29,14 @@ export const extractTokenFromReq = (req: Request, error: string) => {
   return token;
 };
 
-export const buildResponseDataWithPagination = <T>(
+type ExtraSafe<E> = Omit<E, 'status' | 'data' | 'pagination'>;
+
+export const buildResponseDataWithPagination = <T, E extends object = {}>(
   data: T[] | any,
   total: number,
   pagination: { limit: number; page: number },
-): BasePaginatedResponseDto => {
+  extra?: ExtraSafe<E>,
+): BasePaginatedResponseDto & E => {
   return {
     status: true,
     data,
@@ -47,10 +50,15 @@ export const buildResponseDataWithPagination = <T>(
         (total && 1) ||
         0,
     },
+    ...(extra as E),
   };
 };
 
-export const appendCondition = (sql: string, params: any[], value?: string | number) => {
+export const appendCondition = (
+  sql: string,
+  params: any[],
+  value?: string | number,
+) => {
   if (value === undefined || value === null || value === '') {
     return '';
   }
@@ -58,8 +66,8 @@ export const appendCondition = (sql: string, params: any[], value?: string | num
   if (typeof value === 'string' && value.includes(',')) {
     const values = value
       .split(',')
-      .map(v => v.trim())
-      .filter(v => v !== '');
+      .map((v) => v.trim())
+      .filter((v) => v !== '');
     if (values.length === 0) return '';
 
     params.push(...values);
