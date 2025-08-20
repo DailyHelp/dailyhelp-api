@@ -707,7 +707,7 @@ export class UsersService {
   ) {
     const messageExists = await this.messageRepository.findOne({
       from: { uuid },
-      offer: { uuid },
+      offer: { uuid: offerUuid },
     });
     if (!messageExists) throw new NotFoundException('Message does not exist');
     const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
@@ -728,7 +728,7 @@ export class UsersService {
   ) {
     const messageExists = await this.messageRepository.findOne({
       from: { uuid },
-      offer: { uuid },
+      offer: { uuid: offerUuid },
     });
     if (!messageExists) throw new NotFoundException('Message does not exist');
     const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
@@ -767,7 +767,7 @@ export class UsersService {
   async acceptOffer(offerUuid: string, { uuid }: IAuthContext) {
     const messageExists = await this.messageRepository.findOne({
       to: { uuid },
-      offer: { uuid },
+      offer: { uuid: offerUuid },
     });
     if (!messageExists) throw new NotFoundException('Message does not exist');
     const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
@@ -786,7 +786,7 @@ export class UsersService {
   ) {
     const messageExists = await this.messageRepository.findOne({
       to: { uuid },
-      offer: { uuid },
+      offer: { uuid: offerUuid },
     });
     if (!messageExists) throw new NotFoundException('Message does not exist');
     const offerExists = await this.offerRepository.findOne({ uuid: offerUuid });
@@ -1126,6 +1126,7 @@ export class UsersService {
         sp.firstname AS spFirstname,
         sp.lastname AS spLastname,
         sp.middlename AS spMiddlename,
+        sp.picture AS spPicture,
         sp.tier AS spTier,
         m.uuid AS lastMessageId,
         m.message AS lastMessage,
