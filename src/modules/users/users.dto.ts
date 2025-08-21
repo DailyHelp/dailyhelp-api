@@ -1,6 +1,5 @@
 import {
   IsBoolean,
-  IsBooleanString,
   IsEnum,
   IsNumber,
   IsNumberString,
@@ -11,7 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Users } from './users.entity';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { createPaginatedSwaggerDto, PaginationInput } from 'src/base/dto';
 import { AccountTier, OfferStatus, PaymentPurpose, UserType } from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
@@ -154,8 +153,14 @@ export class ClientDashboardFilter {
   longitude?: number;
 
   @IsOptional()
-  @IsBooleanString()
-  @Type(() => Boolean)
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    const v = String(value).toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(v)) return true;
+    if (['false', '0', 'no', 'off'].includes(v)) return false;
+    return value; 
+  })
   isSearchPage?: boolean;
 }
 

@@ -279,6 +279,7 @@ export class UsersService {
       ...userExists.providerOnboarding,
       step3: true,
     };
+    userExists.onboardingCompleted = true;
     if (!userExists.userTypes.includes(userType)) {
       const splittedUserTypes = userExists.userTypes.split(',');
       splittedUserTypes.push(userType);
@@ -1071,7 +1072,7 @@ export class UsersService {
 
     const data = await this.em
       .getConnection()
-      .execute(dataQuery, [...params, limit, offset]);
+      .execute(dataQuery, [...params, Number(limit), Number(offset)]);
 
     const countQuery = `
       SELECT COUNT(*) as total

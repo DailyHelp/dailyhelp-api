@@ -254,6 +254,7 @@ export class ProvidersController {
   @Get('conversations')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiQuery({ name: 'search', required: false })
   @ApiOkResponse({
     type: PaginatedConversationsDto,
     description: 'Provider conversations fetched successfully',
@@ -322,6 +323,6 @@ export class ProvidersController {
 
 // verify identity
 // conversation and message read status
-// websockets
+// websockets for messages, conversations, offers, jobs, online/offline
 // payment acceptance refactoring
 // admin

@@ -144,6 +144,9 @@ export class Users extends Timestamp {
   @Property({ type: 'json', nullable: true })
   providerOnboarding: IProviderOnboarding;
 
+  @Property({ default: false })
+  onboardingCompleted: boolean;
+
   @Property({ nullable: true })
   utilityBill: string;
 }
