@@ -233,6 +233,11 @@ export class CustomersController {
     return this.userService.switchUserType(body.userType, req.user as any);
   }
 
+  @Post('initialize-paystack-payment')
+  initializePaystackPayment(@Body() paymentInfo: PaymentInfo, @Req() request: Request) {
+    return this.userService.initializePaystackPayment(paymentInfo, request.user as any);
+  }
+
   @Post('verify-transaction/:transactionId')
   @UseGuards(ExpiredJwtAuthGuard)
   verifyPayment(

@@ -192,8 +192,8 @@ export class ProvidersController {
   }
 
   @Post('wallet/withdraw')
-  async withdrawFunds(@Body() body: WithdrawFundsDto) {
-    // return this.userService.withdrawFunds(body);
+  async withdrawFunds(@Body() body: WithdrawFundsDto, @Req() req: Request) {
+    return this.userService.withdrawFunds(body, req.user as any);
   }
 
   @Get('analytics')
@@ -324,5 +324,4 @@ export class ProvidersController {
 // verify identity
 // conversation and message read status
 // websockets for messages, conversations, offers, jobs, online/offline
-// payment acceptance refactoring
 // admin

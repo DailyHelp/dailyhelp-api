@@ -41,6 +41,7 @@ import {
   SendOfferDto,
   UpdatePricesDto,
   VerifyIdentityDto,
+  WithdrawFundsDto,
 } from './users.dto';
 import {
   AccountTier,
@@ -53,6 +54,7 @@ import {
   OrderDir,
   PaymentPurpose,
   PaymentType,
+  TransactionStatus,
   TransactionType,
   UserType,
 } from 'src/types';
@@ -73,7 +75,6 @@ import {
 import {
   Conversation,
   Offer,
-  Payment,
   Report,
 } from '../conversations/conversations.entity';
 import { Message } from 'src/entities/message.entity';
@@ -85,7 +86,7 @@ import { SubCategory } from '../admin/admin.entities';
 import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import bcrypt from 'bcryptjs';
-import e from 'express';
+import { Payment } from '../../entities/payment.entity';
 
 @Injectable()
 export class UsersService {
@@ -318,29 +319,33 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     const providerStats = await this.em.getConnection().execute(
       `
-      SELECT 
-        COALESCE(SUM(DISTINCT CASE 
-          WHEN DATE(t.created_at) = CURDATE() AND t.locked = FALSE THEN t.amount 
-          ELSE 0 END), 0) AS todaysEarnings,
-
-        SUM(CASE WHEN o.status IN ('ACCEPTED', 'DECLINED', 'COUNTERED') THEN 1 ELSE 0 END) AS totalDecisions,
-        SUM(CASE WHEN o.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS acceptedOffers,
-
-        CASE 
-          WHEN SUM(CASE WHEN o.status IN ('ACCEPTED', 'DECLINED', 'COUNTERED') THEN 1 ELSE 0 END) = 0 THEN 0
-          ELSE ROUND(
-            (SUM(CASE WHEN o.status = 'ACCEPTED' THEN 1 ELSE 0 END) /
-            SUM(CASE WHEN o.status IN ('ACCEPTED', 'DECLINED', 'COUNTERED') THEN 1 ELSE 0 END)) * 100, 2)
+      WITH tx AS (
+        SELECT COALESCE(SUM(t.amount), 0) AS todaysEarnings
+        FROM wallets w
+        JOIN transactions t ON t.wallet = w.uuid
+        WHERE w.user = ?
+          AND DATE(t.created_at) = CURDATE()
+          AND t.locked = 0
+      ),
+      decisions AS (
+        SELECT
+          SUM(o.status IN ('ACCEPTED','DECLINED','COUNTERED')) AS totalDecisions,
+          SUM(o.status = 'ACCEPTED')                           AS acceptedOffers
+        FROM conversations c
+        JOIN messages m ON m.conversation = c.uuid
+        JOIN offers   o ON o.uuid = m.offer
+        WHERE c.service_provider = ?
+      )
+      SELECT
+        tx.todaysEarnings,
+        decisions.totalDecisions,
+        decisions.acceptedOffers,
+        CASE WHEN decisions.totalDecisions = 0 THEN 0
+            ELSE ROUND(decisions.acceptedOffers / decisions.totalDecisions * 100, 2)
         END AS acceptanceRate
-      FROM users u
-      LEFT JOIN wallets w ON w.user = u.uuid
-      LEFT JOIN transactions t ON t.wallet = w.uuid
-      LEFT JOIN conversations c ON c.service_provider = u.uuid
-      LEFT JOIN messages m ON m.conversation = c.uuid
-      LEFT JOIN offers o ON o.uuid = m.offer
-      WHERE u.uuid = ?,
+      FROM tx, decisions
     `,
-      [uuid],
+      [uuid, uuid],
     );
     let jobGoal = 15;
     switch (user.tier) {
@@ -633,6 +638,55 @@ export class UsersService {
     return { status: true };
   }
 
+  async withdrawFunds(dto: WithdrawFundsDto, { uuid, userType }: IAuthContext) {
+    const wallet = await this.walletRepository.findOne({
+      user: { uuid },
+      userType,
+    });
+    if (wallet.availableBalance < dto.amount)
+      throw new ForbiddenException(`Insufficient balance`);
+    const bankAccount = await this.bankAccountRepository.findOne({
+      user: { uuid },
+      uuid: dto.bankAccountUuid,
+    });
+    if (!bankAccount)
+      throw new NotFoundException(`Bank account does not exist`);
+    const transactionUuid = v4();
+    const response = await axios.post(
+      `${this.paystackConfig.baseUrl}/transfer`,
+      {
+        source: 'balance',
+        amount: dto.amount * 100,
+        recipient: bankAccount.recipientCode,
+        reference: transactionUuid,
+        reason: `Payout`,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
+        },
+      },
+    );
+    const status = response.data.data.status;
+    if (status !== 'disabled') {
+      throw new InternalServerErrorException(
+        `Kindly contact admin to ensure that OTP is disabled for transfers on this account`,
+      );
+    }
+    const transactionModel = this.transactionRepository.create({
+      uuid: transactionUuid,
+      type: TransactionType.DEBIT,
+      status: TransactionStatus.PENDING,
+      amount: dto.amount,
+      wallet: this.walletRepository.getReference(wallet.uuid),
+      remark: 'Payout',
+      locked: false,
+    });
+    this.em.persist(transactionModel);
+    wallet.availableBalance -= dto.amount;
+    await this.em.flush();
+  }
+
   async addBankAccount(dto: BankAccountDto, { uuid }: IAuthContext) {
     const duplicateExists = await this.bankAccountRepository.findOne({
       accountNumber: dto.accountNumber,
@@ -748,19 +802,6 @@ export class UsersService {
       conversation.lastLockedAt = new Date();
       conversation.cancellationChances = 3;
     }
-    const messageModel = this.messageRepository.create({
-      uuid: v4(),
-      conversation: this.conversationRepository.getReference(conversation.uuid),
-      from: this.usersRepository.getReference(uuid),
-      to: this.usersRepository.getReference(messageExists.to?.uuid),
-      type: MessageType.OFFER,
-      offer: this.offerRepository.getReference(offerExists.uuid),
-      message: dto.reason,
-    });
-    conversation.lastMessage = this.messageRepository.getReference(
-      messageModel.uuid,
-    );
-    this.em.persist(messageModel);
     await this.em.flush();
     return { status: true };
   }
@@ -1357,6 +1398,63 @@ export class UsersService {
     };
   }
 
+  async initializePaystackPayment(
+    dto: PaymentInfo,
+    { uuid, userType, email }: IAuthContext,
+  ) {
+    const reference = v4();
+    const initRes = await axios.post(
+      `${this.paystackConfig.baseUrl}/transaction/initialize`,
+      {
+        email,
+        amount: Math.round(dto.amount * 100),
+        currency: Currencies.NGN,
+        reference,
+        metadata: {
+          intentId: reference,
+          purpose: dto.purpose,
+          offerUuid: dto.offerUuid ?? null,
+          conversationUuid: dto.conversationUuid ?? null,
+          userUuid: uuid,
+          userType,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
+        },
+      },
+    );
+    const paymentModel = this.paymentRepository.create({
+      uuid: reference,
+      reference,
+      amount: dto.amount,
+      currency: Currencies.NGN,
+      user: this.usersRepository.getReference(uuid),
+      type: PaymentType.INCOMING,
+      userType,
+      offer: dto.offerUuid
+        ? this.offerRepository.getReference(dto.offerUuid)
+        : null,
+      conversation: dto.conversationUuid
+        ? this.conversationRepository.getReference(dto.conversationUuid)
+        : null,
+      status: 'initialized',
+      metadata: JSON.stringify({
+        purpose: dto.purpose,
+        description: dto.description,
+      }),
+    });
+    this.em.persist(paymentModel);
+    await this.em.flush();
+    const { authorization_url, access_code } = initRes.data.data;
+    return {
+      authorizationUrl: authorization_url,
+      accessCode: access_code,
+      reference,
+    };
+  }
+
   async verifyPayment(
     transactionId: string,
     dto: PaymentInfo,
@@ -1391,7 +1489,7 @@ export class UsersService {
       const paymentUuid = v4();
       const paymentModel = this.paymentRepository.create({
         uuid: paymentUuid,
-        transactionId: transactionId.toString(),
+        reference: transactionId.toString(),
         metadata: JSON.stringify(paymentData),
         type: PaymentType.INCOMING,
         amount: dto.amount,
@@ -1435,7 +1533,7 @@ export class UsersService {
       const paymentUuid = v4();
       const paymentModel = this.paymentRepository.create({
         uuid: paymentUuid,
-        transactionId: transactionId.toString(),
+        reference: transactionId.toString(),
         metadata: JSON.stringify(paymentData),
         type: PaymentType.INCOMING,
         amount: offerExists.price,

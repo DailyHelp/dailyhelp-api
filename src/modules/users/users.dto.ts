@@ -283,6 +283,10 @@ export class PaymentInfo {
 
   @IsString()
   @ValidateIf((p) => p.purpose === PaymentPurpose.JOB_OFFER)
+  conversationUuid: string;
+
+  @IsString()
+  @ValidateIf((p) => p.purpose === PaymentPurpose.JOB_OFFER)
   description: string;
 
   @IsNumber()

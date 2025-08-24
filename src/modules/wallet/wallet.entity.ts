@@ -8,9 +8,9 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { Users } from '../users/users.entity';
-import { TransactionType, UserType } from '../../types';
+import { TransactionStatus, TransactionType, UserType } from '../../types';
 import { Job } from '../jobs/jobs.entity';
-import { Payment } from '../conversations/conversations.entity';
+import { Payment } from '../../entities/payment.entity';
 
 @Filter({
   name: 'notDeleted',
@@ -52,6 +52,9 @@ export class Transaction extends Timestamp {
 
   @Enum({ items: () => TransactionType })
   type: TransactionType;
+
+  @Enum({ items: () => TransactionStatus, default: TransactionStatus.SUCCESS })
+  status: TransactionStatus;
 
   @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   amount: number;

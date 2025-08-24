@@ -76,6 +76,12 @@ export enum TransactionType {
   DEBIT = 'debit',
 }
 
+export enum TransactionStatus {
+  PENDING = 'PENDING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+}
+
 export enum Currencies {
   NGN = 'NGN',
 }

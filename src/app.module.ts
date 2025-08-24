@@ -17,6 +17,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import CronModule from './modules/cron/cron.module';
 import { JobsModule } from './modules/jobs/jobs.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
     WalletModule,
     CronModule,
     JobsModule,
+    IntegrationsModule,
   ],
   controllers: [AppController],
   providers: [

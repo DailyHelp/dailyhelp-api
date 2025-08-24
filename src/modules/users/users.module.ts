@@ -21,7 +21,6 @@ import { Location } from 'src/entities/location.entity';
 import {
   Conversation,
   Offer,
-  Payment,
   Report,
 } from '../conversations/conversations.entity';
 import { Message } from 'src/entities/message.entity';
@@ -33,6 +32,7 @@ import { SubCategory } from '../admin/admin.entities';
 import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import { ProvidersController } from './providers.controller';
+import { Payment } from '../../entities/payment.entity';
 
 @Module({
   imports: [

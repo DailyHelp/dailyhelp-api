@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Job, JobTimeline } from './jobs.entity';
 import { PaginationInput } from 'src/base/dto';
-import { IAuthContext, JobStatus, TransactionType, UserType } from 'src/types';
+import { IAuthContext, JobStatus, TransactionStatus, TransactionType, UserType } from 'src/types';
 import {
   CancelJobDto,
   DisputeJobDto,
@@ -152,6 +152,7 @@ export class JobService {
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Payment',
       locked: true,
+      status: TransactionStatus.PENDING,
       lockedAt: new Date(),
     });
     this.em.persist(transactionModel);
@@ -197,6 +198,7 @@ export class JobService {
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Refund for Cancellation',
       locked: true,
+      status: TransactionStatus.PENDING
     });
     const jobTimelineModel = this.jobTimelineRepository.create({
       uuid: v4(),

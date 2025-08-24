@@ -11,7 +11,7 @@ import { Users } from '../users/users.entity';
 import { JobStatus, UserType } from '../../types';
 import { JobDispute } from './job-dispute.entity';
 import { JobReview } from '../../entities/job-review.entity';
-import { Payment } from '../conversations/conversations.entity';
+import { Payment } from '../../entities/payment.entity';
 
 @Filter({
   name: 'notDeleted',

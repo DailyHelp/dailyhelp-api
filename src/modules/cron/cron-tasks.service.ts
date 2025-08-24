@@ -2,7 +2,12 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Transaction } from '../wallet/wallet.entity';
-import { EntityManager, EntityRepository, RequestContext } from '@mikro-orm/core';
+import {
+  EntityManager,
+  EntityRepository,
+  RequestContext,
+} from '@mikro-orm/core';
+import { TransactionStatus } from 'src/types';
 
 @Injectable()
 export class CronTasksService {
@@ -27,6 +32,7 @@ export class CronTasksService {
         transaction.locked = false;
         transaction.releasedAt = new Date();
         transaction.wallet.availableBalance += transaction.amount;
+        transaction.status = TransactionStatus.SUCCESS;
       }
       await this.em.flush();
     });
