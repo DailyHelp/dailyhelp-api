@@ -121,11 +121,18 @@ export class ProvidersController {
     isArray: true,
     description: 'User locations fetched successfully',
   })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'defaultOnly', required: false })
   fetchLocations(
     @Query('defaultOnly') defaultOnly: string,
+    @Query('search') search: string,
     @Req() request: Request,
   ) {
-    return this.userService.fetchLocations(defaultOnly, request.user as any);
+    return this.userService.fetchLocations(
+      defaultOnly,
+      request.user as any,
+      search,
+    );
   }
 
   @Patch('location/:uuid/set-default')
@@ -321,7 +328,6 @@ export class ProvidersController {
 
 // -97k
 
-// verify identity
 // conversation and message read status
 // websockets for messages, conversations, offers, jobs, online/offline
 // admin

@@ -51,4 +51,6 @@ export class Location extends Timestamp {
 
   @Enum({ items: () => UserType })
   userType: UserType;
+
+  isDefault: boolean;
 }

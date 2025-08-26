@@ -1,8 +1,8 @@
 import { Entity, Enum, Filter, ManyToOne, PrimaryKey, Property } from "@mikro-orm/core";
-import { Timestamp } from "src/base/timestamp.entity";
-import { Offer, Conversation } from "src/modules/conversations/conversations.entity";
-import { Users } from "src/modules/users/users.entity";
-import { UserType, PaymentType, Currencies } from "src/types";
+import { Timestamp } from "../base/timestamp.entity";
+import { Offer, Conversation } from "../modules/conversations/conversations.entity";
+import { Users } from "../modules/users/users.entity";
+import { UserType, PaymentType, Currencies } from "../types";
 
 @Filter({
   name: 'notDeleted',

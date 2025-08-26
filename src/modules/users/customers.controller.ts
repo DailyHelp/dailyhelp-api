@@ -115,9 +115,14 @@ export class CustomersController {
   })
   fetchLocations(
     @Query('defaultOnly') defaultOnly: string,
+    @Query('search') search: string,
     @Req() request: Request,
   ) {
-    return this.userService.fetchLocations(defaultOnly, request.user as any);
+    return this.userService.fetchLocations(
+      defaultOnly,
+      request.user as any,
+      search,
+    );
   }
 
   @Patch('location/:uuid/set-default')
@@ -234,8 +239,14 @@ export class CustomersController {
   }
 
   @Post('initialize-paystack-payment')
-  initializePaystackPayment(@Body() paymentInfo: PaymentInfo, @Req() request: Request) {
-    return this.userService.initializePaystackPayment(paymentInfo, request.user as any);
+  initializePaystackPayment(
+    @Body() paymentInfo: PaymentInfo,
+    @Req() request: Request,
+  ) {
+    return this.userService.initializePaystackPayment(
+      paymentInfo,
+      request.user as any,
+    );
   }
 
   @Post('verify-transaction/:transactionId')

@@ -3,6 +3,7 @@ import {
   EntityManager,
   EntityRepository,
   FilterQuery,
+  wrap,
 } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
@@ -157,18 +158,18 @@ export class UsersService {
     let ninResponse: AxiosResponse<any, any>;
     try {
       const token = await this.sharedService.getQoreIDToken();
-      ninResponse = await axios.post(
-        `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/nin`,
-        { idNumber: identity.nin, photoUrl: identity.photo },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      // [bvnResponse, ninResponse] = await Promise.all([
-      //   axios.post(
-      //     `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/bvn`,
-      //     { idNumber: identity.bvn, photoUrl: identity.photo },
-      //     { headers: { Authorization: `Bearer ${token}` } },
-      //   ),
-      // ]);
+      [bvnResponse, ninResponse] = await Promise.all([
+        axios.post(
+          `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/nin`,
+          { idNumber: identity.nin, photoUrl: identity.photo },
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+        axios.post(
+          `${this.qoreidConfig.baseUrl}/v1/ng/identities/bvn-match/${identity.bvn}`,
+          { firstname: identity.firstname, lastname: identity.lastname },
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+      ]);
     } catch (error) {
       console.log('Identity verification failed', error);
       throw new InternalServerErrorException(error?.response?.data?.message);
@@ -230,27 +231,51 @@ export class UsersService {
   async fetchLocations(
     defaultOnly: string,
     { uuid, userType }: IAuthContext,
+    search?: string,
   ): Promise<any> {
+    const where: any = { user: { uuid }, userType };
+
+    if (search && search.trim()) {
+      const q = `%${search.trim()}%`;
+
+      where.$or = [
+        { address: { $like: q } },
+        { state: { $like: q } },
+        { lga: { $like: q } },
+        { description: { $like: q } },
+      ];
+
+      const s = search.trim().toLowerCase();
+      if (['verified', 'true', 'yes', '1', 'on'].includes(s))
+        where.$or.push({ verified: true });
+      if (['unverified', 'false', 'no', '0', 'off'].includes(s))
+        where.$or.push({ verified: false });
+
+      const num = Number(search);
+      if (!Number.isNaN(num)) {
+        const tol = 0.0005; 
+        where.$or.push(
+          { lat: { $gte: num - tol, $lte: num + tol } },
+          { lng: { $gte: num - tol, $lte: num + tol } },
+        );
+      }
+    }
+
     const [userLocations, user] = await Promise.all([
-      this.locationRepository.findAll({
-        where: { user: { uuid }, userType },
-        orderBy: { createdAt: OrderDir.DESC },
-      }),
+      this.locationRepository.find(where, { orderBy: { createdAt: 'DESC' } }),
       this.usersRepository.findOne({ uuid }),
     ]);
+
+    const defaultUuid = user?.defaultLocation?.uuid ?? null;
+
+    const items = userLocations.map((loc) => ({
+      ...wrap(loc).toObject(),
+      isDefault: loc.uuid === defaultUuid,
+    }));
+
     return {
       status: true,
-      data:
-        defaultOnly === 'true'
-          ? userLocations.filter(
-              (location) => location.uuid === user.defaultLocation?.uuid,
-            )
-          : userLocations.map((location) => {
-              return {
-                ...location,
-                isDefault: location.uuid === user.defaultLocation?.uuid,
-              };
-            }),
+      data: defaultOnly === 'true' ? items.filter((i) => i.isDefault) : items,
     };
   }
 
