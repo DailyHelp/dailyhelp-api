@@ -10,7 +10,13 @@ import {
 } from '@nestjs/common';
 import { Job, JobTimeline } from './jobs.entity';
 import { PaginationInput } from 'src/base/dto';
-import { IAuthContext, JobStatus, TransactionStatus, TransactionType, UserType } from 'src/types';
+import {
+  IAuthContext,
+  JobStatus,
+  TransactionStatus,
+  TransactionType,
+  UserType,
+} from 'src/types';
 import {
   CancelJobDto,
   DisputeJobDto,
@@ -25,6 +31,7 @@ import { JobReview } from 'src/entities/job-review.entity';
 import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
 import { JobReport } from './job-reports.entity';
+import { SocketGateway } from '../ws/socket.gateway';
 
 @Injectable()
 export class JobService {
@@ -48,6 +55,7 @@ export class JobService {
     private readonly conversationRepository: EntityRepository<Conversation>,
     @InjectRepository(JobReport)
     private readonly jobReportRepository: EntityRepository<JobReport>,
+    private readonly ws: SocketGateway,
   ) {}
 
   async fetchJobs(
@@ -109,6 +117,13 @@ export class JobService {
     });
     this.em.persist(jobTimelineModel);
     await this.em.flush();
+    this.ws.jobUpdated({
+      uuid: job.uuid,
+      serviceProviderUuid: job.serviceProvider?.uuid,
+      serviceRequestorUuid: job.serviceRequestor?.uuid,
+      status: job.status,
+      ...job,
+    });
     return { status: true };
   }
 
@@ -143,11 +158,11 @@ export class JobService {
       user: { uuid: job.serviceProvider?.uuid },
       userType,
     });
-    providerWallet.totalBalance += job.price * 0.10;
+    providerWallet.totalBalance += job.price * 0.1;
     const transactionModel = this.transactionRepository.create({
       uuid: v4(),
       type: TransactionType.CREDIT,
-      amount: job.price * 0.10,
+      amount: job.price * 0.1,
       wallet: this.walletRepository.getReference(providerWallet.uuid),
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Payment',
@@ -158,6 +173,13 @@ export class JobService {
     this.em.persist(transactionModel);
     this.em.persist(jobTimelineModel);
     await this.em.flush();
+    this.ws.jobUpdated({
+      uuid: job.uuid,
+      serviceProviderUuid: job.serviceProvider?.uuid,
+      serviceRequestorUuid: job.serviceRequestor?.uuid,
+      status: job.status,
+      ...job,
+    });
     return { status: true };
   }
 
@@ -198,7 +220,7 @@ export class JobService {
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Refund for Cancellation',
       locked: true,
-      status: TransactionStatus.PENDING
+      status: TransactionStatus.PENDING,
     });
     const jobTimelineModel = this.jobTimelineRepository.create({
       uuid: v4(),
@@ -209,6 +231,13 @@ export class JobService {
     this.em.persist(jobTimelineModel);
     this.em.persist(requestorTransactionModel);
     await this.em.flush();
+    this.ws.jobUpdated({
+      uuid: job.uuid,
+      serviceProviderUuid: job.serviceProvider?.uuid,
+      serviceRequestorUuid: job.serviceRequestor?.uuid,
+      status: job.status,
+      ...job,
+    });
     return { status: true };
   }
 

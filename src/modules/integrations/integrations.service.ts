@@ -24,6 +24,7 @@ import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { Users } from '../users/users.entity';
 import { generateOtp } from 'src/utils';
 import { Payment } from '../../entities/payment.entity';
+import { SocketGateway } from '../ws/socket.gateway';
 
 @Injectable()
 export class IntegrationsService {
@@ -47,6 +48,7 @@ export class IntegrationsService {
     @InjectRepository(Users)
     private readonly usersRepository: EntityRepository<Users>,
     private readonly em: EntityManager,
+    private readonly ws: SocketGateway,
   ) {}
 
   async handlePaystackWebhook(req: Request, res: Response) {
@@ -208,5 +210,14 @@ export class IntegrationsService {
     });
     this.em.persist(jobModel);
     this.em.persist(jobTimelineModel);
+    this.ws.jobCreated({
+      uuid: jobModel.uuid,
+      conversationUuid: conversation.uuid,
+      serviceProviderUuid: conversation.serviceProvider?.uuid,
+      serviceRequestorUuid: conversation.serviceRequestor?.uuid,
+      price: offer.price,
+      status: jobModel.status,
+      ...jobModel
+    });
   }
 }

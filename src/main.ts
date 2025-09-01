@@ -7,6 +7,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import qs from 'qs';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { BasePaginatedResponseDto } from './base/dto';
+import { RedisIoAdapter } from './modules/ws/redis-adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -23,6 +24,12 @@ async function bootstrap() {
     .getHttpAdapter()
     .getInstance()
     .set('query parser', (str: string) => qs.parse(str));
+
+  if (process.env.REDIS_URL) {
+    const adapter = new RedisIoAdapter(app);
+    await adapter.connectToRedis();
+    app.useWebSocketAdapter(adapter);
+  }
 
   const options = new DocumentBuilder()
     .setTitle('DailyHelp')

@@ -527,6 +527,7 @@
             "uuid"
           ],
           "referencedTableName": "offers",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -820,6 +821,7 @@
             "uuid"
           ],
           "referencedTableName": "main_categories",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1318,6 +1320,7 @@
             "uuid"
           ],
           "referencedTableName": "locations",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -1331,6 +1334,7 @@
             "uuid"
           ],
           "referencedTableName": "locations",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -1344,6 +1348,7 @@
             "uuid"
           ],
           "referencedTableName": "sub_categories",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1526,6 +1531,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1655,6 +1661,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1865,6 +1872,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -1878,6 +1886,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -1891,6 +1900,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -1904,6 +1914,7 @@
             "uuid"
           ],
           "referencedTableName": "messages",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2050,6 +2061,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2063,6 +2075,7 @@
             "uuid"
           ],
           "referencedTableName": "conversations",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2309,6 +2322,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2322,6 +2336,7 @@
             "uuid"
           ],
           "referencedTableName": "offers",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2335,6 +2350,7 @@
             "uuid"
           ],
           "referencedTableName": "conversations",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2651,6 +2667,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2664,6 +2681,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2677,6 +2695,7 @@
             "uuid"
           ],
           "referencedTableName": "job_disputes",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2690,6 +2709,7 @@
             "uuid"
           ],
           "referencedTableName": "job_reviews",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2703,6 +2723,7 @@
             "uuid"
           ],
           "referencedTableName": "payments",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2829,6 +2850,7 @@
             "uuid"
           ],
           "referencedTableName": "jobs",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -2842,6 +2864,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2998,6 +3021,7 @@
             "uuid"
           ],
           "referencedTableName": "jobs",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3011,6 +3035,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3024,6 +3049,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -3170,6 +3196,7 @@
             "uuid"
           ],
           "referencedTableName": "jobs",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3183,6 +3210,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -3377,6 +3405,7 @@
             "uuid"
           ],
           "referencedTableName": "jobs",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3390,6 +3419,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3403,6 +3433,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -3599,6 +3630,7 @@
             "uuid"
           ],
           "referencedTableName": "conversations",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3612,6 +3644,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3625,6 +3658,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -3638,6 +3672,310 @@
             "uuid"
           ],
           "referencedTableName": "offers",
+          "createForeignKeyConstraint": true,
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "message": {
+          "name": "message",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "user": {
+          "name": "user",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        }
+      },
+      "name": "message_receipts",
+      "indexes": [
+        {
+          "columnNames": [
+            "message"
+          ],
+          "composite": false,
+          "keyName": "message_receipts_message_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "user"
+          ],
+          "composite": false,
+          "keyName": "message_receipts_user_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "message_receipts_message_foreign": {
+          "constraintName": "message_receipts_message_foreign",
+          "columnNames": [
+            "message"
+          ],
+          "localTableName": "message_receipts",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "messages",
+          "createForeignKeyConstraint": true,
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "message_receipts_user_foreign": {
+          "constraintName": "message_receipts_user_foreign",
+          "columnNames": [
+            "user"
+          ],
+          "localTableName": "message_receipts",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "conversation": {
+          "name": "conversation",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "user": {
+          "name": "user",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "last_read_at": {
+          "name": "last_read_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "unread_count": {
+          "name": "unread_count",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "0",
+          "mappedType": "integer"
+        }
+      },
+      "name": "conversation_read_states",
+      "indexes": [
+        {
+          "columnNames": [
+            "conversation"
+          ],
+          "composite": false,
+          "keyName": "conversation_read_states_conversation_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "columnNames": [
+            "user"
+          ],
+          "composite": false,
+          "keyName": "conversation_read_states_user_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "conversation_read_states_conversation_foreign": {
+          "constraintName": "conversation_read_states_conversation_foreign",
+          "columnNames": [
+            "conversation"
+          ],
+          "localTableName": "conversation_read_states",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "conversations",
+          "createForeignKeyConstraint": true,
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "conversation_read_states_user_foreign": {
+          "constraintName": "conversation_read_states_user_foreign",
+          "columnNames": [
+            "user"
+          ],
+          "localTableName": "conversation_read_states",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -3784,6 +4122,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -3913,6 +4252,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -4044,6 +4384,7 @@
             "uuid"
           ],
           "referencedTableName": "users",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -4260,6 +4601,7 @@
             "uuid"
           ],
           "referencedTableName": "wallets",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -4273,6 +4615,7 @@
             "uuid"
           ],
           "referencedTableName": "jobs",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
@@ -4286,6 +4629,7 @@
             "uuid"
           ],
           "referencedTableName": "payments",
+          "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"
         }

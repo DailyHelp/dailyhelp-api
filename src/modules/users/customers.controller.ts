@@ -46,13 +46,17 @@ import {
 import { Location } from 'src/entities/location.entity';
 import { ExpiredJwtAuthGuard } from 'src/guards/expired-jwt-auth-guard';
 import { Wallet } from '../wallet/wallet.entity';
+import { ReadStateService } from '../ws/read-state.service';
 
 @Controller('customers')
 @ApiTags('customers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class CustomersController {
-  constructor(private readonly userService: UsersService) {}
+  constructor(
+    private readonly userService: UsersService,
+    private readonly read: ReadStateService,
+  ) {}
 
   @Get()
   @ApiOkResponse({
@@ -153,6 +157,11 @@ export class CustomersController {
     return this.userService.sendMessage(uuid, body, request.user as any);
   }
 
+  @Post('conversation/:uuid/read')
+  async readConversation(@Param('uuid') uuid: string, @Req() request: Request) {
+    return this.read.markConversationRead((request.user as any)?.uuid, uuid);
+  }
+
   @Post('conversation/:uuid/report')
   async reportConversation(
     @Param('uuid') uuid: string,
@@ -219,8 +228,13 @@ export class CustomersController {
   async fetchConversationMessages(
     @Param('uuid') uuid: string,
     @Query() query: PaginationQuery,
+    @Req() req: Request,
   ) {
-    return this.userService.fetchConversationMessages(uuid, query.pagination);
+    return this.userService.fetchConversationMessages(
+      uuid,
+      query.pagination,
+      req.user as any,
+    );
   }
 
   @Get(':uuid/similar-providers')

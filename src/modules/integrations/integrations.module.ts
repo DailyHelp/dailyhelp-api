@@ -9,6 +9,7 @@ import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { Users } from '../users/users.entity';
 import { Payment } from '../../entities/payment.entity';
+import { WsModule } from '../ws/ws.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { Payment } from '../../entities/payment.entity';
         Users,
       ],
     }),
+    WsModule,
   ],
   providers: [IntegrationsService],
   controllers: [ExternalIntegrationsController],

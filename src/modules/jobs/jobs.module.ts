@@ -10,6 +10,7 @@ import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
 import { ProviderJobsController } from './provider-jobs.controller';
 import { JobReport } from './job-reports.entity';
+import { WsModule } from '../ws/ws.module';
 
 @Module({
   imports: [
@@ -23,9 +24,10 @@ import { JobReport } from './job-reports.entity';
         JobReview,
         JobDispute,
         Conversation,
-        JobReport
+        JobReport,
       ],
     }),
+    WsModule,
   ],
   controllers: [CustomerJobsController, ProviderJobsController],
   providers: [JobService],

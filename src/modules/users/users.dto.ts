@@ -159,9 +159,20 @@ export class ClientDashboardFilter {
     const v = String(value).toLowerCase();
     if (['true', '1', 'yes', 'on'].includes(v)) return true;
     if (['false', '0', 'no', 'off'].includes(v)) return false;
-    return value; 
+    return value;
   })
   isSearchPage?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    const v = String(value).toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(v)) return true;
+    if (['false', '0', 'no', 'off'].includes(v)) return false;
+    return value;
+  })
+  engaged?: boolean;
 }
 
 export class ClientDashboardQuery {
@@ -422,6 +433,26 @@ export class ConversationDto {
 
   @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty()
+  unreadCount: number;
+
+  @ApiProperty()
+  iReadLastMessage: boolean;
+
+  @ApiProperty()
+  otherReadLastMessage: boolean;
+
+  @ApiProperty()
+  spOnline: boolean;
+
+  @ApiProperty()
+  srOnline: boolean;
+}
+
+export class MessageDto extends Message {
+  @ApiProperty()
+  readByOther: boolean;
 }
 
 const PaginatedAllProvidersDto = createPaginatedSwaggerDto(
@@ -445,7 +476,7 @@ export const PaginatedConversationsDto = createPaginatedSwaggerDto(
 );
 
 export const PaginatedMessageDto = createPaginatedSwaggerDto(
-  Message,
+  MessageDto,
   'PaginatedMessageDto',
 );
 

@@ -1,8 +1,18 @@
-import { Entity, Enum, Filter, ManyToOne, PrimaryKey, Property } from "@mikro-orm/core";
-import { Timestamp } from "../base/timestamp.entity";
-import { Conversation, Offer } from "../modules/conversations/conversations.entity";
-import { Users } from "../modules/users/users.entity";
-import { MessageStatus, MessageType } from "../types";
+import {
+  Entity,
+  Enum,
+  Filter,
+  ManyToOne,
+  PrimaryKey,
+  Property,
+} from '@mikro-orm/core';
+import { Timestamp } from '../base/timestamp.entity';
+import {
+  Conversation,
+  Offer,
+} from '../modules/conversations/conversations.entity';
+import { Users } from '../modules/users/users.entity';
+import { MessageStatus, MessageType } from '../types';
 
 @Filter({
   name: 'notDeleted',
@@ -54,4 +64,70 @@ export class Message extends Timestamp {
     nullable: true,
   })
   offer: Offer;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'message_receipts' })
+export class MessageReceipt extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @ManyToOne(() => Message, {
+    fieldName: 'message',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  message: Message;
+
+  @ManyToOne(() => Users, {
+    fieldName: 'user',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  user: Users;
+
+  @Property({ nullable: true })
+  deliveredAt: Date;
+
+  @Property({ nullable: true })
+  readAt: Date;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'conversation_read_states' })
+export class ConversationReadState extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @ManyToOne(() => Conversation, {
+    fieldName: 'conversation',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  conversation: Conversation;
+
+  @ManyToOne(() => Users, {
+    fieldName: 'user',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+  })
+  user: Users;
+
+  @Property({ nullable: true })
+  lastReadAt: Date;
+
+  @Property({ default: 0 })
+  unreadCount: number;
 }

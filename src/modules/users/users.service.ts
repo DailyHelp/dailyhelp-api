@@ -78,7 +78,7 @@ import {
   Offer,
   Report,
 } from '../conversations/conversations.entity';
-import { Message } from 'src/entities/message.entity';
+import { ConversationReadState, Message } from 'src/entities/message.entity';
 import { JobReview } from 'src/entities/job-review.entity';
 import { differenceInHours, endOfDay, startOfDay } from 'date-fns';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
@@ -88,6 +88,9 @@ import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import bcrypt from 'bcryptjs';
 import { Payment } from '../../entities/payment.entity';
+import { SocketGateway } from '../ws/socket.gateway';
+import { ReadStateService } from '../ws/read-state.service';
+import { PresenceService } from '../ws/presence.service';
 
 @Injectable()
 export class UsersService {
@@ -127,12 +130,17 @@ export class UsersService {
     private readonly accountDeletionRepository: EntityRepository<AccountDeletionRequest>,
     @InjectRepository(BankAccount)
     private readonly bankAccountRepository: EntityRepository<BankAccount>,
+    @InjectRepository(ConversationReadState)
+    private readonly conversationReadRepository: EntityRepository<ConversationReadState>,
     private readonly sharedService: SharedService,
     @Inject(QoreIDConfiguration.KEY)
     private readonly qoreidConfig: ConfigType<typeof QoreIDConfiguration>,
     @Inject(PaystackConfiguration.KEY)
     private readonly paystackConfig: ConfigType<typeof PaystackConfiguration>,
     private readonly jwtService: JwtService,
+    private readonly ws: SocketGateway,
+    private readonly readService: ReadStateService,
+    private readonly presence: PresenceService,
   ) {}
 
   async findByEmailOrPhone(emailOrPhone: string) {
@@ -253,7 +261,7 @@ export class UsersService {
 
       const num = Number(search);
       if (!Number.isNaN(num)) {
-        const tol = 0.0005; 
+        const tol = 0.0005;
         where.$or.push(
           { lat: { $gte: num - tol, $lte: num + tol } },
           { lng: { $gte: num - tol, $lte: num + tol } },
@@ -592,6 +600,11 @@ export class UsersService {
       allProvidersParams,
       filter?.address ? `%${filter?.address}%` : undefined,
     );
+    allProvidersFiltersSql += appendCondition(
+      'AND u.engaged',
+      allProvidersParams,
+      filter?.engaged,
+    );
     if (search) {
       allProvidersParams.push(...Array(11).fill(`%${search.toLowerCase()}%`));
       allProvidersFiltersSql += `
@@ -798,6 +811,11 @@ export class UsersService {
     if (offer.description) offerExists.description = offer.description;
     if (offer.attachments) offerExists.pictures = offer.attachments.join(',');
     await this.em.flush();
+    this.ws.offerUpdated({
+      uuid: offerExists.uuid,
+      conversationUuid: messageExists.conversation?.uuid,
+      ...offerExists,
+    });
     return { status: true };
   }
 
@@ -828,6 +846,11 @@ export class UsersService {
       conversation.cancellationChances = 3;
     }
     await this.em.flush();
+    this.ws.offerUpdated({
+      uuid: offerExists.uuid,
+      conversationUuid: messageExists.conversation?.uuid,
+      ...offerExists,
+    });
     return { status: true };
   }
 
@@ -843,6 +866,11 @@ export class UsersService {
       throw new ForbiddenException(`Offer status cannot be updated`);
     offerExists.status = OfferStatus.ACCEPTED;
     await this.em.flush();
+    this.ws.offerUpdated({
+      uuid: offerExists.uuid,
+      conversationUuid: messageExists.conversation?.uuid,
+      ...offerExists,
+    });
     return { status: true };
   }
 
@@ -887,6 +915,16 @@ export class UsersService {
     this.em.persist(offerModel);
     this.em.persist(messageModel);
     await this.em.flush();
+    this.ws.offerCountered({
+      conversationUuid: messageExists.conversation?.uuid,
+      toUuid: messageExists.from?.uuid,
+      oldOffer: offerExists,
+      newOffer: offerModel,
+    });
+    this.readService.markConversationRead(
+      uuid,
+      messageExists.conversation?.uuid,
+    );
     return { status: true };
   }
 
@@ -930,6 +968,13 @@ export class UsersService {
     );
     this.em.persist(messageModel);
     await this.em.flush();
+    this.ws.offerUpdated({
+      uuid: offerExists.uuid,
+      conversationUuid: conversation.uuid,
+      status: OfferStatus.DECLINED,
+      ...offerExists,
+    });
+    this.readService.markConversationRead(uuid, conversation.uuid);
     return { status: true };
   }
 
@@ -1025,6 +1070,15 @@ export class UsersService {
     this.em.persist(offerModel);
     this.em.persist(messageModel);
     await this.em.flush();
+    this.ws.offerCreated({
+      uuid: offerModel.uuid,
+      conversationUuid: conversationExists.uuid,
+      fromUuid: uuid,
+      toUuid: providerUuid,
+      price: offerModel.price,
+      status: offerModel.status,
+      ...offerModel,
+    });
     return { status: true };
   }
 
@@ -1078,6 +1132,17 @@ export class UsersService {
     });
     this.em.persist(messageModel);
     await this.em.flush();
+    this.ws.messageCreated({
+      uuid: messageModel.uuid,
+      conversationUuid: conversationExists.uuid,
+      fromUuid: uuid,
+      toUuid: receiverUuid,
+      message: dto.message,
+      type: MessageType.TEXT,
+      createdAt: messageModel.createdAt,
+      ...messageModel,
+    });
+    this.readService.markConversationRead(uuid, conversationExists.uuid);
     return { status: true };
   }
 
@@ -1126,13 +1191,30 @@ export class UsersService {
         c.locked,
         c.restricted,
         c.cancellation_chances AS cancellationChances,
-        c.created_at AS createdAt
+        c.created_at AS createdAt,
+        crs_me.last_read_at AS myLastReadAt,
+        crs_rq.last_read_at AS otherLastReadAt,
+        CASE 
+          WHEN m.created_at IS NOT NULL
+            AND crs_me.last_read_at IS NOT NULL
+            AND m.created_at <= crs_me.last_read_at
+          THEN 1 ELSE 0
+        END AS iReadLastMessage,
+        CASE 
+          WHEN m.created_at IS NOT NULL
+            AND crs_rq.last_read_at IS NOT NULL
+            AND m.created_at <= crs_rq.last_read_at
+          THEN 1 ELSE 0
+        END AS otherReadLastMessage,
+      crs_me.unread_count AS myUnreadCount
       FROM conversations c
       LEFT JOIN users rq ON c.service_requestor = rq.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o ON m.offer = o.uuid
+      LEFT JOIN conversation_read_states crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_provider
+      LEFT JOIN conversation_read_states crs_rq ON crs_rq.conversation = c.uuid AND crs_rq.user = rq.uuid
       WHERE ${whereClause}
-      ORDER BY m.created_at DESC
+      ORDER BY COALESCE(m.created_at, c.created_at) DESC
       LIMIT ? OFFSET ?
     `;
 
@@ -1153,8 +1235,18 @@ export class UsersService {
       .getConnection()
       .execute(countQuery, params);
     const total = totalResult[0]?.total ?? 0;
-
-    return buildResponseDataWithPagination(data, total, { page, limit });
+    const requestorIds: string[] = Array.from(
+      new Set((data || []).map((r: any) => r.requestorId).filter(Boolean)),
+    );
+    const onlineMap = await this.presence.isOnlineMany(requestorIds);
+    const shaped = data.map((row: any) => ({
+      ...row,
+      unreadCount: row.myUnreadCount,
+      iReadLastMessage: !!Number(row.iReadLastMessage),
+      otherReadLastMessage: !!Number(row.otherReadLastMessage),
+      srOnline: !!onlineMap[row.requestorId],
+    }));
+    return buildResponseDataWithPagination(shaped, total, { page, limit });
   }
 
   async fetchCustomerConversations(
@@ -1204,13 +1296,30 @@ export class UsersService {
         c.locked,
         c.restricted,
         c.cancellation_chances AS cancellationChances,
-        c.created_at AS createdAt
+        c.created_at AS createdAt,
+        crs_me.last_read_at AS myLastReadAt,
+        crs_sp.last_read_at AS otherLastReadAt,
+        CASE 
+          WHEN m.created_at IS NOT NULL
+            AND crs_me.last_read_at IS NOT NULL
+            AND m.created_at <= crs_me.last_read_at
+          THEN 1 ELSE 0
+        END AS iReadLastMessage,
+        CASE 
+          WHEN m.created_at IS NOT NULL
+            AND crs_sp.last_read_at IS NOT NULL
+            AND m.created_at <= crs_sp.last_read_at
+          THEN 1 ELSE 0
+        END AS otherReadLastMessage,
+      crs_me.unread_count AS myUnreadCount
       FROM conversations c
       LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o ON m.offer = o.uuid
+      LEFT JOIN conversation_read_states crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_requestor
+      LEFT JOIN conversation_read_states crs_sp ON crs_sp.conversation = c.uuid AND crs_sp.user = sp.uuid
       WHERE ${whereClause}
-      ORDER BY m.created_at DESC
+      ORDER BY COALESCE(m.created_at, c.created_at) DESC
       LIMIT ? OFFSET ?
     `;
 
@@ -1231,16 +1340,31 @@ export class UsersService {
       .getConnection()
       .execute(countQuery, params);
     const total = totalResult[0]?.total ?? 0;
-    return buildResponseDataWithPagination(data, total, { page, limit });
+    const providerIds: string[] = Array.from(
+      new Set(
+        (data || []).map((r: any) => r.serviceProviderId).filter(Boolean),
+      ),
+    );
+    const onlineMap = await this.presence.isOnlineMany(providerIds);
+    const shaped = data.map((row: any) => ({
+      ...row,
+      unreadCount: row.myUnreadCount,
+      iReadLastMessage: !!Number(row.iReadLastMessage),
+      otherReadLastMessage: !!Number(row.otherReadLastMessage),
+      spOnline: !!onlineMap[row.serviceProviderId],
+    }));
+    return buildResponseDataWithPagination(shaped, total, { page, limit });
   }
 
   async fetchConversationMessages(
     conversationUuid: string,
     pagination: PaginationInput,
+    { uuid }: IAuthContext,
   ) {
     const { page = 1, limit = 20 } = pagination;
     const conversation = await this.conversationRepository.findOne({
       uuid: conversationUuid,
+      $or: [{ serviceProvider: { uuid } }, { serviceRequestor: { uuid } }],
     });
     const hoursAgo = differenceInHours(new Date(), conversation.lastLockedAt);
     if (conversation.locked && hoursAgo >= 24) {
@@ -1267,12 +1391,35 @@ export class UsersService {
         conversation.restricted &&
         !conversation.blocked;
     }
-    const [data, total] = await this.messageRepository.findAndCount(
+    const otherUuid =
+      conversation.serviceProvider?.uuid === uuid
+        ? conversation.serviceRequestor?.uuid
+        : conversation.serviceProvider?.uuid;
+    const otherState = await this.conversationReadRepository.findOne({
+      conversation: { uuid: conversationUuid },
+      user: { uuid: otherUuid },
+    });
+    const otherLastReadAt: Date | null = otherState?.lastReadAt ?? null;
+    const [messages, total] = await this.messageRepository.findAndCount(
       {
         conversation: { uuid: conversationUuid },
       },
-      { orderBy: { createdAt: OrderDir.DESC }, populate: ['offer'] },
+      {
+        orderBy: { createdAt: OrderDir.DESC },
+        populate: ['offer', 'from', 'to'],
+      },
     );
+    this.readService.markConversationRead(uuid, conversationUuid);
+    const data = messages.map((m) => {
+      const pojo = wrap(m).toObject();
+      const sentByMe = m.from?.uuid === uuid;
+      const readByOther = !!(
+        sentByMe &&
+        otherLastReadAt &&
+        m.createdAt <= otherLastReadAt
+      );
+      return { ...pojo, readByOther };
+    });
     this.em.flush();
     return buildResponseDataWithPagination(
       data,
@@ -1592,6 +1739,14 @@ export class UsersService {
       this.em.persist(jobModel);
       this.em.persist(jobTimelineModel);
       this.em.persist(paymentModel);
+      this.ws.jobCreated({
+        uuid: jobModel.uuid,
+        conversationUuid: conversation.uuid,
+        serviceProviderUuid: conversation.serviceProvider?.uuid,
+        serviceRequestorUuid: conversation.serviceRequestor?.uuid,
+        price: offerExists.price,
+        status: jobModel.status,
+      });
     }
     await this.em.flush();
     return { status: true };

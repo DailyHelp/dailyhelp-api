@@ -57,7 +57,7 @@ export const buildResponseDataWithPagination = <T, E extends object = {}>(
 export const appendCondition = (
   sql: string,
   params: any[],
-  value?: string | number,
+  value?: string | number | boolean,
 ) => {
   if (value === undefined || value === null || value === '') {
     return '';

@@ -49,13 +49,17 @@ import {
 } from './users.dto';
 import { Location } from 'src/entities/location.entity';
 import { Wallet } from '../wallet/wallet.entity';
+import { ReadStateService } from '../ws/read-state.service';
 
 @Controller('providers')
 @ApiTags('providers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class ProvidersController {
-  constructor(private readonly userService: UsersService) {}
+  constructor(
+    private readonly userService: UsersService,
+    private readonly read: ReadStateService,
+  ) {}
 
   @Get()
   @ApiOkResponse({
@@ -287,6 +291,11 @@ export class ProvidersController {
     return this.userService.sendMessage(uuid, body, request.user as any);
   }
 
+  @Post('conversation/:uuid/read')
+  async readConversation(@Param('uuid') uuid: string, @Req() request: Request) {
+    return this.read.markConversationRead((request.user as any)?.uuid, uuid);
+  }
+
   @Patch('offer/:uuid/accept')
   async updateOffer(@Param('uuid') uuid: string, @Req() request: Request) {
     return this.userService.acceptOffer(uuid, request.user as any);
@@ -328,6 +337,4 @@ export class ProvidersController {
 
 // -97k
 
-// conversation and message read status
-// websockets for messages, conversations, offers, jobs, online/offline
 // admin

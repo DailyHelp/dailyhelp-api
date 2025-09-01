@@ -23,7 +23,7 @@ import {
   Offer,
   Report,
 } from '../conversations/conversations.entity';
-import { Message } from 'src/entities/message.entity';
+import { ConversationReadState, Message } from 'src/entities/message.entity';
 import { JobReview } from 'src/entities/job-review.entity';
 import { ExpiredJwtStrategy } from 'src/strategies/expired-jwt.strategy';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
@@ -33,6 +33,7 @@ import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import { ProvidersController } from './providers.controller';
 import { Payment } from '../../entities/payment.entity';
+import { WsModule } from '../ws/ws.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { Payment } from '../../entities/payment.entity';
         Feedback,
         AccountDeletionRequest,
         BankAccount,
+        ConversationReadState,
       ],
     }),
     JwtModule.registerAsync({
@@ -70,6 +72,7 @@ import { Payment } from '../../entities/payment.entity';
       inject: [JwtAuthConfiguration.KEY],
     }),
     SharedModule,
+    WsModule,
   ],
   controllers: [CustomersController, ProvidersController],
   providers: [UsersService, JwtStrategy, ExpiredJwtStrategy],
