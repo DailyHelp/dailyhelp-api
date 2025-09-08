@@ -10,6 +10,7 @@ import { Timestamp } from '../../base/timestamp.entity';
 import { SubCategory } from '../admin/admin.entities';
 import { AccountTier, IProviderOnboarding, UserType } from '../../types';
 import { Location } from '../../entities/location.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -120,9 +121,11 @@ export class Users extends Timestamp {
   @Property({ default: false })
   engaged: boolean;
 
+  @ApiProperty({ enum: AccountTier })
   @Enum({ items: () => AccountTier, default: AccountTier.BRONZE })
   tier: AccountTier;
 
+  @ApiProperty({ enum: AccountTier })
   @Enum({ items: () => AccountTier, default: AccountTier.BRONZE })
   nextTier: AccountTier;
 
@@ -243,6 +246,7 @@ export class Feedback extends Timestamp {
   @Property({ type: 'longtext', nullable: true })
   description: string;
 
+  @ApiProperty({ enum: UserType, required: false })
   @Enum({ items: () => UserType, nullable: true })
   userType: UserType;
 }
@@ -268,6 +272,7 @@ export class AccountDeletionRequest extends Timestamp {
   @Property({ nullable: true })
   reason: string;
 
+  @ApiProperty({ enum: UserType, required: false })
   @Enum({ items: () => UserType, nullable: true })
   userType: UserType;
 

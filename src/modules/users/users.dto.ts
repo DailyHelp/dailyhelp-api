@@ -12,11 +12,12 @@ import {
 import { Users } from './users.entity';
 import { Transform, Type } from 'class-transformer';
 import { createPaginatedSwaggerDto, PaginationInput } from 'src/base/dto';
-import { AccountTier, OfferStatus, PaymentPurpose, UserType } from 'src/types';
+import { AccountTier, OfferStatus, PaymentPurpose, UserType, DisputeStatus } from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import { JobReview } from 'src/entities/job-review.entity';
 import { Message } from 'src/entities/message.entity';
+import { Transaction } from '../wallet/wallet.entity';
 
 export class VerifyIdentityDto {
   @IsString()
@@ -187,6 +188,7 @@ export class ClientDashboardQuery {
 }
 
 export class DisputeFilter {
+  @ApiProperty({ enum: DisputeStatus, required: false, description: 'Comma-separated values allowed' })
   @IsString()
   @IsOptional()
   status?: string;
@@ -306,10 +308,12 @@ export class PaymentInfo {
   amount: number;
 
   @IsEnum(PaymentPurpose)
+  @ApiProperty({ enum: PaymentPurpose, enumName: 'PaymentPurpose' })
   purpose: PaymentPurpose;
 }
 
 export class SwitchUserType {
+  @ApiProperty({ enum: UserType, enumName: 'UserType' })
   @IsEnum(UserType)
   userType: UserType;
 }
@@ -478,6 +482,11 @@ export const PaginatedConversationsDto = createPaginatedSwaggerDto(
 export const PaginatedMessageDto = createPaginatedSwaggerDto(
   MessageDto,
   'PaginatedMessageDto',
+);
+
+export const PaginatedTransactionsDto = createPaginatedSwaggerDto(
+  Transaction,
+  'PaginatedTransactionsDto',
 );
 
 export class ClientDashboardDto {

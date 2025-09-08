@@ -13,6 +13,8 @@ export class WalletService {
     private readonly transactionRepository: EntityRepository<Transaction>,
   ) {}
 
+  // TODO: Create pagination response
+
   async fetchUserTransactions(
     pagination: PaginationInput,
     { uuid, userType }: IAuthContext,

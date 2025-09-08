@@ -1,5 +1,6 @@
 import { IsEmail, IsEnum, IsOptional, IsString, Length } from 'class-validator';
 import { ReasonCategoryType } from 'src/types';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class AdminLoginDTO {
   @IsString()
@@ -59,6 +60,7 @@ export class CreateReasonCategory {
   @IsString()
   name: string;
 
+  @ApiProperty({ enum: ReasonCategoryType, enumName: 'ReasonCategoryType' })
   @IsEnum(ReasonCategoryType)
   type: ReasonCategoryType;
 }

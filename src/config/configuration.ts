@@ -4,6 +4,7 @@ import { TermiiConfig } from './types/termii.config';
 import { JwtAuthConfig } from './types/jwt-auth.config';
 import { QoreIDConfig } from './types/qoreid.config';
 import { PaystackConfig } from './types/paystack.config';
+import { FirebaseAdminConfig } from './types/firebase.config';
 
 export const SmtpConfiguration = registerAs(
   'smtpConfig',
@@ -49,5 +50,16 @@ export const PaystackConfiguration = registerAs(
   (): PaystackConfig => ({
     baseUrl: process.env.PAYSTACK_BASE_URL,
     secretKey: process.env.PAYSTACK_SECRET_KEY,
+  }),
+);
+
+export const FirebaseConfiguration = registerAs(
+  'firebaseConfig',
+  (): FirebaseAdminConfig => ({
+    serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+    databaseUrl: process.env.FIREBASE_DATABASE_URL,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY,
   }),
 );

@@ -3,6 +3,7 @@ import { Timestamp } from "../base/timestamp.entity";
 import { Offer, Conversation } from "../modules/conversations/conversations.entity";
 import { Users } from "../modules/users/users.entity";
 import { UserType, PaymentType, Currencies } from "../types";
+import { ApiProperty } from "@nestjs/swagger";
 
 @Filter({
   name: 'notDeleted',
@@ -44,6 +45,7 @@ export class Payment extends Timestamp {
   })
   conversation: Conversation;
 
+  @ApiProperty({ enum: UserType })
   @Enum({ items: () => UserType })
   userType: UserType;
 
@@ -62,9 +64,11 @@ export class Payment extends Timestamp {
   @Property({ type: 'longtext', nullable: true })
   metadata: string;
 
+  @ApiProperty({ enum: PaymentType })
   @Enum({ items: () => PaymentType })
   type: PaymentType;
 
+  @ApiProperty({ enum: Currencies })
   @Enum({ items: () => Currencies, default: Currencies.NGN })
   currency: Currencies;
 }

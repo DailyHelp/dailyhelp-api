@@ -292,6 +292,7 @@ export class UsersService {
     userExists.defaultLocation =
       this.locationRepository.getReference(locationUuid);
     await this.em.flush();
+    return { status: true };
   }
 
   async deleteLocation(locationUuid: string, { uuid }: IAuthContext) {
@@ -300,7 +301,7 @@ export class UsersService {
       user: { uuid },
     });
     if (!locationExists) throw new NotFoundException('Location not found');
-    locationExists.deletedAt = new Date();
+    await this.locationRepository.nativeDelete({ uuid: locationUuid });
     return { status: true };
   }
 
@@ -1177,59 +1178,80 @@ export class UsersService {
     }
 
     const dataQuery = `
-      SELECT
-        c.uuid AS conversationId,
-        rq.uuid AS requestorId,
-        rq.firstname AS rqFirstname,
-        rq.lastname AS rqLastname,
-        rq.middlename AS rqMiddlename,
-        m.uuid AS lastMessageId,
-        m.message AS lastMessage,
-        o.description AS offerDescription,
-        o.status AS offerStatus,
-        c.last_locked_at AS lastLockedAt,
-        c.locked,
-        c.restricted,
-        c.cancellation_chances AS cancellationChances,
-        c.created_at AS createdAt,
-        crs_me.last_read_at AS myLastReadAt,
-        crs_rq.last_read_at AS otherLastReadAt,
-        CASE 
-          WHEN m.created_at IS NOT NULL
-            AND crs_me.last_read_at IS NOT NULL
-            AND m.created_at <= crs_me.last_read_at
-          THEN 1 ELSE 0
-        END AS iReadLastMessage,
-        CASE 
-          WHEN m.created_at IS NOT NULL
-            AND crs_rq.last_read_at IS NOT NULL
-            AND m.created_at <= crs_rq.last_read_at
-          THEN 1 ELSE 0
-        END AS otherReadLastMessage,
-      crs_me.unread_count AS myUnreadCount
+  SELECT
+    c.uuid AS conversationId,
+    rq.uuid AS requestorId,
+    rq.firstname AS rqFirstname,
+    rq.lastname  AS rqLastname,
+    rq.middlename AS rqMiddlename,
+    m.uuid  AS lastMessageId,
+    m.message AS lastMessage,
+    o.description AS offerDescription,
+    o.status AS offerStatus,
+    c.last_locked_at AS lastLockedAt,
+    c.locked,
+    c.restricted,
+    c.cancellation_chances AS cancellationChances,
+    c.created_at AS createdAt,
+
+    crs_me.last_read_at AS myLastReadAt,
+    crs_rq.last_read_at AS otherLastReadAt,
+
+    CASE 
+      WHEN m.created_at IS NOT NULL
+       AND crs_me.last_read_at IS NOT NULL
+       AND m.created_at <= crs_me.last_read_at
+      THEN 1 ELSE 0
+    END AS iReadLastMessage,
+
+    CASE 
+      WHEN m.created_at IS NOT NULL
+       AND crs_rq.last_read_at IS NOT NULL
+       AND m.created_at <= crs_rq.last_read_at
+      THEN 1 ELSE 0
+    END AS otherReadLastMessage,
+
+    crs_me.unread_count AS myUnreadCount
+
+  FROM conversations c
+  LEFT JOIN users rq ON c.service_requestor = rq.uuid
+  LEFT JOIN messages m ON c.last_message = m.uuid
+  LEFT JOIN offers o   ON m.offer = o.uuid
+
+  /* one row per (conversation, user) */
+  LEFT JOIN (
+    SELECT conversation, user,
+           MAX(last_read_at) AS last_read_at,
+           MAX(unread_count) AS unread_count
+    FROM conversation_read_states
+    GROUP BY conversation, user
+  ) crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_provider
+
+  LEFT JOIN (
+    SELECT conversation, user,
+           MAX(last_read_at) AS last_read_at,
+           MAX(unread_count) AS unread_count
+    FROM conversation_read_states
+    GROUP BY conversation, user
+  ) crs_rq ON crs_rq.conversation = c.uuid AND crs_rq.user = rq.uuid
+
+  WHERE ${whereClause}
+  ORDER BY COALESCE(m.created_at, c.created_at) DESC
+  LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = `
+      SELECT COUNT(DISTINCT c.uuid) AS total
       FROM conversations c
       LEFT JOIN users rq ON c.service_requestor = rq.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
-      LEFT JOIN offers o ON m.offer = o.uuid
-      LEFT JOIN conversation_read_states crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_provider
-      LEFT JOIN conversation_read_states crs_rq ON crs_rq.conversation = c.uuid AND crs_rq.user = rq.uuid
+      LEFT JOIN offers o   ON m.offer = o.uuid
       WHERE ${whereClause}
-      ORDER BY COALESCE(m.created_at, c.created_at) DESC
-      LIMIT ? OFFSET ?
     `;
 
     const data = await this.em
       .getConnection()
       .execute(dataQuery, [...params, Number(limit), Number(offset)]);
-
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM conversations c
-      LEFT JOIN users rq ON c.service_requestor = rq.uuid
-      LEFT JOIN messages m ON c.last_message = m.uuid
-      LEFT JOIN offers o ON m.offer = o.uuid
-      WHERE ${whereClause}
-    `;
 
     const totalResult = await this.em
       .getConnection()
@@ -1279,62 +1301,84 @@ export class UsersService {
     }
 
     const dataQuery = `
-      SELECT
-        c.uuid AS conversationId,
-        sp.uuid AS serviceProviderId,
-        sp.firstname AS spFirstname,
-        sp.lastname AS spLastname,
-        sp.middlename AS spMiddlename,
-        sp.picture AS spPicture,
-        sp.tier AS spTier,
-        m.uuid AS lastMessageId,
-        m.message AS lastMessage,
-        o.description AS offerDescription,
-        o.status AS offerStatus,
-        o.price AS offerPrice,
-        c.last_locked_at AS lastLockedAt,
-        c.locked,
-        c.restricted,
-        c.cancellation_chances AS cancellationChances,
-        c.created_at AS createdAt,
-        crs_me.last_read_at AS myLastReadAt,
-        crs_sp.last_read_at AS otherLastReadAt,
-        CASE 
-          WHEN m.created_at IS NOT NULL
-            AND crs_me.last_read_at IS NOT NULL
-            AND m.created_at <= crs_me.last_read_at
-          THEN 1 ELSE 0
-        END AS iReadLastMessage,
-        CASE 
-          WHEN m.created_at IS NOT NULL
-            AND crs_sp.last_read_at IS NOT NULL
-            AND m.created_at <= crs_sp.last_read_at
-          THEN 1 ELSE 0
-        END AS otherReadLastMessage,
-      crs_me.unread_count AS myUnreadCount
+  SELECT
+    c.uuid AS conversationId,
+    sp.uuid AS serviceProviderId,
+    sp.firstname AS spFirstname,
+    sp.lastname AS spLastname,
+    sp.middlename AS spMiddlename,
+    sp.picture AS spPicture,
+    sp.tier AS spTier,
+    m.uuid AS lastMessageId,
+    m.message AS lastMessage,
+    o.description AS offerDescription,
+    o.status AS offerStatus,
+    o.price AS offerPrice,
+    c.last_locked_at AS lastLockedAt,
+    c.locked,
+    c.restricted,
+    c.cancellation_chances AS cancellationChances,
+    c.created_at AS createdAt,
+
+    crs_me.last_read_at   AS myLastReadAt,
+    crs_sp.last_read_at   AS otherLastReadAt,
+
+    CASE 
+      WHEN m.created_at IS NOT NULL
+        AND crs_me.last_read_at IS NOT NULL
+        AND m.created_at <= crs_me.last_read_at
+      THEN 1 ELSE 0
+    END AS iReadLastMessage,
+
+    CASE 
+      WHEN m.created_at IS NOT NULL
+        AND crs_sp.last_read_at IS NOT NULL
+        AND m.created_at <= crs_sp.last_read_at
+      THEN 1 ELSE 0
+    END AS otherReadLastMessage,
+
+    crs_me.unread_count AS myUnreadCount
+
+  FROM conversations c
+  LEFT JOIN users sp ON c.service_provider = sp.uuid
+  LEFT JOIN messages m ON c.last_message = m.uuid
+  LEFT JOIN offers o ON m.offer = o.uuid
+
+  /* pre-aggregate to ensure one row per (conversation,user) */
+  LEFT JOIN (
+    SELECT conversation, user, 
+           MAX(last_read_at)   AS last_read_at,
+           MAX(unread_count)   AS unread_count
+    FROM conversation_read_states
+    GROUP BY conversation, user
+  ) crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_requestor
+
+  LEFT JOIN (
+    SELECT conversation, user, 
+           MAX(last_read_at)   AS last_read_at,
+           MAX(unread_count)   AS unread_count
+    FROM conversation_read_states
+    GROUP BY conversation, user
+  ) crs_sp ON crs_sp.conversation = c.uuid AND crs_sp.user = sp.uuid
+
+  WHERE ${whereClause}
+  ORDER BY COALESCE(m.created_at, c.created_at) DESC
+  LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = `
+      SELECT COUNT(DISTINCT c.uuid) as total
       FROM conversations c
       LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o ON m.offer = o.uuid
-      LEFT JOIN conversation_read_states crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_requestor
-      LEFT JOIN conversation_read_states crs_sp ON crs_sp.conversation = c.uuid AND crs_sp.user = sp.uuid
+      /* joins are not strictly needed for count, but harmless; DISTINCT avoids dupes */
       WHERE ${whereClause}
-      ORDER BY COALESCE(m.created_at, c.created_at) DESC
-      LIMIT ? OFFSET ?
     `;
 
     const data = await this.em
       .getConnection()
       .execute(dataQuery, [...params, Number(limit), Number(offset)]);
-
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM conversations c
-      LEFT JOIN users sp ON c.service_provider = sp.uuid
-      LEFT JOIN messages m ON c.last_message = m.uuid
-      LEFT JOIN offers o ON m.offer = o.uuid
-      WHERE ${whereClause}
-    `;
 
     const totalResult = await this.em
       .getConnection()
@@ -1575,11 +1619,65 @@ export class UsersService {
     { uuid, userType, email }: IAuthContext,
   ) {
     const reference = v4();
+
+    // Determine amount and validate references based on purpose
+    let amountKobo = 0;
+    let amountNaira = 0;
+    let offerRef: any = null;
+    let conversationRef: any = null;
+
+    if (dto.purpose === PaymentPurpose.JOB_OFFER) {
+      if (!dto.offerUuid || !dto.conversationUuid)
+        throw new BadRequestException(
+          'offerUuid and conversationUuid are required for JOB_OFFER',
+        );
+
+      const [conversation, offer] = await Promise.all([
+        this.conversationRepository.findOne({ uuid: dto.conversationUuid }),
+        this.offerRepository.findOne({ uuid: dto.offerUuid }),
+      ]);
+
+      if (!conversation)
+        throw new NotFoundException('Conversation does not exist');
+      if (!offer) throw new NotFoundException('Offer does not exist');
+
+      // Ensure the offer belongs to this conversation
+      const linkage = await this.messageRepository.findOne({
+        conversation: { uuid: dto.conversationUuid },
+        offer: { uuid: dto.offerUuid },
+      });
+      if (!linkage)
+        throw new ForbiddenException(
+          'Offer does not belong to the specified conversation',
+        );
+
+      // Ensure current user is part of the conversation
+      const isParticipant =
+        conversation.serviceRequestor?.uuid === uuid ||
+        conversation.serviceProvider?.uuid === uuid;
+      if (!isParticipant)
+        throw new ForbiddenException('You are not part of this conversation');
+
+      amountNaira = Number(offer.price || 0);
+      amountKobo = Math.round(amountNaira * 100);
+      offerRef = this.offerRepository.getReference(dto.offerUuid);
+      conversationRef = this.conversationRepository.getReference(
+        dto.conversationUuid,
+      );
+    } else if (dto.purpose === PaymentPurpose.FUND_WALLET) {
+      if (!dto.amount || dto.amount < 1)
+        throw new BadRequestException('Amount is required to fund wallet');
+      amountNaira = Number(dto.amount);
+      amountKobo = Math.round(amountNaira * 100);
+    } else {
+      throw new BadRequestException('Invalid payment purpose');
+    }
+
     const initRes = await axios.post(
       `${this.paystackConfig.baseUrl}/transaction/initialize`,
       {
         email,
-        amount: Math.round(dto.amount * 100),
+        amount: amountKobo,
         currency: Currencies.NGN,
         reference,
         metadata: {
@@ -1597,20 +1695,17 @@ export class UsersService {
         },
       },
     );
+
     const paymentModel = this.paymentRepository.create({
       uuid: reference,
       reference,
-      amount: dto.amount,
+      amount: amountNaira,
       currency: Currencies.NGN,
       user: this.usersRepository.getReference(uuid),
       type: PaymentType.INCOMING,
       userType,
-      offer: dto.offerUuid
-        ? this.offerRepository.getReference(dto.offerUuid)
-        : null,
-      conversation: dto.conversationUuid
-        ? this.conversationRepository.getReference(dto.conversationUuid)
-        : null,
+      offer: offerRef,
+      conversation: conversationRef,
       status: 'initialized',
       metadata: JSON.stringify({
         purpose: dto.purpose,
@@ -1875,7 +1970,10 @@ export class UsersService {
         ...conditions,
       }),
     ]);
-    return { status: true, data: { disputes, totalDisputes } };
+    return buildResponseDataWithPagination(disputes, totalDisputes, {
+      page,
+      limit,
+    });
   }
 
   async submitFeedback(dto: FeedbackDto, { uuid, userType }: IAuthContext) {

@@ -13,6 +13,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtAuthConfiguration } from 'src/config/configuration';
 import { PresenceService } from './presence.service';
 import { RedisProvider } from './redis.provider';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RedisProvider } from './redis.provider';
       ],
     }),
     ConfigModule.forFeature(JwtAuthConfiguration),
+    NotificationsModule,
   ],
   providers: [SocketGateway, ReadStateService, PresenceService, RedisProvider],
   exports: [SocketGateway, ReadStateService, PresenceService],

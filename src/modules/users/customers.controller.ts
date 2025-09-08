@@ -15,11 +15,14 @@ import {
   ApiOkResponse,
   ApiQuery,
   ApiTags,
+  ApiBody,
+  ApiExtraModels,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { Request } from 'express';
-import { IAuthContext } from 'src/types';
+import { IAuthContext, PaymentPurpose } from 'src/types';
 import { Users } from './users.entity';
 import {
   CancelOfferDto,
@@ -52,6 +55,7 @@ import { ReadStateService } from '../ws/read-state.service';
 @ApiTags('customers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
+@ApiExtraModels(PaymentInfo, SwitchUserType)
 export class CustomersController {
   constructor(
     private readonly userService: UsersService,
@@ -248,11 +252,39 @@ export class CustomersController {
   }
 
   @Patch('switch-user-type')
+  @ApiBody({
+    schema: { $ref: getSchemaPath(SwitchUserType) },
+    examples: {
+      Provider: { value: { userType: 'PROVIDER' } },
+      Customer: { value: { userType: 'CUSTOMER' } },
+    },
+  })
   async switchUserType(@Body() body: SwitchUserType, @Req() req: Request) {
     return this.userService.switchUserType(body.userType, req.user as any);
   }
 
   @Post('initialize-paystack-payment')
+  @ApiBody({
+    schema: { $ref: getSchemaPath(PaymentInfo) },
+    examples: {
+      FundWallet: {
+        summary: 'Fund wallet',
+        value: {
+          purpose: PaymentPurpose.FUND_WALLET,
+          amount: 5000,
+        },
+      },
+      JobOffer: {
+        summary: 'Pay for job offer',
+        value: {
+          purpose: PaymentPurpose.JOB_OFFER,
+          offerUuid: 'offer-uuid',
+          conversationUuid: 'conversation-uuid',
+          description: 'Payment for accepted offer',
+        },
+      },
+    },
+  })
   initializePaystackPayment(
     @Body() paymentInfo: PaymentInfo,
     @Req() request: Request,
@@ -265,6 +297,27 @@ export class CustomersController {
 
   @Post('verify-transaction/:transactionId')
   @UseGuards(ExpiredJwtAuthGuard)
+  @ApiBody({
+    schema: { $ref: getSchemaPath(PaymentInfo) },
+    examples: {
+      FundWallet: {
+        summary: 'Fund wallet',
+        value: {
+          purpose: PaymentPurpose.FUND_WALLET,
+          amount: 5000,
+        },
+      },
+      JobOffer: {
+        summary: 'Pay for job offer',
+        value: {
+          purpose: PaymentPurpose.JOB_OFFER,
+          offerUuid: 'offer-uuid',
+          conversationUuid: 'conversation-uuid',
+          description: 'Payment for accepted offer',
+        },
+      },
+    },
+  })
   verifyPayment(
     @Param('transactionId') transactionId: string,
     @Body() paymentInfo: PaymentInfo,
@@ -290,7 +343,6 @@ export class CustomersController {
   @Get('disputes')
   @ApiOkResponse({
     type: PaginatedDisputesDto,
-    isArray: true,
     description: 'Job disputes fetched successfully',
   })
   async getDisputes(@Query() query: DisputeQuery, @Req() request: Request) {

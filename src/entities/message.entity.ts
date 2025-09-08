@@ -13,6 +13,7 @@ import {
 } from '../modules/conversations/conversations.entity';
 import { Users } from '../modules/users/users.entity';
 import { MessageStatus, MessageType } from '../types';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -51,9 +52,11 @@ export class Message extends Timestamp {
   @Property({ nullable: true })
   message: string;
 
+  @ApiProperty({ enum: MessageType })
   @Enum({ items: () => MessageType, default: MessageType.TEXT })
   type: MessageType;
 
+  @ApiProperty({ enum: MessageStatus })
   @Enum({ items: () => MessageStatus, default: MessageStatus.SENT })
   status: MessageStatus;
 

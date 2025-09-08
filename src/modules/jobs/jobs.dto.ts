@@ -9,8 +9,10 @@ import {
 } from 'class-validator';
 import { PaginationInput } from 'src/base/dto';
 import { JobStatus } from 'src/types';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class JobFilter {
+  @ApiProperty({ enum: JobStatus, enumName: 'JobStatus', required: false })
   @IsEnum(JobStatus)
   @IsOptional()
   status: JobStatus;

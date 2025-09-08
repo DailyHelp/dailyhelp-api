@@ -9,6 +9,7 @@ import {
 import { Timestamp } from '../base/timestamp.entity';
 import { Users } from '../modules/users/users.entity';
 import { UserType } from '../types';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -49,6 +50,7 @@ export class Location extends Timestamp {
   })
   user: Users;
 
+  @ApiProperty({ enum: UserType })
   @Enum({ items: () => UserType })
   userType: UserType;
 

@@ -32,6 +32,7 @@ import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
 import { JobReport } from './job-reports.entity';
 import { SocketGateway } from '../ws/socket.gateway';
+import { generateOtp } from 'src/utils';
 
 @Injectable()
 export class JobService {
@@ -382,6 +383,7 @@ export class JobService {
     const disputeModel = this.jobDisputeRepository.create({
       uuid: v4(),
       job: this.jobRepository.getReference(jobUuid),
+      code: `DH${generateOtp(4)}`,
       category: dto.reasonCategory,
       description: dto.description,
       pictures: dto.pictures.join(','),

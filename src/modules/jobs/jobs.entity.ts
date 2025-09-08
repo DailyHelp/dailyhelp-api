@@ -12,6 +12,7 @@ import { JobStatus, UserType } from '../../types';
 import { JobDispute } from './job-dispute.entity';
 import { JobReview } from '../../entities/job-review.entity';
 import { Payment } from '../../entities/payment.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -45,6 +46,7 @@ export class Job extends Timestamp {
   @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   price: number;
 
+  @ApiProperty({ enum: JobStatus })
   @Enum({ items: () => JobStatus, default: JobStatus.PENDING })
   status: JobStatus;
 

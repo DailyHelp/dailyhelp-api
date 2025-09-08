@@ -51,6 +51,7 @@ export class PaginationInput {
   orderBy?: string = '';
 
   @IsOptional()
+  @ApiProperty({ enum: OrderDir, enumName: 'OrderDir', required: false })
   @IsEnum(OrderDir)
   orderDir?: OrderDir;
 }

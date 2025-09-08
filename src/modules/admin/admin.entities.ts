@@ -9,6 +9,7 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { ReasonCategoryType } from '../../types';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -87,6 +88,7 @@ export class ReasonCategory extends Timestamp {
   @Property({ nullable: true })
   name: string;
 
+  @ApiProperty({ enum: ReasonCategoryType, required: false })
   @Enum({
     items: () => ReasonCategoryType,
     nullable: true,

@@ -11,6 +11,7 @@ import { Users } from '../users/users.entity';
 import { TransactionStatus, TransactionType, UserType } from '../../types';
 import { Job } from '../jobs/jobs.entity';
 import { Payment } from '../../entities/payment.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -36,6 +37,7 @@ export class Wallet extends Timestamp {
   })
   user: Users;
 
+  @ApiProperty({ enum: UserType, required: false })
   @Enum({ items: () => UserType, nullable: true })
   userType: UserType;
 }
@@ -50,9 +52,11 @@ export class Transaction extends Timestamp {
   @PrimaryKey()
   uuid: string;
 
+  @ApiProperty({ enum: TransactionType })
   @Enum({ items: () => TransactionType })
   type: TransactionType;
 
+  @ApiProperty({ enum: TransactionStatus })
   @Enum({ items: () => TransactionStatus, default: TransactionStatus.SUCCESS })
   status: TransactionStatus;
 

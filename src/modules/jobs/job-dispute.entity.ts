@@ -10,6 +10,8 @@ import { Timestamp } from '../../base/timestamp.entity';
 import { DisputeStatus, JobStatus, UserType } from '../../types';
 import { Users } from '../users/users.entity';
 import { Job } from './jobs.entity';
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 @Filter({
   name: 'notDeleted',
@@ -21,6 +23,8 @@ export class JobDispute extends Timestamp {
   @PrimaryKey()
   uuid!: string;
 
+  @ApiProperty({ type: () => Job, required: false })
+  @Type(() => Job)
   @ManyToOne(() => Job, {
     fieldName: 'job',
     referenceColumnName: 'uuid',
@@ -28,6 +32,9 @@ export class JobDispute extends Timestamp {
     nullable: true
   })
   job: Job;
+
+  @Property({ nullable: true })
+  code: string;
 
   @Property({ nullable: true })
   category: string;
@@ -38,9 +45,11 @@ export class JobDispute extends Timestamp {
   @Property({ type: 'longtext', nullable: true })
   pictures: string;
 
+  @ApiProperty({ enum: DisputeStatus })
   @Enum({ items: () => DisputeStatus, default: DisputeStatus.PENDING })
   status: DisputeStatus;
 
+  @ApiProperty({ type: () => Users, required: false })
   @ManyToOne(() => Users, {
     fieldName: 'submitted_by',
     referenceColumnName: 'uuid',
@@ -49,6 +58,7 @@ export class JobDispute extends Timestamp {
   })
   submittedBy: Users;
 
+  @ApiProperty({ type: () => Users, required: false })
   @ManyToOne(() => Users, {
     fieldName: 'submitted_for',
     referenceColumnName: 'uuid',
@@ -57,6 +67,7 @@ export class JobDispute extends Timestamp {
   })
   submittedFor: Users;
 
+  @ApiProperty({ enum: UserType, required: false })
   @Enum({ items: () => UserType, nullable: true })
   userType: UserType;
 }

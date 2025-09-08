@@ -16,6 +16,9 @@ import {
   ApiOkResponse,
   ApiQuery,
   ApiTags,
+  ApiBody,
+  ApiExtraModels,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { UsersService } from './users.service';
@@ -55,6 +58,7 @@ import { ReadStateService } from '../ws/read-state.service';
 @ApiTags('providers')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
+@ApiExtraModels(SwitchUserType)
 export class ProvidersController {
   constructor(
     private readonly userService: UsersService,
@@ -163,6 +167,13 @@ export class ProvidersController {
   }
 
   @Patch('switch-user-type')
+  @ApiBody({
+    schema: { $ref: getSchemaPath(SwitchUserType) },
+    examples: {
+      Provider: { value: { userType: 'PROVIDER' } },
+      Customer: { value: { userType: 'CUSTOMER' } },
+    },
+  })
   async switchUserType(@Body() body: SwitchUserType, @Req() req: Request) {
     return this.userService.switchUserType(body.userType, req.user as any);
   }
@@ -225,7 +236,6 @@ export class ProvidersController {
   @Get('disputes')
   @ApiOkResponse({
     type: PaginatedDisputesDto,
-    isArray: true,
     description: 'Job disputes fetched successfully',
   })
   async getDisputes(@Query() query: DisputeQuery, @Req() request: Request) {

@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiExtraModels, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
@@ -19,14 +19,43 @@ import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { Request } from 'express';
 import { extractTokenFromReq } from 'src/utils';
 import { LoginResponseDto } from '../users/users.dto';
+import { OTPActionType, UserType } from 'src/types';
 
 @Controller('auth')
 @ApiTags('auth')
 @ApiBearerAuth()
+@ApiExtraModels(SignupStepOneDto, VerifyOtpDto, SendOtpDto)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('signup')
+  @ApiBody({
+    schema: { $ref: getSchemaPath(SignupStepOneDto) },
+    examples: {
+      Customer: {
+        value: {
+          firstname: 'Jane',
+          lastname: 'Doe',
+          email: 'jane@example.com',
+          phone: '+2348000000000',
+          password: 'Passw0rd!',
+          deviceToken: 'device-token',
+          type: UserType.CUSTOMER,
+        },
+      },
+      Provider: {
+        value: {
+          firstname: 'John',
+          lastname: 'Doe',
+          email: 'john@example.com',
+          phone: '+2348111111111',
+          password: 'Passw0rd!',
+          deviceToken: 'device-token',
+          type: UserType.PROVIDER,
+        },
+      },
+    },
+  })
   @ApiCreatedResponse({
     description: 'User created successfully',
     schema: {
@@ -84,6 +113,27 @@ export class AuthController {
   }
 
   @Post('verify-otp')
+  @ApiBody({
+    schema: { $ref: getSchemaPath(VerifyOtpDto) },
+    examples: {
+      VerifyAccount: {
+        value: {
+          pinId: 'pin-id',
+          otp: '123456',
+          userUuid: 'user-uuid',
+          otpActionType: OTPActionType.VERIFY_ACCOUNT,
+        },
+      },
+      ResetPassword: {
+        value: {
+          pinId: 'pin-id',
+          otp: '123456',
+          userUuid: 'user-uuid',
+          otpActionType: OTPActionType.RESET_PASSWORD,
+        },
+      },
+    },
+  })
   @ApiCreatedResponse({
     description: 'OTP verified successfully',
     schema: {
@@ -98,6 +148,24 @@ export class AuthController {
   }
 
   @Post('send-otp')
+  @ApiBody({
+    schema: { $ref: getSchemaPath(SendOtpDto) },
+    examples: {
+      VerifyPhone: {
+        value: {
+          userUuid: 'user-uuid',
+          otpActionType: OTPActionType.VERIFY_PHONE,
+          phone: '+2348000000000',
+        },
+      },
+      ResetPassword: {
+        value: {
+          userUuid: 'user-uuid',
+          otpActionType: OTPActionType.RESET_PASSWORD,
+        },
+      },
+    },
+  })
   @ApiCreatedResponse({
     description: 'OTP sent successfully',
     schema: { example: { status: true, data: 'string' } },

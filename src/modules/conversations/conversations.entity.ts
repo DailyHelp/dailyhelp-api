@@ -10,6 +10,7 @@ import { Timestamp } from '../../base/timestamp.entity';
 import { Users } from '../users/users.entity';
 import { OfferStatus } from '../../types';
 import { Message } from '../../entities/message.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
   name: 'notDeleted',
@@ -88,6 +89,7 @@ export class Offer extends Timestamp {
   @Property({ type: 'longtext', nullable: true })
   pictures: string;
 
+  @ApiProperty({ enum: OfferStatus })
   @Enum({ items: () => OfferStatus, default: OfferStatus.PENDING })
   status: OfferStatus;
 

@@ -3,7 +3,6 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -103,7 +102,7 @@ export class AuthService {
       totalBalance: 0,
       availableBalance: 0,
       user: this.usersRepository.getReference(userUuid),
-      userType: user.type
+      userType: user.type,
     });
     this.em.persist(userModel);
     this.em.persist(walletModel);
@@ -117,7 +116,7 @@ export class AuthService {
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (passwordMatch) {
       if (user.deletedAt)
-        throw new ForbiddenException('This account is disabled');
+        throw new UnauthorizedException('This account is disabled');
       if (!user.emailVerified) {
         user.deviceToken = deviceToken;
         const pinId = nanoid();
@@ -268,13 +267,13 @@ export class AuthService {
     try {
       payload = this.jwtService.verify(refreshToken);
     } catch (err) {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
     const isBlacklisted = await this.blacklistedTokensRepository.findOne({
       token: refreshToken,
     });
     if (isBlacklisted)
-      throw new ForbiddenException('Refresh token is blacklisted');
+      throw new UnauthorizedException('Refresh token is blacklisted');
     const blacklistedToken = this.blacklistedTokensRepository.create({
       uuid: v4(),
       token: refreshToken,

@@ -10,6 +10,7 @@ import { WsJwtGuard } from 'src/guards/ws-jwt-guard';
 import { Server, Socket } from 'socket.io';
 import { ReadStateService } from './read-state.service';
 import { PresenceService } from './presence.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type WSUser = { uuid: string; userType: string; email?: string };
 
@@ -24,6 +25,7 @@ export class SocketGateway {
   constructor(
     private readonly readState: ReadStateService,
     private readonly presence: PresenceService,
+    private readonly notify: NotificationsService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -108,6 +110,15 @@ export class SocketGateway {
     this.server
       .to(userRoom(payload.serviceRequestorUuid))
       .emit('conversation:created', payload);
+
+    this.notify.sendToUserUuids(
+      [payload.serviceProviderUuid, payload.serviceRequestorUuid],
+      {
+        title: 'New Conversation',
+        body: 'A new conversation was started',
+        data: { type: 'CONVERSATION_CREATED', conversationUuid: String(payload.uuid) },
+      },
+    );
   }
 
   conversationUpdated(payload: {
@@ -128,6 +139,16 @@ export class SocketGateway {
     this.server
       .to(userRoom(payload.serviceRequestorUuid))
       .emit('conversation:updated', payload);
+
+    this.notify.sendToUserUuids(
+      [payload.serviceProviderUuid, payload.serviceRequestorUuid],
+      {
+        title: 'Conversation Updated',
+        body: 'Conversation state has changed',
+        data: { type: 'CONVERSATION_UPDATED', conversationUuid: String(payload.uuid) },
+        silent: true,
+      },
+    );
   }
 
   messageCreated(payload: {
@@ -146,6 +167,20 @@ export class SocketGateway {
       conversationUuid: payload.conversationUuid,
       lastMessageSnippet: (payload.message ?? '').slice(0, 120),
     });
+
+    // Push notification to recipient
+    this.notify.sendToUserUuids(
+      [payload.toUuid],
+      {
+        title: 'New message',
+        body: payload.message || 'You have a new message',
+        data: {
+          type: 'MESSAGE',
+          payload: JSON.stringify(payload),
+        },
+      },
+      payload.fromUuid,
+    );
   }
 
   messageRead(payload: {
@@ -183,6 +218,19 @@ export class SocketGateway {
       .to(convRoom(payload.conversationUuid))
       .emit('offer:created', payload);
     this.server.to(userRoom(payload.toUuid)).emit('offer:created', payload);
+
+    this.notify.sendToUserUuids(
+      [payload.toUuid],
+      {
+        title: 'New offer',
+        body: `You received an offer of ₦${payload.price}`,
+        data: {
+          type: 'OFFER_CREATED',
+          payload: JSON.stringify(payload),
+        },
+      },
+      payload.fromUuid,
+    );
   }
 
   offerCountered(payload: any) {
@@ -190,6 +238,21 @@ export class SocketGateway {
       .to(convRoom(payload.conversationUuid))
       .emit('offer:countered', payload);
     this.server.to(userRoom(payload.toUuid)).emit('offer:countered', payload);
+
+    if (payload?.toUuid) {
+      this.notify.sendToUserUuids(
+        [payload.toUuid],
+        {
+          title: 'Offer countered',
+          body: 'Your offer has a counter-offer',
+          data: {
+            type: 'OFFER_COUNTERED',
+            payload: JSON.stringify(payload),
+          },
+        },
+        payload?.fromUuid,
+      );
+    }
   }
 
   offerUpdated(payload: {
@@ -200,6 +263,16 @@ export class SocketGateway {
     this.server
       .to(convRoom(payload.conversationUuid))
       .emit('offer:updated', payload);
+
+    // Notify both participants in the conversation
+    this.notify.notifyConversationParticipants(payload.conversationUuid, {
+      title: 'Offer updated',
+      body: `Offer status: ${payload.status}`,
+      data: {
+        type: 'OFFER_UPDATED',
+        payload: JSON.stringify(payload),
+      },
+    });
   }
 
   jobCreated(payload: {
@@ -220,6 +293,21 @@ export class SocketGateway {
     this.server
       .to(userRoom(payload.serviceRequestorUuid))
       .emit('job:created', payload);
+
+    const body = payload.price
+      ? `Job created • ₦${payload.price}`
+      : 'Job created';
+    this.notify.sendToUserUuids(
+      [payload.serviceProviderUuid, payload.serviceRequestorUuid],
+      {
+        title: 'Job Created',
+        body,
+        data: {
+          type: 'JOB_CREATED',
+          payload: JSON.stringify(payload),
+        },
+      },
+    );
   }
 
   jobUpdated(payload: {
@@ -239,5 +327,17 @@ export class SocketGateway {
     this.server
       .to(userRoom(payload.serviceRequestorUuid))
       .emit('job:updated', payload);
+
+    this.notify.sendToUserUuids(
+      [payload.serviceProviderUuid, payload.serviceRequestorUuid],
+      {
+        title: 'Job Updated',
+        body: `Status: ${payload.status}`,
+        data: {
+          type: 'JOB_UPDATED',
+          payload: JSON.stringify(payload),
+        },
+      },
+    );
   }
 }
