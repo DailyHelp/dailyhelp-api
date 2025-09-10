@@ -343,7 +343,7 @@ export class ProvidersController {
 // 60k => CAC
 // 20 ~ 30k => Whogohost
 // 110k => (maybe 40k) (play store) (maybe 160k) (app store)
-// qoreid (1k), zoho (1k ~ 5k) termii (1k)
+// qoreid (2k), zoho (1k ~ 5k) termii (3k)
 
 // -97k
 

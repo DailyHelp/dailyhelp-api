@@ -106,12 +106,12 @@ export class SaveProviderDetails {
 
 export class PriceFilter {
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   @Type(() => Number)
   minPrice?: number;
 
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   @Type(() => Number)
   maxPrice?: number;
 }
@@ -131,7 +131,7 @@ export class ClientDashboardFilter {
   priceRange?: PriceFilter;
 
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   @Type(() => Number)
   minRating?: number;
 
@@ -144,12 +144,12 @@ export class ClientDashboardFilter {
   search?: string;
 
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   @Type(() => Number)
   latitude?: number;
 
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   @Type(() => Number)
   longitude?: number;
 
