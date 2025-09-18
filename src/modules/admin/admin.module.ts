@@ -6,6 +6,7 @@ import {
   ReasonCategory,
   SubCategory,
 } from './admin.entities';
+import { Users } from '../users/users.entity';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
 import { JwtAuthConfiguration } from 'src/config/configuration';
@@ -15,14 +16,17 @@ import { AdminService } from './admin.service';
 import { AdminLocalStrategy } from './strategies/local.strategy';
 import { AdminJwtStrategy } from './strategies/jwt.strategy';
 import { AdminController } from './admin.controller';
+import { OTP } from '../users/users.entity';
+import { SharedModule } from '../shared/shared.module';
 
 @Module({
   imports: [
     MikroOrmModule.forFeature({
-      entities: [AdminUser, MainCategory, SubCategory, ReasonCategory],
+      entities: [AdminUser, MainCategory, SubCategory, ReasonCategory, OTP, Users],
     }),
     PassportModule,
     ConfigModule.forFeature(JwtAuthConfiguration),
+    SharedModule,
     JwtModule.registerAsync({
       imports: [ConfigModule.forFeature(JwtAuthConfiguration)],
       useFactory: (jwtAuthConfig: ConfigType<typeof JwtAuthConfiguration>) => ({

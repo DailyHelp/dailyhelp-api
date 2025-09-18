@@ -1,6 +1,17 @@
-import { IsEmail, IsEnum, IsOptional, IsString, Length } from 'class-validator';
+import {
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { ReasonCategoryType } from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class AdminLoginDTO {
   @IsString()
@@ -8,6 +19,18 @@ export class AdminLoginDTO {
 
   @IsString()
   password: string;
+}
+
+export class AdminVerifyOtpDto {
+  @IsString()
+  pinId: string;
+
+  @IsString()
+  @Length(6, 6)
+  otp: string;
+
+  @IsEmail()
+  email: string;
 }
 
 export class AdminUserDto {
@@ -22,6 +45,116 @@ export class AdminUserDto {
   @IsString()
   @Length(1, 50)
   password: string;
+}
+
+export class AdminInitiateResetPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class AdminResendOtpDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  pinId: string;
+}
+
+export class AdminNewResetPasswordDto {
+  @IsString()
+  @Length(1, 50)
+  password: string;
+}
+
+export class AdminChangePasswordDto {
+  @IsString()
+  @Length(1, 50)
+  oldPassword: string;
+
+  @IsString()
+  @Length(1, 50)
+  newPassword: string;
+}
+
+export enum AdminCustomerStatus {
+  SUSPENDED = 'SUSPENDED',
+  VERIFIED = 'VERIFIED',
+  UNVERIFIED = 'UNVERIFIED',
+}
+
+export class AdminFetchCustomersDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsEnum(AdminCustomerStatus)
+  status?: AdminCustomerStatus;
+}
+
+export class AdminDashboardPaginationDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+}
+
+export enum AdminDashboardDateFilter {
+  TODAY = 'TODAY',
+  YESTERDAY = 'YESTERDAY',
+  LAST_WEEK = 'LAST_WEEK',
+  LAST_7_DAYS = 'LAST_7_DAYS',
+  THIS_MONTH = 'THIS_MONTH',
+  LAST_30_DAYS = 'LAST_30_DAYS',
+  CUSTOM = 'CUSTOM',
+}
+
+export class AdminDashboardFilterDto {
+  @IsOptional()
+  @IsEnum(AdminDashboardDateFilter)
+  filter?: AdminDashboardDateFilter;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AdminDashboardPaginationDto)
+  categoriesPagination?: AdminDashboardPaginationDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AdminDashboardPaginationDto)
+  locationsPagination?: AdminDashboardPaginationDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AdminDashboardPaginationDto)
+  providersPagination?: AdminDashboardPaginationDto;
 }
 
 export class CreateMainCategory {

@@ -4,16 +4,19 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AdminJwtAuthGuard } from './guards/jwt-auth-guard';
 import { AdminService } from './admin.service';
 import { AllowUnauthorizedRequest } from 'src/decorators/unauthorized.decorator';
 import { AdminLocalAuthGuard } from './guards/local-auth-guard';
 import * as dtos from './dto';
 import { MainCategory, SubCategory } from './admin.entities';
+import { extractTokenFromReq } from 'src/utils';
+import { Request } from 'express';
 
 @Controller('admin')
 @ApiTags('admin')
@@ -26,11 +29,176 @@ export class AdminController {
     return 'Welcome to DailyHelp Admin!!!';
   }
 
+  @Get('customers')
+  @ApiOkResponse({ description: 'Customers fetched successfully' })
+  fetchCustomers(@Query() query: dtos.AdminFetchCustomersDto) {
+    return this.service.fetchCustomers(query);
+  }
+
+  @Get('dashboard')
+  @ApiBody({ type: dtos.AdminDashboardFilterDto })
+  @ApiOkResponse({
+    description: 'Dashboard analytics fetched successfully',
+  })
+  dashboard(@Body() body: dtos.AdminDashboardFilterDto) {
+    return this.service.fetchDashboardAnalytics(body);
+  }
+
   @Post('auth/login')
   @AllowUnauthorizedRequest()
   @UseGuards(AdminLocalAuthGuard)
+  @ApiBody({ type: dtos.AdminLoginDTO })
+  @ApiCreatedResponse({
+    description: 'Admin login initiated successfully',
+    schema: {
+      example: {
+        status: true,
+        data: {
+          pinId: 'string',
+          email: 'admin@example.com',
+          otpRequired: true,
+        },
+      },
+    },
+  })
   login(@Body() _body: dtos.AdminLoginDTO, @Req() req: any) {
-    return this.service.login(req.user);
+    return this.service.initiateLogin(req.user);
+  }
+
+  @Post('auth/verify-otp')
+  @AllowUnauthorizedRequest()
+  @ApiBody({ type: dtos.AdminVerifyOtpDto })
+  @ApiCreatedResponse({
+    description: 'Admin login OTP verified successfully',
+    schema: {
+      example: {
+        status: true,
+        data: {
+          accessToken: 'string',
+          user: {
+            uuid: 'string',
+            fullname: 'Jane Doe',
+            email: 'admin@example.com',
+          },
+        },
+      },
+    },
+  })
+  verifyAdminLoginOtp(@Body() body: dtos.AdminVerifyOtpDto) {
+    return this.service.verifyAdminLoginOtp(body);
+  }
+
+  @Post('auth/resend-login-otp')
+  @AllowUnauthorizedRequest()
+  @ApiBody({ type: dtos.AdminResendOtpDto })
+  @ApiCreatedResponse({
+    description: 'Admin login OTP resent successfully',
+    schema: {
+      example: {
+        status: true,
+        data: {
+          pinId: 'string',
+          email: 'admin@example.com',
+          otpRequired: true,
+        },
+      },
+    },
+  })
+  resendAdminLoginOtp(@Body() body: dtos.AdminResendOtpDto) {
+    return this.service.resendAdminLoginOtp(body);
+  }
+
+  @Post('auth/initiate-reset-password')
+  @AllowUnauthorizedRequest()
+  @ApiBody({ type: dtos.AdminInitiateResetPasswordDto })
+  @ApiCreatedResponse({
+    description: 'Admin password reset initiated successfully',
+    schema: {
+      example: {
+        status: true,
+        data: {
+          pinId: 'string',
+          email: 'admin@example.com',
+        },
+      },
+    },
+  })
+  initiateResetPassword(@Body() body: dtos.AdminInitiateResetPasswordDto) {
+    return this.service.initiateResetPassword(body);
+  }
+
+  @Post('auth/verify-reset-otp')
+  @AllowUnauthorizedRequest()
+  @ApiBody({ type: dtos.AdminVerifyOtpDto })
+  @ApiCreatedResponse({
+    description: 'Admin reset password OTP verified successfully',
+    schema: {
+      example: {
+        status: true,
+        data: 'string',
+      },
+    },
+  })
+  verifyAdminResetOtp(@Body() body: dtos.AdminVerifyOtpDto) {
+    return this.service.verifyAdminResetOtp(body);
+  }
+
+  @Post('auth/resend-reset-otp')
+  @AllowUnauthorizedRequest()
+  @ApiBody({ type: dtos.AdminResendOtpDto })
+  @ApiCreatedResponse({
+    description: 'Admin reset password OTP resent successfully',
+    schema: {
+      example: {
+        status: true,
+        data: {
+          pinId: 'string',
+          email: 'admin@example.com',
+        },
+      },
+    },
+  })
+  resendResetPasswordOtp(@Body() body: dtos.AdminResendOtpDto) {
+    return this.service.resendResetPasswordOtp(body);
+  }
+
+  @Post('auth/reset-password')
+  @AllowUnauthorizedRequest()
+  @ApiBody({ type: dtos.AdminNewResetPasswordDto })
+  @ApiCreatedResponse({
+    description: 'Admin password reset successfully',
+    schema: {
+      example: {
+        status: true,
+      },
+    },
+  })
+  resetAdminPassword(
+    @Body() body: dtos.AdminNewResetPasswordDto,
+    @Req() req: Request,
+  ) {
+    const token = extractTokenFromReq(
+      req,
+      'Kindly provide a valid access token to reset your password',
+    );
+    return this.service.resetAdminPassword(body, token);
+  }
+
+  @Post('auth/change-password')
+  @ApiBody({ type: dtos.AdminChangePasswordDto })
+  @ApiCreatedResponse({
+    description: 'Admin password updated successfully',
+    schema: {
+      example: {
+        status: true,
+      },
+    },
+  })
+  changeAdminPassword(
+    @Body() body: dtos.AdminChangePasswordDto,
+    @Req() req: any,
+  ) {
+    return this.service.changeAdminPassword(body, req.user);
   }
 
   @Post('user')
