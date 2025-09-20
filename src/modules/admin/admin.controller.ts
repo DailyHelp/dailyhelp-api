@@ -35,6 +35,61 @@ export class AdminController {
     return this.service.fetchCustomers(query);
   }
 
+  @Post('users/:uuid/suspend')
+  @ApiBody({ type: dtos.AdminSuspendUserDto })
+  @ApiOkResponse({ description: 'User suspended successfully' })
+  suspendUser(@Param('uuid') uuid: string, @Body() body: dtos.AdminSuspendUserDto) {
+    return this.service.suspendUser(uuid, body);
+  }
+
+  @Post('users/:uuid/reactivate')
+  @ApiOkResponse({ description: 'User reactivated successfully' })
+  reactivateUser(@Param('uuid') uuid: string) {
+    return this.service.reactivateUser(uuid);
+  }
+
+  @Get('customers/:uuid/jobs')
+  @ApiOkResponse({ description: 'Customer jobs fetched successfully' })
+  fetchCustomerJobs(
+    @Param('uuid') uuid: string,
+    @Query() query: dtos.AdminFetchCustomerJobsDto,
+  ) {
+    return this.service.fetchCustomerJobs(uuid, query);
+  }
+
+  @Get('jobs/:uuid/timelines')
+  @ApiOkResponse({ description: 'Job timelines fetched successfully' })
+  fetchJobTimelines(@Param('uuid') uuid: string) {
+    return this.service.fetchJobTimelines(uuid);
+  }
+
+  @Get('jobs/:uuid/dispute')
+  @ApiOkResponse({ description: 'Job dispute fetched successfully' })
+  fetchJobDispute(@Param('uuid') uuid: string) {
+    return this.service.fetchJobDispute(uuid);
+  }
+
+  @Get('conversations/history')
+  @ApiOkResponse({ description: 'Chat history fetched successfully' })
+  fetchChatHistory(@Query() query: dtos.AdminChatHistoryDto) {
+    return this.service.fetchChatHistory(query);
+  }
+
+  @Get('customers/:uuid/wallet')
+  @ApiOkResponse({ description: 'Customer wallet fetched successfully' })
+  fetchCustomerWallet(@Param('uuid') uuid: string) {
+    return this.service.fetchCustomerWallet(uuid);
+  }
+
+  @Get('customers/:uuid/wallet/transactions')
+  @ApiOkResponse({ description: 'Wallet transactions fetched successfully' })
+  fetchCustomerWalletTransactions(
+    @Param('uuid') uuid: string,
+    @Query() query: dtos.AdminWalletTransactionsDto,
+  ) {
+    return this.service.fetchCustomerWalletTransactions(uuid, query);
+  }
+
   @Get('dashboard')
   @ApiBody({ type: dtos.AdminDashboardFilterDto })
   @ApiOkResponse({

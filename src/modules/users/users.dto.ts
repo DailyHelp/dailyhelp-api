@@ -388,6 +388,9 @@ export class ConversationDto {
   serviceProviderId: string;
 
   @ApiProperty({ required: false })
+  requestorId: string;
+
+  @ApiProperty({ required: false })
   spFirstname: string;
 
   @ApiProperty({ required: false })
@@ -395,6 +398,9 @@ export class ConversationDto {
 
   @ApiProperty({ required: false })
   spMiddlename: string;
+
+  @ApiProperty({ required: false })
+  spPicture: string;
 
   @ApiProperty({ enum: AccountTier })
   spTier: AccountTier;
@@ -407,6 +413,12 @@ export class ConversationDto {
 
   @ApiProperty({ required: false })
   rqMiddlename: string;
+
+  @ApiProperty({ required: false })
+  rqPicture: string;
+
+  @ApiProperty({ enum: AccountTier, required: false })
+  rqTier: AccountTier;
 
   @ApiProperty()
   lastMessageId: string;

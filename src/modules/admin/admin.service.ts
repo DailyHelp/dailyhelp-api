@@ -14,9 +14,8 @@ import {
   ReasonCategory,
   SubCategory,
 } from './admin.entities';
-import { Users } from '../users/users.entity';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { IAdminAuthContext } from 'src/types';
+import { IAdminAuthContext, UserType } from 'src/types';
 import { JwtService } from '@nestjs/jwt';
 import {
   AdminInitiateResetPasswordDto,
@@ -25,7 +24,11 @@ import {
   AdminDashboardPaginationDto,
   AdminChangePasswordDto,
   AdminCustomerStatus,
+  AdminChatHistoryDto,
+  AdminFetchCustomerJobsDto,
   AdminFetchCustomersDto,
+  AdminSuspendUserDto,
+  AdminWalletTransactionsDto,
   AdminNewResetPasswordDto,
   AdminResendOtpDto,
   AdminUserDto,
@@ -37,12 +40,17 @@ import {
   UpdateSubCategory,
 } from './dto';
 import { v4 } from 'uuid';
-import { OTP } from '../users/users.entity';
+import { OTP, Users } from '../users/users.entity';
 import { SharedService } from '../shared/shared.service';
 import { nanoid } from 'nanoid';
 import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
 import { JwtAuthConfiguration } from 'src/config/configuration';
 import { ConfigType } from '@nestjs/config';
+import { Job, JobTimeline } from '../jobs/jobs.entity';
+import { JobDispute } from '../jobs/job-dispute.entity';
+import { Conversation } from '../conversations/conversations.entity';
+import { Message } from 'src/entities/message.entity';
+import { Wallet, Transaction } from '../wallet/wallet.entity';
 
 type DateRange = { startDate?: Date; endDate?: Date };
 
@@ -66,6 +74,20 @@ export class AdminService {
     private readonly usersRepository: EntityRepository<Users>,
     @InjectRepository(OTP)
     private readonly otpRepository: EntityRepository<OTP>,
+    @InjectRepository(Job)
+    private readonly jobRepository: EntityRepository<Job>,
+    @InjectRepository(JobTimeline)
+    private readonly jobTimelineRepository: EntityRepository<JobTimeline>,
+    @InjectRepository(JobDispute)
+    private readonly jobDisputeRepository: EntityRepository<JobDispute>,
+    @InjectRepository(Conversation)
+    private readonly conversationRepository: EntityRepository<Conversation>,
+    @InjectRepository(Message)
+    private readonly messageRepository: EntityRepository<Message>,
+    @InjectRepository(Wallet)
+    private readonly walletRepository: EntityRepository<Wallet>,
+    @InjectRepository(Transaction)
+    private readonly transactionRepository: EntityRepository<Transaction>,
     private readonly jwtService: JwtService,
     private readonly sharedService: SharedService,
     @Inject(JwtAuthConfiguration.KEY)
@@ -927,6 +949,324 @@ export class AdminService {
         : user.identityVerified
         ? AdminCustomerStatus.VERIFIED
         : AdminCustomerStatus.UNVERIFIED,
+    }));
+
+    return buildResponseDataWithPagination(data, total, {
+      page: parsedPage,
+      limit: parsedLimit,
+    });
+  }
+
+  async suspendUser(uuid: string, { reason }: AdminSuspendUserDto) {
+    const user = await this.usersRepository.findOne({ uuid });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.suspended && user.suspensionReason === reason) {
+      return { status: true };
+    }
+    user.suspended = true;
+    user.suspensionReason = reason;
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async reactivateUser(uuid: string) {
+    const user = await this.usersRepository.findOne({ uuid });
+    if (!user) throw new NotFoundException('User not found');
+    user.suspended = false;
+    user.suspensionReason = null;
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async fetchCustomerJobs(
+    customerUuid: string,
+    { page = 1, limit = 20, status, search }: AdminFetchCustomerJobsDto,
+  ) {
+    const customer = await this.usersRepository.findOne({ uuid: customerUuid });
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (!customer.userTypes || !customer.userTypes.toUpperCase().includes(UserType.CUSTOMER)) {
+      throw new BadRequestException('User is not a customer');
+    }
+
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 20;
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const connection = this.em.getConnection();
+    const baseParams: any[] = [customerUuid];
+    let whereSql = `WHERE j.deleted_at IS NULL AND j.service_requestor = ?`;
+
+    if (status) {
+      whereSql += ' AND j.status = ?';
+      baseParams.push(status);
+    }
+
+    if (search) {
+      const trimmedSearch = search.trim();
+      const lowerSearch = `%${trimmedSearch.toLowerCase()}%`;
+      const phoneSearch = `%${trimmedSearch}%`;
+      whereSql += ` AND (
+        LOWER(j.code) LIKE ?
+        OR LOWER(COALESCE(sp.firstname, '')) LIKE ?
+        OR LOWER(COALESCE(sp.lastname, '')) LIKE ?
+        OR LOWER(COALESCE(sp.email, '')) LIKE ?
+        OR COALESCE(sp.phone, '') LIKE ?
+      )`;
+      baseParams.push(lowerSearch, lowerSearch, lowerSearch, lowerSearch, phoneSearch);
+    }
+
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM jobs j
+      LEFT JOIN users sp ON sp.uuid = j.service_provider
+      LEFT JOIN sub_categories sc ON sc.uuid = sp.primary_job_role
+      ${whereSql}
+    `;
+    const selectSql = `
+      SELECT
+        j.uuid,
+        j.code,
+        j.status,
+        j.price,
+        j.tip,
+        j.created_at,
+        j.start_date,
+        j.end_date,
+        j.accepted_at,
+        j.description,
+        j.pictures,
+        sp.uuid AS service_provider_uuid,
+        sp.firstname AS service_provider_firstname,
+        sp.lastname AS service_provider_lastname,
+        sp.email AS service_provider_email,
+        sp.phone AS service_provider_phone,
+        sp.picture AS service_provider_picture,
+        sp.tier AS service_provider_tier,
+        sc.name AS service_provider_category
+      FROM jobs j
+      LEFT JOIN users sp ON sp.uuid = j.service_provider
+      LEFT JOIN sub_categories sc ON sc.uuid = sp.primary_job_role
+      ${whereSql}
+      ORDER BY j.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const totalRows = await connection.execute(countSql, baseParams);
+    const selectParams = [...baseParams, parsedLimit, offset];
+    const rows = await connection.execute(selectSql, selectParams);
+
+    const total = Number(totalRows[0]?.total ?? 0);
+    const jobs = (rows as any[]).map((row) => ({
+      uuid: row.uuid,
+      code: row.code,
+      status: row.status,
+      price: row.price !== null && row.price !== undefined ? Number(row.price) : null,
+      tip: row.tip !== null && row.tip !== undefined ? Number(row.tip) : null,
+      createdAt: row.created_at,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      acceptedAt: row.accepted_at,
+      description: row.description,
+      pictures: row.pictures,
+      serviceProvider: row.service_provider_uuid
+        ? {
+            uuid: row.service_provider_uuid,
+            firstname: row.service_provider_firstname,
+            lastname: row.service_provider_lastname,
+            email: row.service_provider_email,
+            phone: row.service_provider_phone,
+            picture: row.service_provider_picture,
+            tier: row.service_provider_tier,
+            serviceCategory: row.service_provider_category,
+          }
+        : null,
+      jobCode: row.code,
+    }));
+
+    return buildResponseDataWithPagination(jobs, total, {
+      page: parsedPage,
+      limit: parsedLimit,
+    });
+  }
+
+  async fetchJobTimelines(jobUuid: string) {
+    const job = await this.jobRepository.findOne({ uuid: jobUuid });
+    if (!job) throw new NotFoundException('Job not found');
+    const timelines = await this.jobTimelineRepository.find(
+      { job: { uuid: jobUuid } },
+      { orderBy: { createdAt: 'ASC' } },
+    );
+    return { status: true, data: timelines };
+  }
+
+  async fetchJobDispute(jobUuid: string) {
+    const job = await this.jobRepository.findOne({ uuid: jobUuid });
+    if (!job) throw new NotFoundException('Job not found');
+    const dispute = await this.jobDisputeRepository.findOne(
+      { job: { uuid: jobUuid } },
+      { populate: ['submittedBy', 'submittedFor'] },
+    );
+    if (!dispute)
+      return { status: true, data: null };
+    const response = {
+      uuid: dispute.uuid,
+      code: dispute.code,
+      category: dispute.category,
+      description: dispute.description,
+      pictures: dispute.pictures,
+      status: dispute.status,
+      submittedBy: dispute.submittedBy
+        ? {
+            uuid: dispute.submittedBy.uuid,
+            firstname: dispute.submittedBy.firstname,
+            lastname: dispute.submittedBy.lastname,
+            email: dispute.submittedBy.email,
+            phone: dispute.submittedBy.phone,
+          }
+        : null,
+      submittedFor: dispute.submittedFor
+        ? {
+            uuid: dispute.submittedFor.uuid,
+            firstname: dispute.submittedFor.firstname,
+            lastname: dispute.submittedFor.lastname,
+            email: dispute.submittedFor.email,
+            phone: dispute.submittedFor.phone,
+          }
+        : null,
+      userType: dispute.userType,
+      createdAt: dispute.createdAt,
+    };
+    return { status: true, data: response };
+  }
+
+  async fetchChatHistory({
+    customerUuid,
+    providerUuid,
+    page = 1,
+    limit = 20,
+  }: AdminChatHistoryDto) {
+    const provider = await this.usersRepository.findOne({ uuid: providerUuid });
+    if (!provider) throw new NotFoundException('Provider not found');
+    const customer = await this.usersRepository.findOne({ uuid: customerUuid });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const conversation = await this.conversationRepository.findOne({
+      serviceProvider: { uuid: providerUuid },
+      serviceRequestor: { uuid: customerUuid },
+    });
+
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 20;
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    if (!conversation) {
+      return buildResponseDataWithPagination([], 0, {
+        page: parsedPage,
+        limit: parsedLimit,
+      });
+    }
+
+    const [messages, total] = await this.messageRepository.findAndCount(
+      { conversation: { uuid: conversation.uuid } },
+      {
+        limit: parsedLimit,
+        offset,
+        orderBy: { createdAt: 'DESC' },
+        populate: ['from', 'to'],
+      },
+    );
+
+    const data = messages.map((message) => ({
+      uuid: message.uuid,
+      message: message.message,
+      type: message.type,
+      status: message.status,
+      createdAt: message.createdAt,
+      from: message.from
+        ? {
+            uuid: message.from.uuid,
+            firstname: message.from.firstname,
+            lastname: message.from.lastname,
+            email: message.from.email,
+            phone: message.from.phone,
+          }
+        : null,
+      to: message.to
+        ? {
+            uuid: message.to.uuid,
+            firstname: message.to.firstname,
+            lastname: message.to.lastname,
+            email: message.to.email,
+            phone: message.to.phone,
+          }
+        : null,
+    }));
+
+    return buildResponseDataWithPagination(data, total, {
+      page: parsedPage,
+      limit: parsedLimit,
+    });
+  }
+
+  async fetchCustomerWallet(customerUuid: string) {
+    const customer = await this.usersRepository.findOne({ uuid: customerUuid });
+    if (!customer) throw new NotFoundException('Customer not found');
+    const wallet = await this.walletRepository.findOne({
+      user: { uuid: customerUuid },
+      userType: UserType.CUSTOMER,
+    });
+    if (!wallet)
+      return {
+        status: true,
+        data: { totalBalance: 0, availableBalance: 0 },
+      };
+    return {
+      status: true,
+      data: {
+        totalBalance: Number(wallet.totalBalance ?? 0),
+        availableBalance: Number(wallet.availableBalance ?? 0),
+      },
+    };
+  }
+
+  async fetchCustomerWalletTransactions(
+    customerUuid: string,
+    { page = 1, limit = 20, status }: AdminWalletTransactionsDto,
+  ) {
+    const wallet = await this.walletRepository.findOne({
+      user: { uuid: customerUuid },
+      userType: UserType.CUSTOMER,
+    });
+    if (!wallet)
+      return buildResponseDataWithPagination([], 0, {
+        page: Number(page) || 1,
+        limit: Number(limit) || 20,
+      });
+
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 20;
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const where: any = { wallet: { uuid: wallet.uuid } };
+    if (status) where.status = status;
+
+    const [transactions, total] = await this.transactionRepository.findAndCount(
+      where,
+      {
+        limit: parsedLimit,
+        offset,
+        orderBy: { createdAt: 'DESC' },
+      },
+    );
+
+    const data = transactions.map((transaction) => ({
+      uuid: transaction.uuid,
+      amount: Number(transaction.amount ?? 0),
+      status: transaction.status,
+      type: transaction.type,
+      remark: transaction.remark,
+      locked: transaction.locked,
+      createdAt: transaction.createdAt,
     }));
 
     return buildResponseDataWithPagination(data, total, {

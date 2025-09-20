@@ -9,7 +9,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { ReasonCategoryType } from 'src/types';
+import { JobStatus, ReasonCategoryType, TransactionStatus } from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -102,6 +102,72 @@ export class AdminFetchCustomersDto {
   @IsOptional()
   @IsEnum(AdminCustomerStatus)
   status?: AdminCustomerStatus;
+}
+
+export class AdminFetchCustomerJobsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(JobStatus)
+  status?: JobStatus;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminSuspendUserDto {
+  @IsString()
+  @Length(1, 500)
+  reason: string;
+}
+
+export class AdminChatHistoryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsString()
+  providerUuid: string;
+
+  @IsString()
+  customerUuid: string;
+}
+
+export class AdminWalletTransactionsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(TransactionStatus)
+  status?: TransactionStatus;
 }
 
 export class AdminDashboardPaginationDto {

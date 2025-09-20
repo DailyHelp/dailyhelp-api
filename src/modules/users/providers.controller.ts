@@ -35,6 +35,7 @@ import {
   FeedbackDto,
   PaginatedConversationsDto,
   PaginatedDisputesDto,
+  PaginatedMessageDto,
   PaginatedReviewsDto,
   PaginationQuery,
   ProvidersDashboardDto,
@@ -336,6 +337,25 @@ export class ProvidersController {
     @Req() request: Request,
   ) {
     return this.userService.reportConversation(uuid, body, request.user as any);
+  }
+
+  @Get('conversations/:uuid/messages')
+  @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
+  @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiOkResponse({
+    type: PaginatedMessageDto,
+    description: 'Conversation messages fetched successfully',
+  })
+  async fetchConversationMessages(
+    @Param('uuid') uuid: string,
+    @Query() query: PaginationQuery,
+    @Req() req: Request,
+  ) {
+    return this.userService.fetchConversationMessages(
+      uuid,
+      query.pagination,
+      req.user as any,
+    );
   }
 }
 

@@ -153,8 +153,11 @@ export class Users extends Timestamp {
   @Property({ nullable: true })
   utilityBill: string;
 
-  @Property({ nullable: true })
+  @Property({ default: false })
   suspended: boolean;
+
+  @Property({ nullable: true })
+  suspensionReason: string;
 }
 
 @Filter({

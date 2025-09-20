@@ -1180,14 +1180,23 @@ export class UsersService {
     const dataQuery = `
   SELECT
     c.uuid AS conversationId,
+    sp.uuid AS serviceProviderId,
+    sp.firstname AS spFirstname,
+    sp.lastname  AS spLastname,
+    sp.middlename AS spMiddlename,
+    sp.picture AS spPicture,
+    sp.tier AS spTier,
     rq.uuid AS requestorId,
     rq.firstname AS rqFirstname,
     rq.lastname  AS rqLastname,
     rq.middlename AS rqMiddlename,
+    rq.picture AS rqPicture,
+    rq.tier AS rqTier,
     m.uuid  AS lastMessageId,
     m.message AS lastMessage,
     o.description AS offerDescription,
     o.status AS offerStatus,
+    o.price AS offerPrice,
     c.last_locked_at AS lastLockedAt,
     c.locked,
     c.restricted,
@@ -1215,6 +1224,7 @@ export class UsersService {
 
   FROM conversations c
   LEFT JOIN users rq ON c.service_requestor = rq.uuid
+  LEFT JOIN users sp ON c.service_provider = sp.uuid
   LEFT JOIN messages m ON c.last_message = m.uuid
   LEFT JOIN offers o   ON m.offer = o.uuid
 
@@ -1244,6 +1254,7 @@ export class UsersService {
       SELECT COUNT(DISTINCT c.uuid) AS total
       FROM conversations c
       LEFT JOIN users rq ON c.service_requestor = rq.uuid
+      LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o   ON m.offer = o.uuid
       WHERE ${whereClause}
@@ -1260,12 +1271,16 @@ export class UsersService {
     const requestorIds: string[] = Array.from(
       new Set((data || []).map((r: any) => r.requestorId).filter(Boolean)),
     );
-    const onlineMap = await this.presence.isOnlineMany(requestorIds);
+    const [onlineMap, meOnline] = await Promise.all([
+      this.presence.isOnlineMany(requestorIds),
+      this.presence.isOnline(uuid),
+    ]);
     const shaped = data.map((row: any) => ({
       ...row,
       unreadCount: row.myUnreadCount,
       iReadLastMessage: !!Number(row.iReadLastMessage),
       otherReadLastMessage: !!Number(row.otherReadLastMessage),
+      spOnline: !!meOnline,
       srOnline: !!onlineMap[row.requestorId],
     }));
     return buildResponseDataWithPagination(shaped, total, { page, limit });

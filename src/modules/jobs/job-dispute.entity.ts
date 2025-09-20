@@ -7,7 +7,7 @@ import {
   Property,
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
-import { DisputeStatus, JobStatus, UserType } from '../../types';
+import { DisputeStatus, UserType } from '../../types';
 import { Users } from '../users/users.entity';
 import { Job } from './jobs.entity';
 import { ApiProperty } from '@nestjs/swagger';

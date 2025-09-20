@@ -117,6 +117,14 @@ export class AuthService {
     if (passwordMatch) {
       if (user.deletedAt)
         throw new UnauthorizedException('This account is disabled');
+      if (user.suspended) {
+        const reason = user.suspensionReason?.trim();
+        throw new UnauthorizedException(
+          reason && reason.length > 0
+            ? `Your account has been suspended: ${reason}`
+            : 'Your account has been suspended',
+        );
+      }
       if (!user.emailVerified) {
         user.deviceToken = deviceToken;
         const pinId = nanoid();

@@ -6,23 +6,40 @@ import {
   ReasonCategory,
   SubCategory,
 } from './admin.entities';
-import { Users } from '../users/users.entity';
+import { OTP, Users } from '../users/users.entity';
+import { Job, JobTimeline } from '../jobs/jobs.entity';
+import { JobDispute } from '../jobs/job-dispute.entity';
+import { Conversation } from '../conversations/conversations.entity';
+import { Message } from 'src/entities/message.entity';
+import { Wallet, Transaction } from '../wallet/wallet.entity';
 import { PassportModule } from '@nestjs/passport';
-import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import { JwtAuthConfiguration } from 'src/config/configuration';
 import { JwtModule } from '@nestjs/jwt';
-import { JwtAuthConfig } from 'src/config/types/jwt-auth.config';
 import { AdminService } from './admin.service';
 import { AdminLocalStrategy } from './strategies/local.strategy';
 import { AdminJwtStrategy } from './strategies/jwt.strategy';
 import { AdminController } from './admin.controller';
-import { OTP } from '../users/users.entity';
 import { SharedModule } from '../shared/shared.module';
 
 @Module({
   imports: [
     MikroOrmModule.forFeature({
-      entities: [AdminUser, MainCategory, SubCategory, ReasonCategory, OTP, Users],
+      entities: [
+        AdminUser,
+        MainCategory,
+        SubCategory,
+        ReasonCategory,
+        OTP,
+        Users,
+        Job,
+        JobTimeline,
+        JobDispute,
+        Conversation,
+        Message,
+        Wallet,
+        Transaction,
+      ],
     }),
     PassportModule,
     ConfigModule.forFeature(JwtAuthConfiguration),
