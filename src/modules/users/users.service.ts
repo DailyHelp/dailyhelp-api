@@ -52,7 +52,6 @@ import {
   JobStatus,
   MessageType,
   OfferStatus,
-  OrderDir,
   PaymentPurpose,
   PaymentType,
   TransactionStatus,
@@ -1421,12 +1420,17 @@ export class UsersService {
     { uuid }: IAuthContext,
   ) {
     const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
     const conversation = await this.conversationRepository.findOne({
       uuid: conversationUuid,
       $or: [{ serviceProvider: { uuid } }, { serviceRequestor: { uuid } }],
     });
-    const hoursAgo = differenceInHours(new Date(), conversation.lastLockedAt);
-    if (conversation.locked && hoursAgo >= 24) {
+    if (!conversation) throw new NotFoundException(`Conversation not found`);
+    const lastLockedAt = conversation.lastLockedAt;
+    const hoursAgo = lastLockedAt
+      ? differenceInHours(new Date(), lastLockedAt)
+      : 0;
+    if (conversation.locked && lastLockedAt && hoursAgo >= 24) {
       conversation.locked = false;
       conversation.lastLockedAt = null;
     }
@@ -1435,11 +1439,11 @@ export class UsersService {
       const lastMessage = await this.messageRepository.findOne({
         uuid: conversation.lastMessage?.uuid,
       });
-      if (lastMessage.type === MessageType.OFFER) {
+      if (lastMessage?.type === MessageType.OFFER) {
         const lastOffer = await this.offerRepository.findOne({
           uuid: lastMessage.offer?.uuid,
         });
-        if (lastOffer.status === OfferStatus.PENDING) {
+        if (lastOffer?.status === OfferStatus.PENDING) {
           canSendOffer = false;
         }
       }
@@ -1459,25 +1463,140 @@ export class UsersService {
       user: { uuid: otherUuid },
     });
     const otherLastReadAt: Date | null = otherState?.lastReadAt ?? null;
-    const [messages, total] = await this.messageRepository.findAndCount(
-      {
-        conversation: { uuid: conversationUuid },
-      },
-      {
-        orderBy: { createdAt: OrderDir.DESC },
-        populate: ['offer', 'from', 'to'],
-      },
-    );
+    const dataQuery = `
+      SELECT
+        m.uuid,
+        m.message,
+        m.type,
+        m.status,
+        m.created_at AS createdAt,
+        m.updated_at AS updatedAt,
+        m.deleted_at AS deletedAt,
+        m.conversation AS conversationUuid,
+        m.\`from\` AS fromUuid,
+        fu.firstname AS fromFirstname,
+        fu.lastname AS fromLastname,
+        fu.middlename AS fromMiddlename,
+        fu.picture AS fromPicture,
+        fu.tier AS fromTier,
+        m.\`to\` AS toUuid,
+        tu.firstname AS toFirstname,
+        tu.lastname AS toLastname,
+        tu.middlename AS toMiddlename,
+        tu.picture AS toPicture,
+        tu.tier AS toTier,
+        o.uuid AS offerUuid,
+        o.price AS offerPrice,
+        o.description AS offerDescription,
+        o.pictures AS offerPictures,
+        o.status AS offerStatus,
+        o.declined_reason AS offerDeclinedReason,
+        o.declined_reason_category AS offerDeclinedReasonCategory,
+        o.cancelled_reason AS offerCancelledReason,
+        o.cancelled_reason_category AS offerCancelledReasonCategory,
+        o.counter_reason AS offerCounterReason,
+        o.current_offer AS offerCurrentOfferUuid,
+        o.created_at AS offerCreatedAt,
+        o.updated_at AS offerUpdatedAt,
+        o.deleted_at AS offerDeletedAt
+      FROM messages m
+      LEFT JOIN users fu ON fu.uuid = m.\`from\`
+      LEFT JOIN users tu ON tu.uuid = m.\`to\`
+      LEFT JOIN offers o ON o.uuid = m.offer
+      WHERE m.conversation = ?
+      ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM messages
+      WHERE conversation = ?
+    `;
+
+    const connection = this.em.getConnection();
+    const rows = await connection.execute(dataQuery, [
+      conversationUuid,
+      Number(limit),
+      Number(offset),
+    ]);
+    const countResult = await connection.execute(countQuery, [
+      conversationUuid,
+    ]);
+    const total = Number(countResult[0]?.total ?? 0);
+
     this.readService.markConversationRead(uuid, conversationUuid);
-    const data = messages.map((m) => {
-      const pojo = wrap(m).toObject();
-      const sentByMe = m.from?.uuid === uuid;
+    const data = rows.map((row: any) => {
+      const createdAt = row.createdAt ? new Date(row.createdAt) : null;
+      const updatedAt = row.updatedAt ? new Date(row.updatedAt) : null;
+      const deletedAt = row.deletedAt ? new Date(row.deletedAt) : null;
+      const offerCreatedAt = row.offerCreatedAt
+        ? new Date(row.offerCreatedAt)
+        : null;
+      const offerUpdatedAt = row.offerUpdatedAt
+        ? new Date(row.offerUpdatedAt)
+        : null;
+      const offerDeletedAt = row.offerDeletedAt
+        ? new Date(row.offerDeletedAt)
+        : null;
+      const sentByMe = row.fromUuid === uuid;
       const readByOther = !!(
         sentByMe &&
         otherLastReadAt &&
-        m.createdAt <= otherLastReadAt
+        createdAt &&
+        createdAt <= otherLastReadAt
       );
-      return { ...pojo, readByOther };
+      const mapUser = (prefix: 'from' | 'to') => {
+        const userUuid = row[`${prefix}Uuid`];
+        if (!userUuid) return null;
+        return {
+          uuid: userUuid,
+          firstname: row[`${prefix}Firstname`],
+          lastname: row[`${prefix}Lastname`],
+          middlename: row[`${prefix}Middlename`],
+          picture: row[`${prefix}Picture`],
+          tier: row[`${prefix}Tier`],
+        };
+      };
+
+      const offer = row.offerUuid
+        ? {
+            uuid: row.offerUuid,
+            price:
+              row.offerPrice !== null && row.offerPrice !== undefined
+                ? Number(row.offerPrice)
+                : null,
+            description: row.offerDescription,
+            pictures: row.offerPictures,
+            status: row.offerStatus,
+            declinedReason: row.offerDeclinedReason,
+            declinedReasonCategory: row.offerDeclinedReasonCategory,
+            cancelledReason: row.offerCancelledReason,
+            cancelledReasonCategory: row.offerCancelledReasonCategory,
+            counterReason: row.offerCounterReason,
+            currentOffer: row.offerCurrentOfferUuid
+              ? { uuid: row.offerCurrentOfferUuid }
+              : null,
+            createdAt: offerCreatedAt,
+            updatedAt: offerUpdatedAt,
+            deletedAt: offerDeletedAt,
+          }
+        : null;
+
+      return {
+        uuid: row.uuid,
+        conversation: { uuid: conversationUuid },
+        message: row.message,
+        type: row.type,
+        status: row.status,
+        createdAt,
+        updatedAt,
+        deletedAt,
+        from: mapUser('from'),
+        to: mapUser('to'),
+        offer,
+        readByOther,
+      };
     });
     this.em.flush();
     return buildResponseDataWithPagination(
