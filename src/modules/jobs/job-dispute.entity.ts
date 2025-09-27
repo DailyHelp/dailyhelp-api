@@ -7,7 +7,7 @@ import {
   Property,
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
-import { DisputeStatus, UserType } from '../../types';
+import { DisputeResolutionAction, DisputeStatus, UserType } from '../../types';
 import { Users } from '../users/users.entity';
 import { Job } from './jobs.entity';
 import { ApiProperty } from '@nestjs/swagger';
@@ -70,4 +70,26 @@ export class JobDispute extends Timestamp {
   @ApiProperty({ enum: UserType, required: false })
   @Enum({ items: () => UserType, nullable: true })
   userType: UserType;
+
+  @ApiProperty({ enum: DisputeResolutionAction, required: false })
+  @Enum({ items: () => DisputeResolutionAction, nullable: true })
+  resolutionAction?: DisputeResolutionAction;
+
+  @Property({ nullable: true })
+  resolutionNote?: string;
+
+  @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  resolutionRefundAmount?: number;
+
+  @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  resolutionProviderAmount?: number;
+
+  @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  resolutionCommissionAmount?: number;
+
+  @Property({ nullable: true })
+  resolvedAt?: Date;
+
+  @Property({ nullable: true })
+  resolvedBy?: string;
 }

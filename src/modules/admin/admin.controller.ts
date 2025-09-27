@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -35,6 +36,12 @@ export class AdminController {
     return this.service.fetchCustomers(query);
   }
 
+  @Get('providers')
+  @ApiOkResponse({ description: 'Providers fetched successfully' })
+  fetchProviders(@Query() query: dtos.AdminFetchProvidersDto) {
+    return this.service.fetchProviders(query);
+  }
+
   @Post('users/:uuid/suspend')
   @ApiBody({ type: dtos.AdminSuspendUserDto })
   @ApiOkResponse({ description: 'User suspended successfully' })
@@ -57,6 +64,61 @@ export class AdminController {
     return this.service.fetchCustomerJobs(uuid, query);
   }
 
+  @Get('providers/:uuid/jobs')
+  @ApiOkResponse({ description: 'Provider jobs fetched successfully' })
+  fetchProviderJobs(
+    @Param('uuid') uuid: string,
+    @Query() query: dtos.AdminFetchProviderJobsDto,
+  ) {
+    return this.service.fetchProviderJobs(uuid, query);
+  }
+
+  @Get('jobs')
+  @ApiOkResponse({ description: 'Jobs fetched successfully' })
+  fetchJobs(@Query() query: dtos.AdminFetchJobsDto) {
+    return this.service.fetchJobs(query);
+  }
+
+  @Get('jobs/disputes')
+  @ApiOkResponse({ description: 'Job disputes fetched successfully' })
+  fetchDisputes(@Query() query: dtos.AdminFetchDisputesDto) {
+    return this.service.fetchDisputes(query);
+  }
+
+  @Patch('jobs/disputes/:uuid/resolve')
+  @ApiBody({ type: dtos.AdminResolveDisputeDto })
+  @ApiOkResponse({ description: 'Job dispute resolved successfully' })
+  resolveDispute(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminResolveDisputeDto,
+    @Req() req: Request,
+  ) {
+    return this.service.resolveDispute(uuid, body, req.user as any);
+  }
+
+  @Get('reports')
+  @ApiOkResponse({ description: 'Reports fetched successfully' })
+  fetchReports(@Query() query: dtos.AdminFetchReportsDto) {
+    return this.service.fetchReports(query);
+  }
+
+  @Patch('reports/:uuid/resolve')
+  @ApiBody({ type: dtos.AdminResolveReportDto })
+  @ApiOkResponse({ description: 'Report resolved successfully' })
+  resolveReport(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminResolveReportDto,
+    @Req() req: Request,
+  ) {
+    return this.service.resolveReport(uuid, body, req.user as any);
+  }
+
+  @Get('feedbacks')
+  @ApiOkResponse({ description: 'Feedback fetched successfully' })
+  fetchFeedbacks(@Query() query: dtos.AdminFetchFeedbacksDto) {
+    return this.service.fetchFeedbacks(query);
+  }
+
   @Get('jobs/:uuid/timelines')
   @ApiOkResponse({ description: 'Job timelines fetched successfully' })
   fetchJobTimelines(@Param('uuid') uuid: string) {
@@ -77,17 +139,38 @@ export class AdminController {
 
   @Get('customers/:uuid/wallet')
   @ApiOkResponse({ description: 'Customer wallet fetched successfully' })
-  fetchCustomerWallet(@Param('uuid') uuid: string) {
-    return this.service.fetchCustomerWallet(uuid);
-  }
-
-  @Get('customers/:uuid/wallet/transactions')
-  @ApiOkResponse({ description: 'Wallet transactions fetched successfully' })
-  fetchCustomerWalletTransactions(
+  fetchCustomerWallet(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminWalletTransactionsDto,
   ) {
-    return this.service.fetchCustomerWalletTransactions(uuid, query);
+    return this.service.fetchCustomerWallet(uuid, query);
+  }
+
+  @Get('providers/:uuid/wallet')
+  @ApiOkResponse({ description: 'Provider wallet fetched successfully' })
+  fetchProviderWallet(
+    @Param('uuid') uuid: string,
+    @Query() query: dtos.AdminWalletTransactionsDto,
+  ) {
+    return this.service.fetchProviderWallet(uuid, query);
+  }
+
+  @Get('providers/:uuid/reviews')
+  @ApiOkResponse({ description: 'Provider reviews fetched successfully' })
+  fetchProviderReviews(
+    @Param('uuid') uuid: string,
+    @Query() query: dtos.AdminFetchProviderReviewsDto,
+  ) {
+    return this.service.fetchProviderReviews(uuid, query);
+  }
+
+  @Get('providers/:uuid/analytics')
+  @ApiOkResponse({ description: 'Provider analytics fetched successfully' })
+  fetchProviderAnalytics(
+    @Param('uuid') uuid: string,
+    @Query() query: dtos.AdminProviderAnalyticsDto,
+  ) {
+    return this.service.fetchProviderAnalytics(uuid, query);
   }
 
   @Get('dashboard')

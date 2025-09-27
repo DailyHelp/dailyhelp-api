@@ -8,7 +8,7 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { Users } from '../users/users.entity';
-import { OfferStatus } from '../../types';
+import { OfferStatus, ReportStatus } from '../../types';
 import { Message } from '../../entities/message.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -151,4 +151,17 @@ export class Report extends Timestamp {
     nullable: true,
   })
   conversation: Conversation;
+
+  @ApiProperty({ enum: ReportStatus })
+  @Enum({ items: () => ReportStatus, default: ReportStatus.PENDING })
+  status: ReportStatus;
+
+  @Property({ nullable: true })
+  resolutionNote?: string;
+
+  @Property({ nullable: true })
+  resolvedAt?: Date;
+
+  @Property({ nullable: true })
+  resolvedBy?: string;
 }

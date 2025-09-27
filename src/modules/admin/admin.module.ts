@@ -9,9 +9,11 @@ import {
 import { OTP, Users } from '../users/users.entity';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
-import { Conversation } from '../conversations/conversations.entity';
+import { Conversation, Report } from '../conversations/conversations.entity';
+import { Feedback } from '../users/users.entity';
 import { Message } from 'src/entities/message.entity';
 import { Wallet, Transaction } from '../wallet/wallet.entity';
+import { JobReview } from 'src/entities/job-review.entity';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import { JwtAuthConfiguration } from 'src/config/configuration';
@@ -36,9 +38,12 @@ import { SharedModule } from '../shared/shared.module';
         JobTimeline,
         JobDispute,
         Conversation,
+        Report,
+        Feedback,
         Message,
         Wallet,
         Transaction,
+        JobReview,
       ],
     }),
     PassportModule,

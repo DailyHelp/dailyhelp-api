@@ -1,5 +1,6 @@
 import { defineConfig, Options } from '@mikro-orm/mysql';
 import * as dotenv from 'dotenv';
+import { booleanTinyIntTypeCast } from './lib/mysql-type-cast';
 
 dotenv.config();
 const config: Options = {
@@ -18,6 +19,9 @@ const config: Options = {
     disableForeignKeys: true,
     allOrNothing: true,
     dropTables: true,
+  },
+  driverOptions: {
+    typeCast: booleanTinyIntTypeCast,
   },
   debug: ['query'],
 };

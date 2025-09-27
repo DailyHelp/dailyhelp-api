@@ -3,6 +3,7 @@ import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { defineConfig, MySqlDriver } from '@mikro-orm/mysql';
 import { DatabaseConfigService, DatabaseConfigModule } from './config';
 import { DatabaseHealthIndicator } from './database.health-indicator';
+import { booleanTinyIntTypeCast } from './lib/mysql-type-cast';
 
 @Module({})
 export class DatabaseModule {
@@ -23,6 +24,9 @@ export class DatabaseModule {
               entities: ['./dist/**/*.entity.js', './dist/**/*.entities.js'],
               discovery: {
                 warnWhenNoEntities: false,
+              },
+              driverOptions: {
+                typeCast: booleanTinyIntTypeCast,
               },
               debug: process.env.NODE_ENV !== 'production',
             });

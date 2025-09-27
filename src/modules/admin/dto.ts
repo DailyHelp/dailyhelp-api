@@ -3,13 +3,23 @@ import {
   IsEmail,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Length,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { JobStatus, ReasonCategoryType, TransactionStatus } from 'src/types';
+import {
+  DisputeResolutionAction,
+  DisputeStatus,
+  JobStatus,
+  ReasonCategoryType,
+  ReportStatus,
+  UserType,
+  TransactionStatus,
+} from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -82,6 +92,12 @@ export enum AdminCustomerStatus {
   UNVERIFIED = 'UNVERIFIED',
 }
 
+export enum AdminProviderStatus {
+  SUSPENDED = 'SUSPENDED',
+  VERIFIED = 'VERIFIED',
+  UNVERIFIED = 'UNVERIFIED',
+}
+
 export class AdminFetchCustomersDto {
   @IsOptional()
   @Type(() => Number)
@@ -104,6 +120,28 @@ export class AdminFetchCustomersDto {
   status?: AdminCustomerStatus;
 }
 
+export class AdminFetchProvidersDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsEnum(AdminProviderStatus)
+  status?: AdminProviderStatus;
+}
+
 export class AdminFetchCustomerJobsDto {
   @IsOptional()
   @Type(() => Number)
@@ -124,6 +162,132 @@ export class AdminFetchCustomerJobsDto {
   @IsOptional()
   @IsString()
   search?: string;
+}
+
+export class AdminFetchProviderJobsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(JobStatus)
+  status?: JobStatus;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminFetchJobsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(JobStatus)
+  status?: JobStatus;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminFetchDisputesDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(DisputeStatus)
+  status?: DisputeStatus;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminResolveDisputeDto {
+  @IsEnum(DisputeResolutionAction)
+  action: DisputeResolutionAction;
+
+  @IsString()
+  @Length(1, 500)
+  note: string;
+
+  @ValidateIf((dto: AdminResolveDisputeDto) =>
+    dto.action === DisputeResolutionAction.PARTIAL_REFUND,
+  )
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  amount?: number;
+}
+
+export class AdminFetchReportsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(ReportStatus)
+  status?: ReportStatus;
+}
+
+export class AdminResolveReportDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  note: string;
+}
+
+export class AdminFetchFeedbacksDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsEnum(UserType)
+  userType?: UserType;
 }
 
 export class AdminSuspendUserDto {
@@ -170,6 +334,20 @@ export class AdminWalletTransactionsDto {
   status?: TransactionStatus;
 }
 
+export class AdminFetchProviderReviewsDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+}
+
 export class AdminDashboardPaginationDto {
   @IsOptional()
   @Type(() => Number)
@@ -191,6 +369,16 @@ export enum AdminDashboardDateFilter {
   LAST_7_DAYS = 'LAST_7_DAYS',
   THIS_MONTH = 'THIS_MONTH',
   LAST_30_DAYS = 'LAST_30_DAYS',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum AdminProviderAnalyticsFilter {
+  TODAY = 'TODAY',
+  CURRENT_WEEK = 'CURRENT_WEEK',
+  LAST_WEEK = 'LAST_WEEK',
+  THIS_MONTH = 'THIS_MONTH',
+  THIS_YEAR = 'THIS_YEAR',
+  ALL_TIME = 'ALL_TIME',
   CUSTOM = 'CUSTOM',
 }
 
@@ -221,6 +409,20 @@ export class AdminDashboardFilterDto {
   @ValidateNested()
   @Type(() => AdminDashboardPaginationDto)
   providersPagination?: AdminDashboardPaginationDto;
+}
+
+export class AdminProviderAnalyticsDto {
+  @IsOptional()
+  @IsEnum(AdminProviderAnalyticsFilter)
+  filter?: AdminProviderAnalyticsFilter;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }
 
 export class CreateMainCategory {

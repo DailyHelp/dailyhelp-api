@@ -31,6 +31,17 @@ export enum DisputeStatus {
   RESOLVED = 'RESOLVED',
 }
 
+export enum DisputeResolutionAction {
+  REFUND_REQUESTOR = 'REFUND_REQUESTOR',
+  PARTIAL_REFUND = 'PARTIAL_REFUND',
+  PAY_PROVIDER = 'PAY_PROVIDER',
+}
+
+export enum ReportStatus {
+  PENDING = 'PENDING',
+  RESOLVED = 'RESOLVED',
+}
+
 export enum ReasonCategoryType {
   CANCEL_JOB_PROVIDER = 'CANCEL_JOB_PROVIDER',
   DECLINE_OFFER_PROVIDER = 'DECLINE_OFFER_PROVIDER',

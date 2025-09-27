@@ -78,3 +78,12 @@ export const appendCondition = (
   params.push(value);
   return `${sql} = ?`;
 };
+
+export const buildFullName = (
+  ...parts: Array<string | null | undefined>
+): string | null => {
+  const cleaned = parts
+    .map((part) => (typeof part === 'string' ? part.trim() : part))
+    .filter((part): part is string => Boolean(part && part.length));
+  return cleaned.length ? cleaned.join(' ') : null;
+};
