@@ -1276,6 +1276,8 @@ export class UsersService {
     ]);
     const shaped = data.map((row: any) => ({
       ...row,
+      locked: !!Number(row.locked),
+      restricted: !!Number(row.restricted),
       unreadCount: row.myUnreadCount,
       iReadLastMessage: !!Number(row.iReadLastMessage),
       otherReadLastMessage: !!Number(row.otherReadLastMessage),
@@ -1409,6 +1411,8 @@ export class UsersService {
     const onlineMap = await this.presence.isOnlineMany(providerIds);
     const shaped = data.map((row: any) => ({
       ...row,
+      locked: !!Number(row.locked),
+      restricted: !!Number(row.restricted),
       unreadCount: row.myUnreadCount,
       iReadLastMessage: !!Number(row.iReadLastMessage),
       otherReadLastMessage: !!Number(row.otherReadLastMessage),

@@ -1,4 +1,4 @@
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import { EntityManager, EntityRepository, FilterQuery, wrap } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   ConflictException,
@@ -32,7 +32,7 @@ import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
 import { JobReport } from './job-reports.entity';
 import { SocketGateway } from '../ws/socket.gateway';
-import { generateOtp } from 'src/utils';
+import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
 
 @Injectable()
 export class JobService {
@@ -64,20 +64,43 @@ export class JobService {
     filter: JobFilter,
     { uuid, userType }: IAuthContext,
   ) {
-    const { page = 1, limit = 20 } = pagination;
-    const job = await this.jobRepository.find(
-      {
-        ...(userType === UserType.CUSTOMER
-          ? { serviceRequestor: { uuid } }
-          : {}),
-        ...(userType === UserType.PROVIDER
-          ? { serviceProvider: { uuid } }
-          : {}),
-        ...(filter?.status ? { status: filter?.status } : {}),
-      },
-      { limit, offset: (page - 1) * limit },
-    );
-    return { status: true, data: job };
+    const { page: pageRaw = 1, limit: limitRaw = 20 } = pagination || {};
+    const page = Math.max(1, Number(pageRaw) || 1);
+    const limit = Math.max(1, Number(limitRaw) || 20);
+    const offset = (page - 1) * limit;
+
+    const where: FilterQuery<Job> = {
+      ...(userType === UserType.CUSTOMER
+        ? { serviceRequestor: { uuid } }
+        : {}),
+      ...(userType === UserType.PROVIDER
+        ? { serviceProvider: { uuid } }
+        : {}),
+      ...(filter?.status ? { status: filter.status } : {}),
+    };
+
+    const [jobs, total] = await Promise.all([
+      this.jobRepository.find(where, {
+        limit,
+        offset,
+        populate: ['serviceProvider', 'serviceProvider.primaryJobRole'],
+      }),
+      this.jobRepository.count(where),
+    ]);
+
+    const shapedJobs = jobs.map((job) => {
+      const provider = job.serviceProvider;
+      return {
+        ...wrap(job).toObject(),
+        providerPicture: provider?.picture ?? null,
+        providerTier: provider?.tier ?? null,
+        providerFirstname: provider?.firstname ?? null,
+        providerLastname: provider?.lastname ?? null,
+        providerPrimaryJobRole: provider?.primaryJobRole?.name ?? null,
+      };
+    });
+
+    return buildResponseDataWithPagination(shapedJobs, total, { page, limit });
   }
 
   async verifyPin(jobUuid: string, pin: string) {
