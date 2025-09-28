@@ -83,20 +83,63 @@ export class JobService {
       this.jobRepository.find(where, {
         limit,
         offset,
-        populate: ['serviceProvider', 'serviceProvider.primaryJobRole'],
       }),
       this.jobRepository.count(where),
     ]);
 
+    const providerIds = Array.from(
+      new Set(
+        jobs
+          .map((job) => job.serviceProvider?.uuid)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const providers = providerIds.length
+      ? await this.usersRepository.find(
+          { uuid: { $in: providerIds } },
+          {
+            fields: [
+              'uuid',
+              'firstname',
+              'lastname',
+              'picture',
+              'tier',
+              'primaryJobRole',
+              'primaryJobRole.uuid',
+              'primaryJobRole.name',
+            ],
+            populate: ['primaryJobRole'],
+          },
+        )
+      : [];
+
+    const providerMap = new Map(
+      providers.map((provider) => [
+        provider.uuid,
+        {
+          picture: provider.picture ?? null,
+          tier: provider.tier ?? null,
+          firstname: provider.firstname ?? null,
+          lastname: provider.lastname ?? null,
+          primaryJobRole: provider.primaryJobRole?.name ?? null,
+        },
+      ]),
+    );
+
     const shapedJobs = jobs.map((job) => {
-      const provider = job.serviceProvider;
+      const providerUuid = job.serviceProvider?.uuid;
+      const providerInfo = providerUuid
+        ? providerMap.get(providerUuid)
+        : undefined;
+
       return {
         ...wrap(job).toObject(),
-        providerPicture: provider?.picture ?? null,
-        providerTier: provider?.tier ?? null,
-        providerFirstname: provider?.firstname ?? null,
-        providerLastname: provider?.lastname ?? null,
-        providerPrimaryJobRole: provider?.primaryJobRole?.name ?? null,
+        providerPicture: providerInfo?.picture ?? null,
+        providerTier: providerInfo?.tier ?? null,
+        providerFirstname: providerInfo?.firstname ?? null,
+        providerLastname: providerInfo?.lastname ?? null,
+        providerPrimaryJobRole: providerInfo?.primaryJobRole ?? null,
       };
     });
 
