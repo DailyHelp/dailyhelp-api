@@ -1222,8 +1222,8 @@ export class UsersService {
     crs_me.unread_count AS myUnreadCount
 
   FROM conversations c
-  LEFT JOIN users rq ON c.service_requestor = rq.uuid
   LEFT JOIN users sp ON c.service_provider = sp.uuid
+  LEFT JOIN users rq ON c.service_requestor = rq.uuid
   LEFT JOIN messages m ON c.last_message = m.uuid
   LEFT JOIN offers o   ON m.offer = o.uuid
 
@@ -1322,6 +1322,7 @@ export class UsersService {
     sp.lastname AS spLastname,
     sp.middlename AS spMiddlename,
     sp.picture AS spPicture,
+    rq.picture AS rqPicture,
     sp.tier AS spTier,
     m.uuid AS lastMessageId,
     m.message AS lastMessage,
@@ -1355,6 +1356,7 @@ export class UsersService {
 
   FROM conversations c
   LEFT JOIN users sp ON c.service_provider = sp.uuid
+  LEFT JOIN users rq ON c.service_requestor = rq.uuid
   LEFT JOIN messages m ON c.last_message = m.uuid
   LEFT JOIN offers o ON m.offer = o.uuid
 
@@ -1383,6 +1385,7 @@ export class UsersService {
     const countQuery = `
       SELECT COUNT(DISTINCT c.uuid) as total
       FROM conversations c
+      LEFT JOIN users rq ON c.service_requestor = rq.uuid
       LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
       LEFT JOIN offers o ON m.offer = o.uuid
@@ -1850,9 +1853,12 @@ export class UsersService {
     await this.em.flush();
     const { authorization_url, access_code } = initRes.data.data;
     return {
-      authorizationUrl: authorization_url,
-      accessCode: access_code,
-      reference,
+      status: true,
+      data: {
+        authorizationUrl: authorization_url,
+        accessCode: access_code,
+        reference,
+      },
     };
   }
 

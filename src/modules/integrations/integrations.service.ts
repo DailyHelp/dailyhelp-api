@@ -60,6 +60,7 @@ export class IntegrationsService {
       return res.status(400).send('Invalid signature');
     const event = req.body?.event;
     const data = req.body?.data;
+    console.log("here", req.body);
     switch (event) {
       case 'charge.success':
         const verified = await this.verifyWithPaystack(data.reference);
