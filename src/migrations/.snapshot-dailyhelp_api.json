@@ -1263,6 +1263,27 @@
           "nullable": true,
           "length": 255,
           "mappedType": "string"
+        },
+        "suspended": {
+          "name": "suspended",
+          "type": "tinyint(1)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 1,
+          "default": "false",
+          "mappedType": "boolean"
+        },
+        "suspension_reason": {
+          "name": "suspension_reason",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
         }
       },
       "name": "users",
@@ -2007,6 +2028,50 @@
         },
         "conversation": {
           "name": "conversation",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('PENDING','RESOLVED')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "'PENDING'",
+          "enumItems": [
+            "PENDING",
+            "RESOLVED"
+          ],
+          "mappedType": "enum"
+        },
+        "resolution_note": {
+          "name": "resolution_note",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "resolved_by": {
+          "name": "resolved_by",
           "type": "varchar(255)",
           "unsigned": false,
           "autoincrement": false,
@@ -3271,6 +3336,16 @@
           "length": 255,
           "mappedType": "string"
         },
+        "code": {
+          "name": "code",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
         "category": {
           "name": "category",
           "type": "varchar(255)",
@@ -3348,6 +3423,83 @@
             "CUSTOMER"
           ],
           "mappedType": "enum"
+        },
+        "resolution_action": {
+          "name": "resolution_action",
+          "type": "enum('REFUND_REQUESTOR','PARTIAL_REFUND','PAY_PROVIDER')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "enumItems": [
+            "REFUND_REQUESTOR",
+            "PARTIAL_REFUND",
+            "PAY_PROVIDER"
+          ],
+          "mappedType": "enum"
+        },
+        "resolution_note": {
+          "name": "resolution_note",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "resolution_refund_amount": {
+          "name": "resolution_refund_amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "resolution_provider_amount": {
+          "name": "resolution_provider_amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "resolution_commission_amount": {
+          "name": "resolution_commission_amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "precision": 10,
+          "scale": 2,
+          "mappedType": "decimal"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "resolved_by": {
+          "name": "resolved_by",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
         }
       },
       "name": "job_disputes",

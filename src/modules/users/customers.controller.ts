@@ -176,6 +176,7 @@ export class CustomersController {
   }
 
   @Patch('offer/:uuid/update')
+  @ApiBody({ type: SendOfferDto })
   async updateOffer(
     @Param('uuid') uuid: string,
     @Body() body: Partial<SendOfferDto>,
