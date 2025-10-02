@@ -58,8 +58,6 @@ export class CustomerJobsController {
     return this.jobService.fetchJobTimelines(uuid);
   }
 
-  // TODO: Endpoint to fetch job details
-
   @Post(':uuid/cancel')
   async cancelJob(
     @Param('uuid') uuid: string,

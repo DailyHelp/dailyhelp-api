@@ -271,8 +271,8 @@ export class JobService {
     if (!conversation) throw new NotFoundException(`Conversation not found`);
     conversation.restricted = true;
     job.status = JobStatus.CANCELED;
-    job.cancellationReason = dto.reason;
-    job.cancellationCategory = dto.reasonCategory;
+    job.cancellationReason = dto.reason ?? null;
+    job.cancellationCategory = dto.reasonCategory ?? null;
     job.cancelledAt = new Date();
     const requestorWallet = await this.walletRepository.findOne({
       user: { uuid: job.serviceRequestor?.uuid },

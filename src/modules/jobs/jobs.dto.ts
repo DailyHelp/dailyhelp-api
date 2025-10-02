@@ -35,11 +35,13 @@ export class VerifyJobDto {
 }
 
 export class CancelJobDto {
+  @IsOptional()
   @IsString()
-  reason: string;
+  reason?: string;
 
+  @IsOptional()
   @IsString()
-  reasonCategory: string;
+  reasonCategory?: string;
 }
 
 export class ReportClientDto {
