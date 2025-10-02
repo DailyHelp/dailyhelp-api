@@ -36,6 +36,10 @@ class EnvironmentVariables {
   TERMII_BASE_URL: string;
   @IsString()
   TERMII_API_KEY: string;
+  @IsString()
+  API_BASE_URL: string;
+  @IsString()
+  PAYSTACK_SUCCESS_REDIRECT_PATH: string;
 }
 
 export function validate(config: Record<string, unknown>) {

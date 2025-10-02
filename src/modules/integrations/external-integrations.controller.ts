@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { Request, Response } from 'express';
 
@@ -9,5 +9,13 @@ export class ExternalIntegrationsController {
   @Post('paystack/webhook')
   async handlePaystackWebhook(@Req() req: Request, @Res() res: Response) {
     return this.integrationsService.handlePaystackWebhook(req, res);
+  }
+
+  @Get('paystack/success')
+  paystackSuccessCallback() {
+    return {
+      status: true,
+      message: 'Paystack payment completed. You can close this page.',
+    };
   }
 }

@@ -50,6 +50,15 @@ export const PaystackConfiguration = registerAs(
   (): PaystackConfig => ({
     baseUrl: process.env.PAYSTACK_BASE_URL,
     secretKey: process.env.PAYSTACK_SECRET_KEY,
+    successRedirectUrl:
+      process.env.API_BASE_URL && process.env.PAYSTACK_SUCCESS_REDIRECT_PATH
+        ? new URL(
+            process.env.PAYSTACK_SUCCESS_REDIRECT_PATH,
+            process.env.API_BASE_URL.endsWith('/')
+              ? process.env.API_BASE_URL
+              : `${process.env.API_BASE_URL}/`,
+          ).toString()
+        : undefined,
   }),
 );
 

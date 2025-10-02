@@ -60,7 +60,6 @@ export class IntegrationsService {
       return res.status(400).send('Invalid signature');
     const event = req.body?.event;
     const data = req.body?.data;
-    console.log("here", req.body);
     switch (event) {
       case 'charge.success':
         const verified = await this.verifyWithPaystack(data.reference);
@@ -113,6 +112,33 @@ export class IntegrationsService {
     });
     if (!payment) return;
     if (payment.status === 'success' || payment.status === 'processing') return;
+    const offerUuid = payment.offer?.uuid;
+    if (offerUuid) {
+      const [offer, existingSettlement] = await Promise.all([
+        this.offerRepository.findOne({ uuid: offerUuid }),
+        this.paymentRepository.findOne({
+          offer: { uuid: offerUuid },
+          status: { $in: ['success', 'processing'] },
+          uuid: { $ne: payment.uuid },
+        }),
+      ]);
+      if (
+        offer?.status === OfferStatus.ACCEPTED ||
+        Boolean(existingSettlement)
+      ) {
+        const meta = payment.metadata ? JSON.parse(payment.metadata) : {};
+        payment.status = 'failed';
+        payment.transactionId = String(data.id);
+        payment.processedAt = new Date();
+        payment.channel = data.channel ?? data.payment_method;
+        payment.metadata = JSON.stringify({
+          ...meta,
+          duplicatePayment: true,
+        });
+        await this.em.flush();
+        return;
+      }
+    }
     const paidAmount = Number(data.amount) / 100;
     if (paidAmount !== Number(payment.amount)) {
       payment.status = 'failed';
@@ -144,16 +170,24 @@ export class IntegrationsService {
       userType: payment.userType,
     });
     if (!wallet) throw new NotFoundException(`Wallet not found`);
-    wallet.availableBalance += Number(payment.amount);
-    wallet.totalBalance += Number(payment.amount);
+    const existingTransaction = await this.transactionRepository.findOne({
+      payment: { uuid: payment.uuid },
+      type: TransactionType.CREDIT,
+      status: { $in: [TransactionStatus.SUCCESS, TransactionStatus.PENDING] },
+    });
+    const currentMetadata = payment.metadata ? JSON.parse(payment.metadata) : {};
     payment.metadata = JSON.stringify({
-      ...JSON.parse(payment.metadata),
+      ...currentMetadata,
       ...data,
     });
     payment.channel = data.channel ?? data.payment_method;
+    if (existingTransaction) return;
+    wallet.availableBalance += Number(payment.amount);
+    wallet.totalBalance += Number(payment.amount);
     const transactionModel = this.transactionRepository.create({
       uuid: v4(),
       type: TransactionType.CREDIT,
+      status: TransactionStatus.SUCCESS,
       amount: payment.amount,
       wallet: this.walletRepository.getReference(wallet.uuid),
       payment: this.paymentRepository.getReference(payment.uuid),

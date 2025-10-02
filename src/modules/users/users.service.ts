@@ -1782,6 +1782,9 @@ export class UsersService {
         throw new NotFoundException('Conversation does not exist');
       if (!offer) throw new NotFoundException('Offer does not exist');
 
+      if (offer.status === OfferStatus.ACCEPTED)
+        throw new ForbiddenException('Offer has already been paid for');
+
       // Ensure the offer belongs to this conversation
       const linkage = await this.messageRepository.findOne({
         conversation: { uuid: dto.conversationUuid },
@@ -1799,6 +1802,15 @@ export class UsersService {
       if (!isParticipant)
         throw new ForbiddenException('You are not part of this conversation');
 
+      const existingSuccessfulPayment = await this.paymentRepository.findOne({
+        offer: { uuid: dto.offerUuid },
+        status: { $in: ['success', 'processing'] },
+      });
+      if (existingSuccessfulPayment)
+        throw new ForbiddenException(
+          'A payment is already completed or in progress for this offer',
+        );
+
       amountNaira = Number(offer.price || 0);
       amountKobo = Math.round(amountNaira * 100);
       offerRef = this.offerRepository.getReference(dto.offerUuid);
@@ -1814,22 +1826,27 @@ export class UsersService {
       throw new BadRequestException('Invalid payment purpose');
     }
 
+    const payload: Record<string, any> = {
+      email,
+      amount: amountKobo,
+      currency: Currencies.NGN,
+      reference,
+      metadata: {
+        intentId: reference,
+        purpose: dto.purpose,
+        offerUuid: dto.offerUuid ?? null,
+        conversationUuid: dto.conversationUuid ?? null,
+        userUuid: uuid,
+        userType,
+      },
+    };
+    if (this.paystackConfig.successRedirectUrl) {
+      payload.callback_url = this.paystackConfig.successRedirectUrl;
+    }
+
     const initRes = await axios.post(
       `${this.paystackConfig.baseUrl}/transaction/initialize`,
-      {
-        email,
-        amount: amountKobo,
-        currency: Currencies.NGN,
-        reference,
-        metadata: {
-          intentId: reference,
-          purpose: dto.purpose,
-          offerUuid: dto.offerUuid ?? null,
-          conversationUuid: dto.conversationUuid ?? null,
-          userUuid: uuid,
-          userType,
-        },
-      },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${this.paystackConfig.secretKey}`,
@@ -1891,34 +1908,70 @@ export class UsersService {
       throw new ForbiddenException(`Transaction was not successful`);
     }
     if (dto.purpose === PaymentPurpose.FUND_WALLET) {
+      const existingPayment = await this.paymentRepository.findOne({
+        reference: transactionId.toString(),
+      });
+      if (
+        existingPayment &&
+        ['success', 'processing'].includes(existingPayment.status ?? '')
+      ) {
+        throw new ForbiddenException('Transaction has already been processed');
+      }
       const wallet = await this.walletRepository.findOne({
         user: { uuid },
         userType,
       });
+      if (!wallet) throw new NotFoundException('Wallet not found');
+      if (
+        existingPayment &&
+        existingPayment.amount !== undefined &&
+        Number(existingPayment.amount) !== Number(dto.amount)
+      ) {
+        throw new ForbiddenException('Amount does not match existing payment');
+      }
       wallet.availableBalance += dto.amount;
       wallet.totalBalance += dto.amount;
-      const paymentUuid = v4();
-      const paymentModel = this.paymentRepository.create({
-        uuid: paymentUuid,
-        reference: transactionId.toString(),
-        metadata: JSON.stringify(paymentData),
-        type: PaymentType.INCOMING,
-        amount: dto.amount,
-        channel: paymentData.paymentMethod,
-        status: 'success',
-        currency: Currencies.NGN,
-      });
-      const transactionModel = this.transactionRepository.create({
-        uuid: v4(),
-        type: TransactionType.CREDIT,
-        amount: dto.amount,
-        wallet: this.walletRepository.getReference(wallet.uuid),
-        payment: this.paymentRepository.getReference(paymentUuid),
-        remark: `Wallet Fund`,
-        locked: false,
-      });
-      this.em.persist(paymentModel);
-      this.em.persist(transactionModel);
+      const paymentModel = existingPayment
+        ? existingPayment
+        : this.paymentRepository.create({
+            uuid: v4(),
+            reference: transactionId.toString(),
+            type: PaymentType.INCOMING,
+            amount: dto.amount,
+            currency: Currencies.NGN,
+            user: this.usersRepository.getReference(uuid),
+            userType,
+          });
+      paymentModel.metadata = JSON.stringify(paymentData);
+      paymentModel.channel =
+        paymentData.paymentMethod ??
+        paymentData.payment_method ??
+        paymentData.channel;
+      paymentModel.status = 'success';
+      paymentModel.transactionId = paymentData.id
+        ? String(paymentData.id)
+        : transactionId.toString();
+      paymentModel.processedAt = new Date();
+      if (!existingPayment) {
+        this.em.persist(paymentModel);
+      }
+      const existingTransaction = existingPayment
+        ? await this.transactionRepository.findOne({
+            payment: { uuid: existingPayment.uuid },
+          })
+        : null;
+      if (!existingTransaction) {
+        const transactionModel = this.transactionRepository.create({
+          uuid: v4(),
+          type: TransactionType.CREDIT,
+          amount: dto.amount,
+          wallet,
+          payment: paymentModel,
+          remark: `Wallet Fund`,
+          locked: false,
+        });
+        this.em.persist(transactionModel);
+      }
     } else if (dto.purpose === PaymentPurpose.JOB_OFFER) {
       const offerExists = await this.offerRepository.findOne({
         uuid: dto.offerUuid,
