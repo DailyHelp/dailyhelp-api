@@ -108,10 +108,9 @@ export class IntegrationsService {
   }
 
   async processPaystackPayment(data: any) {
-    const payment = await this.paymentRepository.findOne(
-      { reference: data.reference },
-      { lockMode: 1 },
-    );
+    const payment = await this.paymentRepository.findOne({
+      reference: data.reference,
+    });
     if (!payment) return;
     if (payment.status === 'success' || payment.status === 'processing') return;
     const paidAmount = Number(data.amount) / 100;
