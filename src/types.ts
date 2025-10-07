@@ -130,6 +130,8 @@ export interface IAdminAuthContext {
   name: string;
   email: string;
   uuid: string;
+  roles?: string[];
+  permissions?: string[];
 }
 
 export interface IProviderOnboarding {

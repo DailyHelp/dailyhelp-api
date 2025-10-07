@@ -168,6 +168,121 @@ export class ProviderJobsController {
     );
   }
 
+  @Get(':uuid')
+  @ApiOkResponse({
+    description: 'Job details fetched successfully',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            status: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                job: { type: 'object' },
+                timelines: {
+                  type: 'array',
+                  items: { type: 'object' },
+                },
+              },
+            },
+          },
+        },
+        example: {
+          status: true,
+          data: {
+            job: {
+              uuid: 'job-uuid',
+              status: 'IN_PROGRESS',
+              requestId: 'REQ-2025-0012',
+              price: 45000,
+              startDate: '2025-01-12T09:00:00.000Z',
+              endDate: null,
+              description: 'Full apartment deep cleaning with laundry.',
+              pictures: null,
+              tip: 0,
+              code: '7821',
+              acceptedAt: '2025-01-11T15:30:00.000Z',
+              cancelledAt: null,
+              cancellationReason: null,
+              cancellationCategory: null,
+              createdAt: '2025-01-10T09:12:00.000Z',
+              updatedAt: '2025-01-11T15:30:00.000Z',
+              serviceProvider: {
+                uuid: 'provider-uuid',
+                firstname: 'Musa',
+                lastname: 'Hassan',
+                middlename: null,
+                picture: 'https://cdn.dailyhelp.ng/providers/musa.png',
+                email: 'musa@example.com',
+                phone: '+2348098765432',
+                userType: 'PROVIDER',
+              },
+              serviceRequestor: {
+                uuid: 'customer-uuid',
+                firstname: 'Ada',
+                lastname: 'Okafor',
+                middlename: null,
+                picture: null,
+                email: 'ada@example.com',
+                phone: '+2348012345678',
+                userType: 'CUSTOMER',
+              },
+              review: null,
+              dispute: null,
+              payment: {
+                uuid: 'payment-uuid',
+                amount: 45000,
+                status: 'processing',
+                type: 'JOB',
+                currency: 'NGN',
+                processedAt: '2025-01-11T15:35:00.000Z',
+              },
+            },
+            timelines: [
+              {
+                uuid: 'timeline-created-uuid',
+                event: 'Job Created',
+                createdAt: '2025-01-10T09:15:32.000Z',
+                updatedAt: '2025-01-10T09:15:32.000Z',
+                actor: {
+                  uuid: 'customer-uuid',
+                  firstname: 'Ada',
+                  lastname: 'Okafor',
+                  middlename: null,
+                  picture: null,
+                  email: 'ada@example.com',
+                  phone: '+2348012345678',
+                  userType: 'CUSTOMER',
+                },
+              },
+              {
+                uuid: 'timeline-accepted-uuid',
+                event: 'Job Accepted',
+                createdAt: '2025-01-11T08:00:00.000Z',
+                updatedAt: '2025-01-11T08:00:00.000Z',
+                actor: {
+                  uuid: 'provider-uuid',
+                  firstname: 'Musa',
+                  lastname: 'Hassan',
+                  middlename: null,
+                  picture: 'https://cdn.dailyhelp.ng/providers/musa.png',
+                  email: 'musa@example.com',
+                  phone: '+2348098765432',
+                  userType: 'PROVIDER',
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  })
+  async fetchJobDetail(@Param('uuid') uuid: string, @Req() request: Request) {
+    return this.jobService.fetchJobDetail(uuid, request.user as any);
+  }
+
   @Post(':uuid/cancel')
   async cancelJob(
     @Param('uuid') uuid: string,

@@ -1,4 +1,6 @@
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -6,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Min,
   ValidateIf,
@@ -43,18 +46,69 @@ export class AdminVerifyOtpDto {
   email: string;
 }
 
-export class AdminUserDto {
+export class AdminCreateTeamMemberDto {
   @IsString()
-  @Length(1, 150)
-  fullname: string;
+  @Length(1, 75)
+  firstName: string;
+
+  @IsString()
+  @Length(1, 75)
+  lastName: string;
 
   @IsEmail()
-  @Length(1, 50)
+  @Length(1, 100)
   email: string;
 
+  @IsOptional()
   @IsString()
-  @Length(1, 50)
-  password: string;
+  @Length(6, 50)
+  password?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  roleUuid?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  roleUuids?: string[];
+}
+
+export class AdminUpdateTeamMemberDto {
+  @IsOptional()
+  @IsUUID('4')
+  roleUuid?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  roleUuids?: string[];
+}
+
+export class AdminListTeamMembersDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  roleUuids?: string[];
 }
 
 export class AdminInitiateResetPasswordDto {
@@ -84,6 +138,65 @@ export class AdminChangePasswordDto {
   @IsString()
   @Length(1, 50)
   newPassword: string;
+}
+
+export class AdminListRolesDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminCreateRoleDto {
+  @IsString()
+  @Length(1, 100)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 255)
+  description?: string;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  permissionUuids: string[];
+}
+
+export class AdminUpdateRoleDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 255)
+  description?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  permissionUuids?: string[];
+}
+
+export class AdminAssignRolesDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  roleUuids: string[];
 }
 
 export enum AdminCustomerStatus {

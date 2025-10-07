@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -14,6 +15,8 @@ import { AdminJwtAuthGuard } from './guards/jwt-auth-guard';
 import { AdminService } from './admin.service';
 import { AllowUnauthorizedRequest } from 'src/decorators/unauthorized.decorator';
 import { AdminLocalAuthGuard } from './guards/local-auth-guard';
+import { AdminPermissionsGuard } from './guards/permissions.guard';
+import { RequireAdminPermissions } from './decorators/permissions.decorator';
 import * as dtos from './dto';
 import { MainCategory, SubCategory } from './admin.entities';
 import { extractTokenFromReq } from 'src/utils';
@@ -21,23 +24,26 @@ import { Request } from 'express';
 
 @Controller('admin')
 @ApiTags('admin')
-@UseGuards(AdminJwtAuthGuard)
+@UseGuards(AdminJwtAuthGuard, AdminPermissionsGuard)
 export class AdminController {
   constructor(private readonly service: AdminService) {}
 
   @Get()
+  @RequireAdminPermissions('dashboard.view')
   getHello(): string {
     return 'Welcome to DailyHelp Admin!!!';
   }
 
   @Get('customers')
   @ApiOkResponse({ description: 'Customers fetched successfully' })
+  @RequireAdminPermissions('users.view')
   fetchCustomers(@Query() query: dtos.AdminFetchCustomersDto) {
     return this.service.fetchCustomers(query);
   }
 
   @Get('providers')
   @ApiOkResponse({ description: 'Providers fetched successfully' })
+  @RequireAdminPermissions('providers.view')
   fetchProviders(@Query() query: dtos.AdminFetchProvidersDto) {
     return this.service.fetchProviders(query);
   }
@@ -45,18 +51,21 @@ export class AdminController {
   @Post('users/:uuid/suspend')
   @ApiBody({ type: dtos.AdminSuspendUserDto })
   @ApiOkResponse({ description: 'User suspended successfully' })
+  @RequireAdminPermissions('users.suspend')
   suspendUser(@Param('uuid') uuid: string, @Body() body: dtos.AdminSuspendUserDto) {
     return this.service.suspendUser(uuid, body);
   }
 
   @Post('users/:uuid/reactivate')
   @ApiOkResponse({ description: 'User reactivated successfully' })
+  @RequireAdminPermissions('users.suspend')
   reactivateUser(@Param('uuid') uuid: string) {
     return this.service.reactivateUser(uuid);
   }
 
   @Get('customers/:uuid/jobs')
   @ApiOkResponse({ description: 'Customer jobs fetched successfully' })
+  @RequireAdminPermissions('jobs.view')
   fetchCustomerJobs(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminFetchCustomerJobsDto,
@@ -66,6 +75,7 @@ export class AdminController {
 
   @Get('providers/:uuid/jobs')
   @ApiOkResponse({ description: 'Provider jobs fetched successfully' })
+  @RequireAdminPermissions('jobs.view')
   fetchProviderJobs(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminFetchProviderJobsDto,
@@ -75,12 +85,14 @@ export class AdminController {
 
   @Get('jobs')
   @ApiOkResponse({ description: 'Jobs fetched successfully' })
+  @RequireAdminPermissions('jobs.view')
   fetchJobs(@Query() query: dtos.AdminFetchJobsDto) {
     return this.service.fetchJobs(query);
   }
 
   @Get('jobs/disputes')
   @ApiOkResponse({ description: 'Job disputes fetched successfully' })
+  @RequireAdminPermissions('disputes.view')
   fetchDisputes(@Query() query: dtos.AdminFetchDisputesDto) {
     return this.service.fetchDisputes(query);
   }
@@ -88,6 +100,7 @@ export class AdminController {
   @Patch('jobs/disputes/:uuid/resolve')
   @ApiBody({ type: dtos.AdminResolveDisputeDto })
   @ApiOkResponse({ description: 'Job dispute resolved successfully' })
+  @RequireAdminPermissions('disputes.resolve')
   resolveDispute(
     @Param('uuid') uuid: string,
     @Body() body: dtos.AdminResolveDisputeDto,
@@ -98,6 +111,7 @@ export class AdminController {
 
   @Get('reports')
   @ApiOkResponse({ description: 'Reports fetched successfully' })
+  @RequireAdminPermissions('reports.view')
   fetchReports(@Query() query: dtos.AdminFetchReportsDto) {
     return this.service.fetchReports(query);
   }
@@ -105,6 +119,7 @@ export class AdminController {
   @Patch('reports/:uuid/resolve')
   @ApiBody({ type: dtos.AdminResolveReportDto })
   @ApiOkResponse({ description: 'Report resolved successfully' })
+  @RequireAdminPermissions('reports.resolve')
   resolveReport(
     @Param('uuid') uuid: string,
     @Body() body: dtos.AdminResolveReportDto,
@@ -115,30 +130,35 @@ export class AdminController {
 
   @Get('feedbacks')
   @ApiOkResponse({ description: 'Feedback fetched successfully' })
+  @RequireAdminPermissions('feedback.view')
   fetchFeedbacks(@Query() query: dtos.AdminFetchFeedbacksDto) {
     return this.service.fetchFeedbacks(query);
   }
 
   @Get('jobs/:uuid/timelines')
   @ApiOkResponse({ description: 'Job timelines fetched successfully' })
+  @RequireAdminPermissions('jobs.view')
   fetchJobTimelines(@Param('uuid') uuid: string) {
     return this.service.fetchJobTimelines(uuid);
   }
 
   @Get('jobs/:uuid/dispute')
   @ApiOkResponse({ description: 'Job dispute fetched successfully' })
+  @RequireAdminPermissions('disputes.view')
   fetchJobDispute(@Param('uuid') uuid: string) {
     return this.service.fetchJobDispute(uuid);
   }
 
   @Get('conversations/history')
   @ApiOkResponse({ description: 'Chat history fetched successfully' })
+  @RequireAdminPermissions('users.view')
   fetchChatHistory(@Query() query: dtos.AdminChatHistoryDto) {
     return this.service.fetchChatHistory(query);
   }
 
   @Get('customers/:uuid/wallet')
   @ApiOkResponse({ description: 'Customer wallet fetched successfully' })
+  @RequireAdminPermissions('users.view')
   fetchCustomerWallet(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminWalletTransactionsDto,
@@ -148,6 +168,7 @@ export class AdminController {
 
   @Get('providers/:uuid/wallet')
   @ApiOkResponse({ description: 'Provider wallet fetched successfully' })
+  @RequireAdminPermissions('providers.view')
   fetchProviderWallet(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminWalletTransactionsDto,
@@ -157,6 +178,7 @@ export class AdminController {
 
   @Get('providers/:uuid/reviews')
   @ApiOkResponse({ description: 'Provider reviews fetched successfully' })
+  @RequireAdminPermissions('providers.view')
   fetchProviderReviews(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminFetchProviderReviewsDto,
@@ -166,6 +188,7 @@ export class AdminController {
 
   @Get('providers/:uuid/analytics')
   @ApiOkResponse({ description: 'Provider analytics fetched successfully' })
+  @RequireAdminPermissions('providers.view')
   fetchProviderAnalytics(
     @Param('uuid') uuid: string,
     @Query() query: dtos.AdminProviderAnalyticsDto,
@@ -178,6 +201,7 @@ export class AdminController {
   @ApiOkResponse({
     description: 'Dashboard analytics fetched successfully',
   })
+  @RequireAdminPermissions('dashboard.view')
   dashboard(@Body() body: dtos.AdminDashboardFilterDto) {
     return this.service.fetchDashboardAnalytics(body);
   }
@@ -340,11 +364,107 @@ export class AdminController {
   }
 
   @Post('user')
-  createUser(@Body() body: dtos.AdminUserDto) {
+  @RequireAdminPermissions('team_members.manage_members')
+  @ApiCreatedResponse({ description: 'Team member created successfully' })
+  createUser(@Body() body: dtos.AdminCreateTeamMemberDto) {
     return this.service.createUser(body);
   }
 
+  @Get('team-members')
+  @RequireAdminPermissions('team_members.view')
+  @ApiOkResponse({ description: 'Team members fetched successfully' })
+  listTeamMembers(@Query() query: dtos.AdminListTeamMembersDto) {
+    return this.service.listTeamMembers(query);
+  }
+
+  @Get('team-members/:uuid')
+  @RequireAdminPermissions('team_members.view')
+  @ApiOkResponse({ description: 'Team member fetched successfully' })
+  getTeamMember(@Param('uuid') uuid: string) {
+    return this.service.getTeamMember(uuid);
+  }
+
+  @Post('team-members')
+  @RequireAdminPermissions('team_members.manage_members')
+  @ApiCreatedResponse({ description: 'Team member created successfully' })
+  createTeamMember(@Body() body: dtos.AdminCreateTeamMemberDto) {
+    return this.service.createUser(body);
+  }
+
+  @Patch('team-members/:uuid')
+  @RequireAdminPermissions('team_members.edit_member_role')
+  @ApiOkResponse({ description: 'Team member updated successfully' })
+  updateTeamMember(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminUpdateTeamMemberDto,
+  ) {
+    return this.service.updateTeamMember(uuid, body);
+  }
+
+  @Delete('team-members/:uuid')
+  @RequireAdminPermissions('team_members.manage_members')
+  @ApiOkResponse({ description: 'Team member removed successfully' })
+  deleteTeamMember(@Param('uuid') uuid: string) {
+    return this.service.deleteTeamMember(uuid);
+  }
+
+  @Get('permissions')
+  @RequireAdminPermissions('team_members.view')
+  @ApiOkResponse({ description: 'Permissions fetched successfully' })
+  listPermissions() {
+    return this.service.listPermissions();
+  }
+
+  @Get('roles')
+  @RequireAdminPermissions('team_members.view')
+  @ApiOkResponse({ description: 'Roles fetched successfully' })
+  listRoles(@Query() query: dtos.AdminListRolesDto) {
+    return this.service.listRoles(query);
+  }
+
+  @Get('roles/:uuid')
+  @RequireAdminPermissions('team_members.view')
+  @ApiOkResponse({ description: 'Role fetched successfully' })
+  getRole(@Param('uuid') uuid: string) {
+    return this.service.getRole(uuid);
+  }
+
+  @Post('roles')
+  @RequireAdminPermissions('team_members.manage_roles')
+  @ApiCreatedResponse({ description: 'Role created successfully' })
+  createRole(@Body() body: dtos.AdminCreateRoleDto) {
+    return this.service.createRole(body);
+  }
+
+  @Patch('roles/:uuid')
+  @RequireAdminPermissions('team_members.edit_roles')
+  @ApiOkResponse({ description: 'Role updated successfully' })
+  updateRole(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminUpdateRoleDto,
+  ) {
+    return this.service.updateRole(uuid, body);
+  }
+
+  @Delete('roles/:uuid')
+  @RequireAdminPermissions('team_members.manage_roles')
+  @ApiOkResponse({ description: 'Role deleted successfully' })
+  deleteRole(@Param('uuid') uuid: string) {
+    return this.service.deleteRole(uuid);
+  }
+
+  @Patch('team-members/:uuid/roles')
+  @RequireAdminPermissions('team_members.edit_member_role')
+  @ApiOkResponse({ description: 'Team member roles updated successfully' })
+  assignRolesToTeamMember(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminAssignRolesDto,
+  ) {
+    return this.service.assignRolesToAdmin(uuid, body);
+  }
+
   @Post('main-category')
+  @RequireAdminPermissions('settings.view')
   createMainCategory(@Body() body: dtos.CreateMainCategory) {
     return this.service.createMainCategory(body);
   }
@@ -355,11 +475,13 @@ export class AdminController {
     isArray: true,
     description: 'Main categories fetched successfully',
   })
+  @RequireAdminPermissions('settings.view')
   fetchMainCategories() {
     return this.service.fetchMainCategories();
   }
 
   @Post('main-category/:uuid/edit')
+  @RequireAdminPermissions('settings.view')
   editMainCategory(
     @Param('uuid') uuid: string,
     @Body() body: dtos.UpdateMainCategory,
@@ -368,11 +490,13 @@ export class AdminController {
   }
 
   @Post('main-category/:uuid/delete')
+  @RequireAdminPermissions('settings.view')
   deleteMainCategory(@Param('uuid') uuid: string) {
     return this.service.deleteMainCategory(uuid);
   }
 
   @Post('sub-category')
+  @RequireAdminPermissions('settings.view')
   createSubCategory(@Body() body: dtos.CreateSubCategory) {
     return this.service.createSubCategory(body);
   }
@@ -383,11 +507,13 @@ export class AdminController {
     isArray: true,
     description: 'Sub categories fetched successfully',
   })
+  @RequireAdminPermissions('settings.view')
   fetchSubCategories(@Param('uuid') uuid: string) {
     return this.service.fetchSubCategories(uuid);
   }
 
   @Post('sub-category/:uuid/edit')
+  @RequireAdminPermissions('settings.view')
   editSubCategory(
     @Param('uuid') uuid: string,
     @Body() body: dtos.UpdateSubCategory,
@@ -396,16 +522,19 @@ export class AdminController {
   }
 
   @Post('sub-category/:uuid/delete')
+  @RequireAdminPermissions('settings.view')
   deleteSubCategory(@Param('uuid') uuid: string) {
     return this.service.deleteSubCategory(uuid);
   }
 
   @Post('reason-category')
+  @RequireAdminPermissions('settings.view')
   reasonCategory(@Body() body: dtos.CreateReasonCategory) {
     return this.service.createReasonCategory(body);
   }
 
   @Post('reason-category/:uuid/delete')
+  @RequireAdminPermissions('settings.view')
   deleteReasonCategory(@Param('uuid') uuid: string) {
     return this.service.deleteReasonCategory(uuid);
   }

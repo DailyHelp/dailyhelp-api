@@ -1,6 +1,8 @@
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Module } from '@nestjs/common';
 import {
+  AdminPermission,
+  AdminRole,
   AdminUser,
   MainCategory,
   ReasonCategory,
@@ -23,12 +25,15 @@ import { AdminLocalStrategy } from './strategies/local.strategy';
 import { AdminJwtStrategy } from './strategies/jwt.strategy';
 import { AdminController } from './admin.controller';
 import { SharedModule } from '../shared/shared.module';
+import { AdminPermissionsGuard } from './guards/permissions.guard';
 
 @Module({
   imports: [
     MikroOrmModule.forFeature({
       entities: [
         AdminUser,
+        AdminRole,
+        AdminPermission,
         MainCategory,
         SubCategory,
         ReasonCategory,
@@ -58,7 +63,12 @@ import { SharedModule } from '../shared/shared.module';
       inject: [JwtAuthConfiguration.KEY],
     }),
   ],
-  providers: [AdminService, AdminLocalStrategy, AdminJwtStrategy],
+  providers: [
+    AdminService,
+    AdminLocalStrategy,
+    AdminJwtStrategy,
+    AdminPermissionsGuard,
+  ],
   controllers: [AdminController],
 })
 export class AdminModule {}

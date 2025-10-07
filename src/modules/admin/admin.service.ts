@@ -2,6 +2,7 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -9,12 +10,19 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import {
+  AdminPermission,
+  AdminRole,
   AdminUser,
   MainCategory,
   ReasonCategory,
   SubCategory,
 } from './admin.entities';
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import {
+  EntityManager,
+  EntityRepository,
+  FilterQuery,
+  QueryOrder,
+} from '@mikro-orm/core';
 import {
   DisputeResolutionAction,
   DisputeStatus,
@@ -52,8 +60,14 @@ import {
   AdminWalletTransactionsDto,
   AdminNewResetPasswordDto,
   AdminResendOtpDto,
-  AdminUserDto,
+  AdminListRolesDto,
+  AdminCreateTeamMemberDto,
+  AdminUpdateTeamMemberDto,
+  AdminListTeamMembersDto,
   AdminVerifyOtpDto,
+  AdminCreateRoleDto,
+  AdminUpdateRoleDto,
+  AdminAssignRolesDto,
   CreateMainCategory,
   CreateReasonCategory,
   CreateSubCategory,
@@ -91,6 +105,10 @@ export class AdminService {
   constructor(
     @InjectRepository(AdminUser)
     private readonly adminUserRepository: EntityRepository<AdminUser>,
+    @InjectRepository(AdminRole)
+    private readonly adminRoleRepository: EntityRepository<AdminRole>,
+    @InjectRepository(AdminPermission)
+    private readonly adminPermissionRepository: EntityRepository<AdminPermission>,
     @InjectRepository(MainCategory)
     private readonly mainCategoryRepository: EntityRepository<MainCategory>,
     @InjectRepository(SubCategory)
@@ -132,6 +150,135 @@ export class AdminService {
 
   private roundCurrency(value: number) {
     return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private collectPermissionCodesFromRoles(roles: AdminRole[]) {
+    const permissionSet = new Set<string>();
+    roles.forEach((role) => {
+      role.permissions.getItems().forEach((permission) => {
+        permissionSet.add(permission.code);
+      });
+    });
+    return Array.from(permissionSet);
+  }
+
+  private getAdminPortalLoginUrl() {
+    return (
+      process.env.ADMIN_PORTAL_URL ||
+      process.env.ADMIN_LOGIN_URL ||
+      process.env.ADMIN_APP_URL ||
+      ''
+    );
+  }
+
+  private buildPermissionResponse(permission: AdminPermission) {
+    return {
+      uuid: permission.uuid,
+      code: permission.code,
+      name: permission.name,
+      module: permission.module,
+      description: permission.description,
+      isModulePermission: permission.isModulePermission,
+    };
+  }
+
+  private buildRoleResponse(role: AdminRole) {
+    const permissions = role.permissions
+      .getItems()
+      .map((permission) => this.buildPermissionResponse(permission));
+    return {
+      uuid: role.uuid,
+      name: role.name,
+      description: role.description,
+      isSystem: role.isSystem,
+      permissions,
+      permissionCodes: permissions.map((permission) => permission.code),
+    };
+  }
+
+  private buildAdminUserProfile(admin: AdminUser) {
+    const roles = admin.roles.getItems();
+    const permissionCodes = this.collectPermissionCodesFromRoles(roles);
+    return {
+      uuid: admin.uuid,
+      firstName: admin.firstName ?? '',
+      lastName: admin.lastName ?? '',
+      fullname: admin.fullname ?? buildFullName(admin.firstName, admin.lastName),
+      email: admin.email,
+      roles: roles.map((role) => ({
+        uuid: role.uuid,
+        name: role.name,
+        description: role.description,
+        isSystem: role.isSystem,
+      })),
+      permissions: permissionCodes,
+      requiresPasswordReset: !!admin.isTemporaryPassword,
+    };
+  }
+
+  private async fetchPermissionsByUuids(uuids: string[]) {
+    const unique = Array.from(new Set(uuids));
+    if (!unique.length) return [];
+    const permissions = await this.adminPermissionRepository.find(
+      { uuid: { $in: unique } as any },
+      { orderBy: { displayOrder: QueryOrder.ASC } },
+    );
+    const found = new Set(permissions.map((permission) => permission.uuid));
+    const missing = unique.filter((id) => !found.has(id));
+    if (missing.length) {
+      throw new NotFoundException(
+        `Permission(s) not found: ${missing.join(', ')}`,
+      );
+    }
+    return permissions;
+  }
+
+  private async fetchRolesByUuids(uuids: string[]) {
+    const unique = Array.from(new Set(uuids));
+    if (!unique.length) return [];
+    const roles = await this.adminRoleRepository.find(
+      { uuid: { $in: unique } as any },
+      { populate: ['permissions'] },
+    );
+    const found = new Set(roles.map((role) => role.uuid));
+    const missing = unique.filter((id) => !found.has(id));
+    if (missing.length) {
+      throw new NotFoundException(`Role(s) not found: ${missing.join(', ')}`);
+    }
+    return roles;
+  }
+
+  private async loadAdminWithRoles(uuid: string) {
+    const admin = await this.adminUserRepository.findOne(
+      { uuid, deletedAt: null } as FilterQuery<AdminUser>,
+      { populate: ['roles', 'roles.permissions'] },
+    );
+    if (!admin) throw new NotFoundException('Admin user not found');
+    return admin;
+  }
+
+  private normalizeRoleIds(
+    roleUuid?: string,
+    roleUuids?: string[],
+  ): string[] {
+    const combined = [
+      ...(roleUuids ?? []),
+      ...(roleUuid ? [roleUuid] : []),
+    ];
+    const filtered = combined.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+    return Array.from(new Set(filtered));
+  }
+
+  private async ensureRoleNameUnique(name: string, excludeUuid?: string) {
+    const where: FilterQuery<AdminRole> = excludeUuid
+      ? { name, uuid: { $ne: excludeUuid } as any }
+      : { name };
+    const existing = await this.adminRoleRepository.findOne(where);
+    if (existing) {
+      throw new ConflictException(`Role with name "${name}" already exists`);
+    }
   }
 
   private describeDisputeResolution(action: DisputeResolutionAction) {
@@ -415,8 +562,13 @@ export class AdminService {
     return otpRecord;
   }
 
-  async findUserByEmail(email: string) {
-    return this.adminUserRepository.findOne({ email });
+  async findUserByEmail(email: string, includeRelations = false) {
+    return this.adminUserRepository.findOne(
+      { email, deletedAt: null } as FilterQuery<AdminUser>,
+      includeRelations
+        ? { populate: ['roles', 'roles.permissions'] }
+        : undefined,
+    );
   }
 
   async validateUser(email: string, password: string) {
@@ -428,20 +580,22 @@ export class AdminService {
   }
 
   async login(user: AdminUser) {
+    const admin = await this.findUserByEmail(user.email, true);
+    if (!admin) throw new NotFoundException('User not found');
+    const profile = this.buildAdminUserProfile(admin);
     const payload: IAdminAuthContext = {
-      uuid: user.uuid,
-      name: user.fullname,
-      email: user.email,
+      uuid: admin.uuid,
+      name: admin.fullname,
+      email: admin.email,
+      roles: profile.roles.map((role) => role.name),
+      permissions: profile.permissions,
     };
-    const userInfo = await this.findUserByEmail(user.email);
-    delete userInfo.password;
-    delete userInfo.createdAt;
-    delete userInfo.updatedAt;
     return {
       status: true,
       data: {
         accessToken: this.jwtService.sign(payload),
-        user: userInfo,
+        user: profile,
+        requiresPasswordReset: profile.requiresPasswordReset,
       },
     };
   }
@@ -534,6 +688,7 @@ export class AdminService {
     if (!admin) throw new NotFoundException('User not found');
     const hashedPassword = await bcrypt.hash(password, 12);
     admin.password = hashedPassword;
+    admin.isTemporaryPassword = false;
     await this.em.flush();
     return { status: true };
   }
@@ -549,6 +704,7 @@ export class AdminService {
       throw new BadRequestException('Current password is incorrect');
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     admin.password = hashedPassword;
+    admin.isTemporaryPassword = false;
     await this.em.flush();
     return { status: true };
   }
@@ -2653,24 +2809,284 @@ export class AdminService {
     };
   }
 
-  async createUser(user: AdminUserDto) {
+  async createUser(user: AdminCreateTeamMemberDto) {
     const userExists = await this.adminUserRepository.findOne({
       email: user.email,
-    });
+      deletedAt: null,
+    } as FilterQuery<AdminUser>);
     if (userExists)
       throw new ConflictException(
         `User with email: ${user.email} already exists`,
       );
-    const hashedPassword = await bcrypt.hash(user.password, 12);
+    const providedPassword = user.password ? user.password.trim() : '';
+    const temporaryPassword = providedPassword.length
+      ? providedPassword
+      : nanoid(12);
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
     const adminUserModel = this.adminUserRepository.create({
       uuid: v4(),
-      fullname: user.fullname,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullname: buildFullName(user.firstName, user.lastName),
       email: user.email,
       password: hashedPassword,
+      isTemporaryPassword: true,
     });
+    const roleIds = this.normalizeRoleIds(user.roleUuid, user.roleUuids);
+    if (roleIds.length) {
+      const roles = await this.fetchRolesByUuids(roleIds);
+      for (const role of roles) {
+        adminUserModel.roles.add(role);
+      }
+    }
     this.em.persist(adminUserModel);
     await this.em.flush();
+    const freshAdmin = await this.loadAdminWithRoles(adminUserModel.uuid);
+    const roleNames = freshAdmin.roles
+      .getItems()
+      .map((role) => role.name)
+      .join(', ');
+    const firstname =
+      freshAdmin.firstName?.trim() ||
+      freshAdmin.fullname?.trim() ||
+      'there';
+    if (freshAdmin.email) {
+      await this.sharedService.sendEmail({
+        templateCode: 'admin_invitation',
+        subject: 'DailyHelp Admin Invitation',
+        to: freshAdmin.email,
+        data: {
+          firstname,
+          roleName: roleNames || 'Admin',
+          email: freshAdmin.email,
+          temporaryPassword,
+          loginUrl: this.getAdminPortalLoginUrl(),
+        },
+      });
+    }
+    return { status: true, data: this.buildAdminUserProfile(freshAdmin) };
+  }
+
+  async listTeamMembers(dto: AdminListTeamMembersDto) {
+    const page = dto.page && dto.page > 0 ? dto.page : 1;
+    const limit = dto.limit && dto.limit > 0 ? dto.limit : 25;
+    const where: FilterQuery<AdminUser> = { deletedAt: null };
+    if (dto.search) {
+      const like = `%${dto.search}%`;
+      where.$or = [
+        { email: { $like: like } as any },
+        { firstName: { $like: like } as any },
+        { lastName: { $like: like } as any },
+        { fullname: { $like: like } as any },
+      ];
+    }
+    const roleIds = this.normalizeRoleIds(undefined, dto.roleUuids);
+    if (roleIds.length) {
+      where.roles = {
+        $some: {
+          uuid: { $in: roleIds } as any,
+        },
+      } as any;
+    }
+    const [admins, total] = await this.adminUserRepository.findAndCount(where, {
+      populate: ['roles', 'roles.permissions'],
+      orderBy: { createdAt: QueryOrder.DESC },
+      limit,
+      offset: (page - 1) * limit,
+    });
+    const payload = admins.map((admin) => this.buildAdminUserProfile(admin));
+    return buildResponseDataWithPagination(payload, total, { limit, page });
+  }
+
+  async getTeamMember(uuid: string) {
+    const admin = await this.loadAdminWithRoles(uuid);
+    if (admin.deletedAt) {
+      throw new NotFoundException('Admin user not found');
+    }
+    return { status: true, data: this.buildAdminUserProfile(admin) };
+  }
+
+  async updateTeamMember(uuid: string, dto: AdminUpdateTeamMemberDto) {
+    const admin = await this.loadAdminWithRoles(uuid);
+    if (admin.deletedAt) {
+      throw new NotFoundException('Admin user not found');
+    }
+    const roleIds = this.normalizeRoleIds(dto.roleUuid, dto.roleUuids);
+    if (!roleIds.length) {
+      throw new BadRequestException('At least one role must be provided');
+    }
+    const roles = await this.fetchRolesByUuids(roleIds);
+    admin.roles.removeAll();
+    for (const role of roles) {
+      admin.roles.add(role);
+    }
+    await this.em.flush();
+    await admin.roles.init();
+    return { status: true, data: this.buildAdminUserProfile(admin) };
+  }
+
+  async deleteTeamMember(uuid: string) {
+    const admin = await this.adminUserRepository.findOne({ uuid });
+    if (!admin || admin.deletedAt) {
+      throw new NotFoundException('Admin user not found');
+    }
+    await this.adminUserRepository.nativeUpdate(
+      { uuid },
+      { deletedAt: new Date() },
+    );
     return { status: true };
+  }
+
+  async listPermissions() {
+    const permissions = await this.adminPermissionRepository.findAll({
+      orderBy: {
+        module: QueryOrder.ASC,
+        displayOrder: QueryOrder.ASC,
+        name: QueryOrder.ASC,
+      },
+    });
+    const grouped = new Map<
+      string,
+      {
+        module: string;
+        modulePermission?: ReturnType<typeof this.buildPermissionResponse> | null;
+        permissions: ReturnType<typeof this.buildPermissionResponse>[];
+      }
+    >();
+    permissions.forEach((permission) => {
+      const key = permission.module;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          module: key,
+          modulePermission: null,
+          permissions: [],
+        });
+      }
+      const bucket = grouped.get(key)!;
+      const payload = this.buildPermissionResponse(permission);
+      if (permission.isModulePermission) {
+        bucket.modulePermission = payload;
+      } else {
+        bucket.permissions.push(payload);
+      }
+    });
+    const data = Array.from(grouped.values()).map((group) => ({
+      module: group.module,
+      modulePermission: group.modulePermission ?? null,
+      permissions: group.permissions,
+    }));
+    return { status: true, data };
+  }
+
+  async listRoles(dto: AdminListRolesDto) {
+    const { page, limit, search } = dto;
+    const where: FilterQuery<AdminRole> = {};
+    if (search) {
+      where.$or = [
+        { name: { $like: `%${search}%` } as any },
+        { description: { $like: `%${search}%` } as any },
+      ];
+    }
+    const paginationLimit = limit ?? 0;
+    const paginationPage = page ?? 1;
+    const [roles, total] = await this.adminRoleRepository.findAndCount(where, {
+      populate: ['permissions'],
+      orderBy: { createdAt: QueryOrder.DESC },
+      limit: paginationLimit || undefined,
+      offset: paginationLimit ? (paginationPage - 1) * paginationLimit : undefined,
+    });
+    const payload = roles.map((role) => this.buildRoleResponse(role));
+    const computedLimit = paginationLimit || total || payload.length || 1;
+    return buildResponseDataWithPagination(payload, total, {
+      limit: computedLimit,
+      page: paginationPage,
+    });
+  }
+
+  async getRole(uuid: string) {
+    const role = await this.adminRoleRepository.findOne(
+      { uuid },
+      { populate: ['permissions'] },
+    );
+    if (!role) throw new NotFoundException('Role not found');
+    return { status: true, data: this.buildRoleResponse(role) };
+  }
+
+  async createRole(dto: AdminCreateRoleDto) {
+    await this.ensureRoleNameUnique(dto.name);
+    const permissions = await this.fetchPermissionsByUuids(dto.permissionUuids);
+    const role = this.adminRoleRepository.create({
+      uuid: v4(),
+      name: dto.name,
+      description: dto.description,
+      isSystem: false,
+    });
+    for (const permission of permissions) {
+      role.permissions.add(permission);
+    }
+    this.em.persist(role);
+    await this.em.flush();
+    await role.permissions.init();
+    return { status: true, data: this.buildRoleResponse(role) };
+  }
+
+  async updateRole(uuid: string, dto: AdminUpdateRoleDto) {
+    const role = await this.adminRoleRepository.findOne(
+      { uuid },
+      { populate: ['permissions'] },
+    );
+    if (!role) throw new NotFoundException('Role not found');
+    if (role.isSystem) {
+      throw new ForbiddenException('System roles cannot be modified');
+    }
+    if (dto.name && dto.name !== role.name) {
+      await this.ensureRoleNameUnique(dto.name, role.uuid);
+      role.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      role.description = dto.description;
+    }
+    if (dto.permissionUuids) {
+      const permissions = await this.fetchPermissionsByUuids(dto.permissionUuids);
+      role.permissions.removeAll();
+      for (const permission of permissions) {
+        role.permissions.add(permission);
+      }
+    }
+    await this.em.flush();
+    await role.permissions.init();
+    return { status: true, data: this.buildRoleResponse(role) };
+  }
+
+  async deleteRole(uuid: string) {
+    const role = await this.adminRoleRepository.findOne({ uuid });
+    if (!role) throw new NotFoundException('Role not found');
+    if (role.isSystem) {
+      throw new ForbiddenException('System roles cannot be deleted');
+    }
+    const [{ total }] = await this.em
+      .getConnection()
+      .execute('select count(*) as total from admin_user_roles where role_uuid = ?', [
+        uuid,
+      ]);
+    if (Number(total) > 0) {
+      throw new BadRequestException('Role is assigned to team members');
+    }
+    await this.adminRoleRepository.nativeDelete({ uuid });
+    return { status: true };
+  }
+
+  async assignRolesToAdmin(adminUuid: string, dto: AdminAssignRolesDto) {
+    const admin = await this.loadAdminWithRoles(adminUuid);
+    const roles = await this.fetchRolesByUuids(dto.roleUuids);
+    admin.roles.removeAll();
+    for (const role of roles) {
+      admin.roles.add(role);
+    }
+    await this.em.flush();
+    await admin.roles.init();
+    const profile = this.buildAdminUserProfile(admin);
+    return { status: true, data: profile };
   }
 
   async createMainCategory(dto: CreateMainCategory) {

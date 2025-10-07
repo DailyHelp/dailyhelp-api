@@ -1,4 +1,10 @@
-import { EntityManager, EntityRepository, FilterQuery, wrap } from '@mikro-orm/core';
+import {
+  EntityManager,
+  EntityRepository,
+  FilterQuery,
+  QueryOrder,
+  wrap,
+} from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   ConflictException,
@@ -154,10 +160,14 @@ export class JobService {
   }
 
   async fetchJobTimelines(jobUuid: string) {
-    const timelines = await this.jobTimelineRepository.find({
-      job: { uuid: jobUuid },
-    });
-    return { status: true, data: timelines };
+    const timelines = await this.jobTimelineRepository.find(
+      { job: { uuid: jobUuid } },
+      { orderBy: { createdAt: QueryOrder.ASC }, populate: ['actor'] },
+    );
+    return {
+      status: true,
+      data: timelines.map((timeline) => this.buildJobTimelineResponse(timeline)),
+    };
   }
 
   async startJob(jobUuid: string, { uuid }: IAuthContext) {
@@ -419,6 +429,131 @@ export class JobService {
     provider.nextTier = providerProgress[0].nextTier;
     this.em.flush();
     return { status: true };
+  }
+
+  async fetchJobDetail(jobUuid: string, { uuid, userType }: IAuthContext) {
+    const where: FilterQuery<Job> = {
+      uuid: jobUuid,
+      ...(userType === UserType.CUSTOMER
+        ? { serviceRequestor: { uuid } }
+        : {}),
+      ...(userType === UserType.PROVIDER
+        ? { serviceProvider: { uuid } }
+        : {}),
+    };
+
+    const job = await this.jobRepository.findOne(where, {
+      populate: [
+        'serviceProvider',
+        'serviceRequestor',
+        'review',
+        'review.reviewedBy',
+        'review.reviewedFor',
+        'dispute',
+        'payment',
+      ],
+    });
+
+    if (!job) throw new NotFoundException('Job not found');
+
+    const timelines = await this.jobTimelineRepository.find(
+      { job: { uuid: jobUuid } },
+      { orderBy: { createdAt: QueryOrder.ASC }, populate: ['actor'] },
+    );
+
+    const response = {
+      job: {
+        uuid: job.uuid,
+        status: job.status,
+        requestId: job.requestId,
+        price: job.price,
+        startDate: job.startDate,
+        endDate: job.endDate,
+        description: job.description,
+        pictures: job.pictures,
+        tip: job.tip,
+        code: job.code,
+        acceptedAt: job.acceptedAt,
+        cancelledAt: job.cancelledAt,
+        cancellationReason: job.cancellationReason,
+        cancellationCategory: job.cancellationCategory,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        serviceProvider: this.buildUserSummary(job.serviceProvider),
+        serviceRequestor: this.buildUserSummary(job.serviceRequestor),
+        review: job.review
+          ? {
+              uuid: job.review.uuid,
+              rating: job.review.rating,
+              review: job.review.review,
+              createdAt: job.review.createdAt,
+              updatedAt: job.review.updatedAt,
+              reviewedBy: this.buildUserSummary(job.review.reviewedBy),
+              reviewedFor: this.buildUserSummary(job.review.reviewedFor),
+            }
+          : null,
+        dispute: job.dispute
+          ? {
+              uuid: job.dispute.uuid,
+              status: job.dispute.status,
+              category: job.dispute.category,
+              description: job.dispute.description,
+              createdAt: job.dispute.createdAt,
+              updatedAt: job.dispute.updatedAt,
+            }
+          : null,
+        payment: job.payment
+          ? {
+              uuid: job.payment.uuid,
+              amount: job.payment.amount,
+              status: job.payment.status,
+              type: job.payment.type,
+              currency: job.payment.currency,
+              processedAt: job.payment.processedAt,
+            }
+          : null,
+      },
+      timelines: timelines.map((timeline) =>
+        this.buildJobTimelineResponse(timeline),
+      ),
+    };
+
+    return { status: true, data: response };
+  }
+
+  private buildUserSummary(user?: Users | null) {
+    if (!user) return null;
+    const userType = this.resolvePrimaryUserType(user.userTypes);
+    return {
+      uuid: user.uuid,
+      firstname: user.firstname ?? null,
+      lastname: user.lastname ?? null,
+      middlename: user.middlename ?? null,
+      picture: user.picture ?? null,
+      email: user.email ?? null,
+      phone: user.phone ?? null,
+      userType,
+      userTypes: user.userTypes ?? null,
+    };
+  }
+
+  private buildJobTimelineResponse(timeline: JobTimeline) {
+    return {
+      uuid: timeline.uuid,
+      event: timeline.event,
+      createdAt: timeline.createdAt,
+      updatedAt: timeline.updatedAt,
+      actor: this.buildUserSummary(timeline.actor),
+    };
+  }
+
+  private resolvePrimaryUserType(userTypes?: string | null) {
+    if (!userTypes) return null;
+    const primary = userTypes
+      .split(',')
+      .map((type) => type.trim())
+      .filter((type) => type.length > 0)[0];
+    return primary ? (primary.toUpperCase() as UserType) : null;
   }
 
   async disputeJob(

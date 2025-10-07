@@ -222,6 +222,174 @@ export class ProvidersController {
   @Get('analytics')
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
+  @ApiOkResponse({
+    description: 'Provider analytics fetched successfully',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            status: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                range: {
+                  type: 'object',
+                  properties: {
+                    start: {
+                      type: 'string',
+                      format: 'date-time',
+                      example: '2025-01-01T00:00:00.000Z',
+                    },
+                    end: {
+                      type: 'string',
+                      format: 'date-time',
+                      example: '2025-01-31T23:59:59.999Z',
+                    },
+                  },
+                },
+                revenue: {
+                  type: 'object',
+                  properties: {
+                    rings: {
+                      type: 'object',
+                      properties: {
+                        earnings: { type: 'number', example: 228000 },
+                        tips: { type: 'number', example: 15000 },
+                        commission: {
+                          type: 'number',
+                          description: 'Commission shown as a negative value for deductions',
+                          example: -12000,
+                        },
+                      },
+                    },
+                    breakdown: {
+                      type: 'object',
+                      properties: {
+                        jobPayment: { type: 'number', example: 225000 },
+                        tips: { type: 'number', example: 15000 },
+                        income: { type: 'number', example: 240000 },
+                        commissionRate: {
+                          type: 'number',
+                          example: 5,
+                          description: 'Commission rate in percentage',
+                        },
+                        deductions: { type: 'number', example: 12000 },
+                        yourEarnings: { type: 'number', example: 228000 },
+                      },
+                    },
+                  },
+                },
+                jobs: {
+                  type: 'object',
+                  properties: {
+                    total: { type: 'integer', example: 28 },
+                    completed: { type: 'integer', example: 24 },
+                    canceled: { type: 'integer', example: 2 },
+                    disputed: { type: 'integer', example: 2 },
+                  },
+                },
+                offers: {
+                  type: 'object',
+                  properties: {
+                    total: { type: 'integer', example: 40 },
+                    accepted: { type: 'integer', example: 30 },
+                    acceptanceRate: {
+                      type: 'number',
+                      example: 75,
+                      description: 'Acceptance rate in percentage',
+                    },
+                    breakdown: {
+                      type: 'object',
+                      properties: {
+                        youAccepted: {
+                          type: 'object',
+                          properties: {
+                            count: { type: 'integer', example: 30 },
+                            percent: { type: 'number', example: 75 },
+                          },
+                        },
+                        youDeclined: {
+                          type: 'object',
+                          properties: {
+                            count: { type: 'integer', example: 3 },
+                            percent: { type: 'number', example: 7.5 },
+                          },
+                        },
+                        youCancelled: {
+                          type: 'object',
+                          properties: {
+                            count: { type: 'integer', example: 2 },
+                            percent: { type: 'number', example: 5 },
+                          },
+                        },
+                        clientDeclined: {
+                          type: 'object',
+                          properties: {
+                            count: { type: 'integer', example: 3 },
+                            percent: { type: 'number', example: 7.5 },
+                          },
+                        },
+                        clientCancelled: {
+                          type: 'object',
+                          properties: {
+                            count: { type: 'integer', example: 2 },
+                            percent: { type: 'number', example: 5 },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        example: {
+          status: true,
+          data: {
+            range: {
+              start: '2025-01-01T00:00:00.000Z',
+              end: '2025-01-31T23:59:59.999Z',
+            },
+            revenue: {
+              rings: {
+                earnings: 228000,
+                tips: 15000,
+                commission: -12000,
+              },
+              breakdown: {
+                jobPayment: 225000,
+                tips: 15000,
+                income: 240000,
+                commissionRate: 5,
+                deductions: 12000,
+                yourEarnings: 228000,
+              },
+            },
+            jobs: {
+              total: 28,
+              completed: 24,
+              canceled: 2,
+              disputed: 2,
+            },
+            offers: {
+              total: 40,
+              accepted: 30,
+              acceptanceRate: 75,
+              breakdown: {
+                youAccepted: { count: 30, percent: 75 },
+                youDeclined: { count: 3, percent: 7.5 },
+                youCancelled: { count: 2, percent: 5 },
+                clientDeclined: { count: 3, percent: 7.5 },
+                clientCancelled: { count: 2, percent: 5 },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
   async getAnalytics(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,

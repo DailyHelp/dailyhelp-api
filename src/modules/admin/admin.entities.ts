@@ -1,11 +1,14 @@
 import {
+  Collection,
   Entity,
   Enum,
   Filter,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryKey,
   Property,
+  Unique,
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { ReasonCategoryType } from '../../types';
@@ -24,11 +27,93 @@ export class AdminUser extends Timestamp {
   @Property({ nullable: true })
   fullname: string;
 
+  @Property({ nullable: true, columnType: 'varchar(150)', fieldName: 'first_name' })
+  firstName?: string;
+
+  @Property({ nullable: true, columnType: 'varchar(150)', fieldName: 'last_name' })
+  lastName?: string;
+
   @Property({ nullable: true })
   email: string;
 
   @Property({ nullable: true })
   password: string;
+
+  @Property({ type: 'boolean', fieldName: 'is_temporary_password', default: false })
+  isTemporaryPassword: boolean = false;
+
+  @ManyToMany(() => AdminRole, (role) => role.users, {
+    owner: true,
+    pivotTable: 'admin_user_roles',
+    joinColumn: 'admin_user_uuid',
+    inverseJoinColumn: 'role_uuid',
+  })
+  roles = new Collection<AdminRole>(this);
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'admin_roles' })
+export class AdminRole extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @Property()
+  @Unique()
+  name: string;
+
+  @Property({ nullable: true })
+  description?: string;
+
+  @Property({ default: false })
+  isSystem: boolean;
+
+  @ManyToMany(() => AdminPermission, (permission) => permission.roles, {
+    owner: true,
+    pivotTable: 'admin_role_permissions',
+    joinColumn: 'role_uuid',
+    inverseJoinColumn: 'permission_uuid',
+  })
+  permissions = new Collection<AdminPermission>(this);
+
+  @ManyToMany(() => AdminUser, (user) => user.roles)
+  users = new Collection<AdminUser>(this);
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'admin_permissions' })
+export class AdminPermission extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @Property()
+  @Unique()
+  code: string;
+
+  @Property()
+  name: string;
+
+  @Property()
+  module: string;
+
+  @Property({ nullable: true })
+  description?: string;
+
+  @Property({ default: false })
+  isModulePermission: boolean;
+
+  @Property({ nullable: true })
+  displayOrder?: number;
+
+  @ManyToMany(() => AdminRole, (role) => role.permissions)
+  roles = new Collection<AdminRole>(this);
 }
 
 @Filter({
