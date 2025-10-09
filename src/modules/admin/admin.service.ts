@@ -10,9 +10,11 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import {
+  AccountTierSetting,
   AdminPermission,
   AdminRole,
   AdminUser,
+  JobTip,
   MainCategory,
   ReasonCategory,
   SubCategory,
@@ -68,9 +70,18 @@ import {
   AdminCreateRoleDto,
   AdminUpdateRoleDto,
   AdminAssignRolesDto,
+  AdminCreateAccountTierDto,
+  AdminCreateJobTipDto,
+  AdminCreateMainCategoryWithSubsDto,
   CreateMainCategory,
   CreateReasonCategory,
   CreateSubCategory,
+  AdminDeleteMainCategoryDto,
+  AdminDeleteSubCategoryDto,
+  AdminFetchReasonCategoriesDto,
+  AdminUpdateAccountTierDto,
+  AdminUpdateJobTipDto,
+  AdminUpdateMainCategoryWithSubsDto,
   UpdateMainCategory,
   UpdateSubCategory,
 } from './dto';
@@ -115,6 +126,10 @@ export class AdminService {
     private readonly subCategoryRepository: EntityRepository<SubCategory>,
     @InjectRepository(ReasonCategory)
     private readonly reasonCategoryRepository: EntityRepository<ReasonCategory>,
+    @InjectRepository(AccountTierSetting)
+    private readonly accountTierRepository: EntityRepository<AccountTierSetting>,
+    @InjectRepository(JobTip)
+    private readonly jobTipRepository: EntityRepository<JobTip>,
     @InjectRepository(Users)
     private readonly usersRepository: EntityRepository<Users>,
     @InjectRepository(OTP)
@@ -3107,14 +3122,71 @@ export class AdminService {
     return { status: true };
   }
 
+  async createMainCategoryWithSubCategories(
+    dto: AdminCreateMainCategoryWithSubsDto,
+  ) {
+    const existing = await this.mainCategoryRepository.findOne({
+      name: dto.name,
+    });
+    if (existing)
+      throw new ConflictException(
+        `Main category with name: ${dto.name} already exists`,
+      );
+    const mainCategoryModel = this.mainCategoryRepository.create({
+      uuid: v4(),
+      name: dto.name,
+      icon: dto.icon,
+    });
+    this.em.persist(mainCategoryModel);
+    if (dto.subCategories?.length) {
+      const seen = new Set<string>();
+      for (const sub of dto.subCategories) {
+        const label = sub.name?.trim();
+        if (!label) continue;
+        const key = label.toLowerCase();
+        if (seen.has(key)) {
+          throw new ConflictException(
+            `Duplicate sub-category name provided: ${label}`,
+          );
+        }
+        seen.add(key);
+        const subCategoryModel = this.subCategoryRepository.create({
+          uuid: v4(),
+          name: label,
+          mainCategory: mainCategoryModel,
+        });
+        this.em.persist(subCategoryModel);
+      }
+    }
+    await this.em.flush();
+    return { status: true };
+  }
+
   async fetchMainCategories() {
-    return {
-      status: true,
-      data: await this.mainCategoryRepository.findAll({
-        populate: ['categories'],
-        orderBy: { createdAt: 'DESC' },
+    const categories = await this.mainCategoryRepository.findAll({
+      populate: ['categories'],
+      orderBy: { createdAt: QueryOrder.DESC },
+    });
+    const payload = await Promise.all(
+      categories.map(async (category) => {
+        const subs = await category.categories;
+        return {
+          uuid: category.uuid,
+          name: category.name,
+          icon: category.icon,
+          createdAt: category.createdAt,
+          updatedAt: category.updatedAt,
+          categories: subs.map((sub) => ({
+            uuid: sub.uuid,
+            name: sub.name,
+            createdAt: sub.createdAt,
+            updatedAt: sub.updatedAt,
+          })),
+          subCategoryCount: subs.length,
+        };
       }),
-    };
+    );
+    return { status: true, data: payload };
   }
 
   async editMainCategory(uuid: string, dto: UpdateMainCategory) {
@@ -3137,12 +3209,118 @@ export class AdminService {
     return { status: true };
   }
 
-  async deleteMainCategory(uuid: string) {
+  async updateMainCategoryWithSubCategories(
+    uuid: string,
+    dto: AdminUpdateMainCategoryWithSubsDto,
+  ) {
     const categoryExists = await this.mainCategoryRepository.findOne({ uuid });
     if (!categoryExists)
       throw new NotFoundException(`Main category does not exist`);
-    await this.mainCategoryRepository.nativeDelete({ uuid });
+    if (dto.name && dto.name !== categoryExists.name) {
+      const duplicate = await this.mainCategoryRepository.findOne({
+        uuid: { $ne: uuid },
+        name: dto.name,
+      });
+      if (duplicate)
+        throw new ConflictException(
+          `Main category with name: ${dto.name} already exists`,
+        );
+      categoryExists.name = dto.name;
+    }
+    if (dto.icon !== undefined) {
+      categoryExists.icon = dto.icon;
+    }
+    if (dto.subCategories) {
+      const existingSubs = await this.subCategoryRepository.find({
+        mainCategory: categoryExists,
+      });
+      const existingByUuid = new Map(
+        existingSubs.map((sub) => [sub.uuid, sub]),
+      );
+      for (const subInput of dto.subCategories) {
+        const label = subInput.name?.trim();
+        if (!label) continue;
+        const normalized = label.toLowerCase();
+        if (subInput.uuid) {
+          const target = existingByUuid.get(subInput.uuid);
+          if (!target)
+            throw new NotFoundException(
+              `Sub-category with id ${subInput.uuid} does not exist in this main category`,
+            );
+          const conflict = existingSubs.find(
+            (sub) =>
+              sub.uuid !== target.uuid &&
+              sub.name?.toLowerCase() === normalized,
+          );
+          if (conflict)
+            throw new ConflictException(
+              `Sub-category with name: ${label} already exists`,
+            );
+          target.name = label;
+        } else {
+          const conflict = existingSubs.find(
+            (sub) => sub.name?.toLowerCase() === normalized,
+          );
+          if (conflict)
+            throw new ConflictException(
+              `Sub-category with name: ${label} already exists`,
+            );
+          const newSub = this.subCategoryRepository.create({
+            uuid: v4(),
+            name: label,
+            mainCategory: categoryExists,
+          });
+          this.em.persist(newSub);
+          existingSubs.push(newSub);
+        }
+      }
+    }
+    await this.em.flush();
+    return { status: true };
+  }
+
+  async deleteMainCategory(uuid: string, dto: AdminDeleteMainCategoryDto) {
+    const categoryExists = await this.mainCategoryRepository.findOne({ uuid });
+    if (!categoryExists)
+      throw new NotFoundException(`Main category does not exist`);
+    const subCategories = await this.subCategoryRepository.find({
+      mainCategory: categoryExists,
+    });
+    const subCategoryUuids = subCategories.map((sub) => sub.uuid);
+    if (subCategoryUuids.length) {
+      const placeholders = subCategoryUuids.map(() => '?').join(',');
+      const [countRow] = await this.em
+        .getConnection()
+        .execute(
+          `select count(*) as total from users where primary_job_role in (${placeholders})`,
+          subCategoryUuids,
+        );
+      const assignedCount = Number(countRow?.total ?? 0);
+      if (assignedCount > 0) {
+        if (!dto?.alternativeSubCategoryUuid)
+          throw new BadRequestException(
+            'An alternative sub-category must be provided to reassign providers before deleting this main category',
+          );
+        if (subCategoryUuids.includes(dto.alternativeSubCategoryUuid))
+          throw new BadRequestException(
+            'Alternative sub-category cannot be one that is being deleted',
+          );
+        const alternative = await this.subCategoryRepository.findOne({
+          uuid: dto.alternativeSubCategoryUuid,
+        });
+        if (!alternative)
+          throw new NotFoundException('Alternative sub-category not found');
+        const placeholders = subCategoryUuids.map(() => '?').join(',');
+        await this.em
+          .getConnection()
+          .execute(
+            `update users set primary_job_role = ? where primary_job_role in (${placeholders})`,
+            [alternative.uuid, ...subCategoryUuids],
+          );
+      }
+    }
     await this.subCategoryRepository.nativeDelete({ mainCategory: { uuid } });
+    await this.mainCategoryRepository.nativeDelete({ uuid });
     return { status: true };
   }
 
@@ -3200,9 +3378,50 @@ export class AdminService {
     return { status: true };
   }
 
-  async deleteSubCategory(uuid: string) {
+  async deleteSubCategory(uuid: string, dto: AdminDeleteSubCategoryDto) {
+    const categoryExists = await this.subCategoryRepository.findOne({ uuid });
+    if (!categoryExists)
+      throw new NotFoundException(`Sub-category does not exist`);
+    const [countRow] = await this.em
+      .getConnection()
+      .execute('select count(*) as total from users where primary_job_role = ?', [
+        uuid,
+      ]);
+    const assignedCount = Number(countRow?.total ?? 0);
+    if (assignedCount > 0) {
+      if (!dto?.alternativeSubCategoryUuid)
+        throw new BadRequestException(
+          'An alternative sub-category must be provided to reassign providers before deleting this sub-category',
+        );
+      if (dto.alternativeSubCategoryUuid === uuid)
+        throw new BadRequestException(
+          'Alternative sub-category must be different from the one being deleted',
+        );
+      const alternative = await this.subCategoryRepository.findOne({
+        uuid: dto.alternativeSubCategoryUuid,
+      });
+      if (!alternative)
+        throw new NotFoundException('Alternative sub-category not found');
+      await this.em
+        .getConnection()
+        .execute('update users set primary_job_role = ? where primary_job_role = ?', [
+          alternative.uuid,
+          uuid,
+        ]);
+    }
     await this.subCategoryRepository.nativeDelete({ uuid });
     return { status: true };
+  }
+
+  async fetchReasonCategories(dto: AdminFetchReasonCategoriesDto) {
+    const where: FilterQuery<ReasonCategory> = {};
+    if (dto?.type) {
+      where.type = dto.type;
+    }
+    const items = await this.reasonCategoryRepository.find(where, {
+      orderBy: { name: QueryOrder.ASC },
+    });
+    return { status: true, data: items };
   }
 
   async createReasonCategory(dto: CreateReasonCategory) {
@@ -3226,6 +3445,97 @@ export class AdminService {
 
   async deleteReasonCategory(uuid: string) {
     await this.reasonCategoryRepository.nativeDelete({ uuid });
+    return { status: true };
+  }
+
+  async listAccountTiers() {
+    const tiers = await this.accountTierRepository.findAll({
+      orderBy: { displayOrder: QueryOrder.ASC, createdAt: QueryOrder.ASC },
+    });
+    return { status: true, data: tiers };
+  }
+
+  async createAccountTier(dto: AdminCreateAccountTierDto) {
+    const existing = await this.accountTierRepository.findOne({
+      tier: dto.tier,
+    });
+    if (existing)
+      throw new ConflictException(
+        `Tier configuration for ${dto.tier} already exists`,
+      );
+    const model = this.accountTierRepository.create({
+      uuid: v4(),
+      tier: dto.tier,
+      label: dto.label,
+      levelLabel: dto.levelLabel,
+      description: dto.description,
+      minJobs: dto.minJobs ?? 0,
+      minAvgRating: dto.minAvgRating ?? 0,
+      displayOrder: dto.displayOrder ?? 0,
+    });
+    this.em.persist(model);
+    await this.em.flush();
+    return { status: true, data: model };
+  }
+
+  async updateAccountTier(uuid: string, dto: AdminUpdateAccountTierDto) {
+    const tier = await this.accountTierRepository.findOne({ uuid });
+    if (!tier) throw new NotFoundException('Tier configuration not found');
+    if (dto.tier && dto.tier !== tier.tier) {
+      const conflict = await this.accountTierRepository.findOne({
+        tier: dto.tier,
+        uuid: { $ne: uuid },
+      });
+      if (conflict)
+        throw new ConflictException(
+          `Tier configuration for ${dto.tier} already exists`,
+        );
+      tier.tier = dto.tier;
+    }
+    if (dto.label !== undefined) tier.label = dto.label;
+    if (dto.levelLabel !== undefined) tier.levelLabel = dto.levelLabel;
+    if (dto.description !== undefined) tier.description = dto.description;
+    if (dto.minJobs !== undefined) tier.minJobs = dto.minJobs;
+    if (dto.minAvgRating !== undefined) tier.minAvgRating = dto.minAvgRating;
+    if (dto.displayOrder !== undefined) tier.displayOrder = dto.displayOrder;
+    await this.em.flush();
+    return { status: true, data: tier };
+  }
+
+  async deleteAccountTier(uuid: string) {
+    await this.accountTierRepository.nativeDelete({ uuid });
+    return { status: true };
+  }
+
+  async listJobTips() {
+    const tips = await this.jobTipRepository.findAll({
+      orderBy: { createdAt: QueryOrder.ASC },
+    });
+    return { status: true, data: tips };
+  }
+
+  async createJobTip(dto: AdminCreateJobTipDto) {
+    const tip = this.jobTipRepository.create({
+      uuid: v4(),
+      title: dto.title,
+      description: dto.description,
+    });
+    this.em.persist(tip);
+    await this.em.flush();
+    return { status: true, data: tip };
+  }
+
+  async updateJobTip(uuid: string, dto: AdminUpdateJobTipDto) {
+    const tip = await this.jobTipRepository.findOne({ uuid });
+    if (!tip) throw new NotFoundException('Job tip not found');
+    if (dto.title !== undefined) tip.title = dto.title;
+    if (dto.description !== undefined) tip.description = dto.description;
+    await this.em.flush();
+    return { status: true, data: tip };
+  }
+
+  async deleteJobTip(uuid: string) {
+    await this.jobTipRepository.nativeDelete({ uuid });
     return { status: true };
   }
 }

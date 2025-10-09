@@ -10,7 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AdminJwtAuthGuard } from './guards/jwt-auth-guard';
 import { AdminService } from './admin.service';
 import { AllowUnauthorizedRequest } from 'src/decorators/unauthorized.decorator';
@@ -18,12 +18,19 @@ import { AdminLocalAuthGuard } from './guards/local-auth-guard';
 import { AdminPermissionsGuard } from './guards/permissions.guard';
 import { RequireAdminPermissions } from './decorators/permissions.decorator';
 import * as dtos from './dto';
-import { MainCategory, SubCategory } from './admin.entities';
+import {
+  AccountTierSetting,
+  JobTip,
+  MainCategory,
+  ReasonCategory,
+  SubCategory,
+} from './admin.entities';
 import { extractTokenFromReq } from 'src/utils';
 import { Request } from 'express';
 
 @Controller('admin')
 @ApiTags('admin')
+@ApiBearerAuth()
 @UseGuards(AdminJwtAuthGuard, AdminPermissionsGuard)
 export class AdminController {
   constructor(private readonly service: AdminService) {}
@@ -469,6 +476,14 @@ export class AdminController {
     return this.service.createMainCategory(body);
   }
 
+  @Post('categories')
+  @RequireAdminPermissions('settings.view')
+  createMainCategoryWithSubs(
+    @Body() body: dtos.AdminCreateMainCategoryWithSubsDto,
+  ) {
+    return this.service.createMainCategoryWithSubCategories(body);
+  }
+
   @Get('main-categories')
   @ApiOkResponse({
     type: MainCategory,
@@ -489,10 +504,23 @@ export class AdminController {
     return this.service.editMainCategory(uuid, body);
   }
 
+  @Patch('categories/:uuid')
+  @RequireAdminPermissions('settings.view')
+  updateMainCategoryWithSubs(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminUpdateMainCategoryWithSubsDto,
+  ) {
+    return this.service.updateMainCategoryWithSubCategories(uuid, body);
+  }
+
   @Post('main-category/:uuid/delete')
   @RequireAdminPermissions('settings.view')
-  deleteMainCategory(@Param('uuid') uuid: string) {
-    return this.service.deleteMainCategory(uuid);
+  @ApiBody({ type: dtos.AdminDeleteMainCategoryDto })
+  deleteMainCategory(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminDeleteMainCategoryDto,
+  ) {
+    return this.service.deleteMainCategory(uuid, body);
   }
 
   @Post('sub-category')
@@ -523,8 +551,12 @@ export class AdminController {
 
   @Post('sub-category/:uuid/delete')
   @RequireAdminPermissions('settings.view')
-  deleteSubCategory(@Param('uuid') uuid: string) {
-    return this.service.deleteSubCategory(uuid);
+  @ApiBody({ type: dtos.AdminDeleteSubCategoryDto })
+  deleteSubCategory(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminDeleteSubCategoryDto,
+  ) {
+    return this.service.deleteSubCategory(uuid, body);
   }
 
   @Post('reason-category')
@@ -533,9 +565,84 @@ export class AdminController {
     return this.service.createReasonCategory(body);
   }
 
+  @Get('reason-categories')
+  @RequireAdminPermissions('settings.view')
+  @ApiOkResponse({
+    type: ReasonCategory,
+    isArray: true,
+    description: 'Reason categories fetched successfully',
+  })
+  fetchReasonCategories(@Query() query: dtos.AdminFetchReasonCategoriesDto) {
+    return this.service.fetchReasonCategories(query);
+  }
+
   @Post('reason-category/:uuid/delete')
   @RequireAdminPermissions('settings.view')
   deleteReasonCategory(@Param('uuid') uuid: string) {
     return this.service.deleteReasonCategory(uuid);
+  }
+
+  @Get('account-tiers')
+  @RequireAdminPermissions('settings.view')
+  @ApiOkResponse({
+    type: AccountTierSetting,
+    isArray: true,
+    description: 'Tier configurations fetched successfully',
+  })
+  listAccountTiers() {
+    return this.service.listAccountTiers();
+  }
+
+  @Post('account-tiers')
+  @RequireAdminPermissions('settings.view')
+  createAccountTier(@Body() body: dtos.AdminCreateAccountTierDto) {
+    return this.service.createAccountTier(body);
+  }
+
+  @Patch('account-tiers/:uuid')
+  @RequireAdminPermissions('settings.view')
+  updateAccountTier(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminUpdateAccountTierDto,
+  ) {
+    return this.service.updateAccountTier(uuid, body);
+  }
+
+  @Delete('account-tiers/:uuid')
+  @RequireAdminPermissions('settings.view')
+  removeAccountTier(@Param('uuid') uuid: string) {
+    return this.service.deleteAccountTier(uuid);
+  }
+
+  @Get('job-tips')
+  @RequireAdminPermissions('settings.view')
+  @ApiOkResponse({
+    type: JobTip,
+    isArray: true,
+    description: 'Job tips fetched successfully',
+  })
+  listJobTips() {
+    return this.service.listJobTips();
+  }
+
+  @Post('job-tips')
+  @RequireAdminPermissions('settings.view')
+  createJobTip(@Body() body: dtos.AdminCreateJobTipDto) {
+    return this.service.createJobTip(body);
+  }
+
+  @Patch('job-tips/:uuid')
+  @RequireAdminPermissions('settings.view')
+  updateJobTip(
+    @Param('uuid') uuid: string,
+    @Body() body: dtos.AdminUpdateJobTipDto,
+  ) {
+    return this.service.updateJobTip(uuid, body);
+  }
+
+  @Delete('job-tips/:uuid')
+  @RequireAdminPermissions('settings.view')
+  deleteJobTip(@Param('uuid') uuid: string) {
+    return this.service.deleteJobTip(uuid);
   }
 }

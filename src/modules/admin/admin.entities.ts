@@ -11,7 +11,7 @@ import {
   Unique,
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
-import { ReasonCategoryType } from '../../types';
+import { AccountTier, ReasonCategoryType } from '../../types';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Filter({
@@ -179,4 +179,54 @@ export class ReasonCategory extends Timestamp {
     nullable: true,
   })
   type: ReasonCategoryType;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'account_tier_settings' })
+export class AccountTierSetting extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @ApiProperty({ enum: AccountTier })
+  @Enum({ items: () => AccountTier })
+  tier: AccountTier;
+
+  @Property({ nullable: true })
+  label?: string;
+
+  @Property({ nullable: true })
+  levelLabel?: string;
+
+  @Property({ nullable: true })
+  description?: string;
+
+  @Property({ columnType: 'int', default: 0 })
+  minJobs: number;
+
+  @Property({ columnType: 'decimal(5,2)', default: 0 })
+  minAvgRating: number;
+
+  @Property({ columnType: 'int', default: 0 })
+  displayOrder: number;
+}
+
+@Filter({
+  name: 'notDeleted',
+  cond: { deletedAt: null },
+  default: true,
+})
+@Entity({ tableName: 'job_tips' })
+export class JobTip extends Timestamp {
+  @PrimaryKey()
+  uuid: string;
+
+  @Property()
+  title: string;
+
+  @Property({ type: 'longtext', nullable: true })
+  description?: string;
 }

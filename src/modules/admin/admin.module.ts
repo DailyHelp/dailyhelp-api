@@ -1,9 +1,11 @@
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Module } from '@nestjs/common';
 import {
+  AccountTierSetting,
   AdminPermission,
   AdminRole,
   AdminUser,
+  JobTip,
   MainCategory,
   ReasonCategory,
   SubCategory,
@@ -37,6 +39,8 @@ import { AdminPermissionsGuard } from './guards/permissions.guard';
         MainCategory,
         SubCategory,
         ReasonCategory,
+        AccountTierSetting,
+        JobTip,
         OTP,
         Users,
         Job,

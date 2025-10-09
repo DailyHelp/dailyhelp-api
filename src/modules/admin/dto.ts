@@ -1,6 +1,7 @@
 import {
   ArrayNotEmpty,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -15,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
+  AccountTier,
   DisputeResolutionAction,
   DisputeStatus,
   JobStatus,
@@ -577,4 +579,141 @@ export class CreateReasonCategory {
   @ApiProperty({ enum: ReasonCategoryType, enumName: 'ReasonCategoryType' })
   @IsEnum(ReasonCategoryType)
   type: ReasonCategoryType;
+}
+
+export class AdminUpsertSubCategoryDto {
+  @IsOptional()
+  @IsUUID('4')
+  uuid?: string;
+
+  @IsString()
+  name: string;
+}
+
+export class AdminCreateMainCategoryWithSubsDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  icon: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminUpsertSubCategoryDto)
+  subCategories?: AdminUpsertSubCategoryDto[];
+}
+
+export class AdminUpdateMainCategoryWithSubsDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminUpsertSubCategoryDto)
+  subCategories?: AdminUpsertSubCategoryDto[];
+}
+
+export class AdminDeleteSubCategoryDto {
+  @IsOptional()
+  @IsUUID('4')
+  alternativeSubCategoryUuid?: string;
+}
+
+export class AdminDeleteMainCategoryDto {
+  @IsOptional()
+  @IsUUID('4')
+  alternativeSubCategoryUuid?: string;
+}
+
+export class AdminFetchReasonCategoriesDto {
+  @IsOptional()
+  @IsEnum(ReasonCategoryType)
+  type?: ReasonCategoryType;
+}
+
+export class AdminCreateAccountTierDto {
+  @IsEnum(AccountTier)
+  tier: AccountTier;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
+
+  @IsOptional()
+  @IsString()
+  levelLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minJobs?: number;
+
+  @IsOptional()
+  @IsNumber()
+  minAvgRating?: number;
+
+  @IsOptional()
+  @IsInt()
+  displayOrder?: number;
+}
+
+export class AdminUpdateAccountTierDto {
+  @IsOptional()
+  @IsEnum(AccountTier)
+  tier?: AccountTier;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
+
+  @IsOptional()
+  @IsString()
+  levelLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minJobs?: number;
+
+  @IsOptional()
+  @IsNumber()
+  minAvgRating?: number;
+
+  @IsOptional()
+  @IsInt()
+  displayOrder?: number;
+}
+
+export class AdminCreateJobTipDto {
+  @IsString()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class AdminUpdateJobTipDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

@@ -3,6 +3,7 @@ import {
   EntityManager,
   EntityRepository,
   FilterQuery,
+  QueryOrder,
   wrap,
 } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
@@ -22,6 +23,7 @@ import {
   Feedback,
   Users,
 } from './users.entity';
+import { AccountTierSetting } from '../admin/admin.entities';
 import { SharedService } from '../shared/shared.service';
 import {
   BankAccountDto,
@@ -117,6 +119,8 @@ export class UsersService {
     private readonly reportRepository: EntityRepository<Report>,
     @InjectRepository(SubCategory)
     private readonly subCategoryRepository: EntityRepository<SubCategory>,
+    @InjectRepository(AccountTierSetting)
+    private readonly accountTierRepository: EntityRepository<AccountTierSetting>,
     @InjectRepository(Wallet)
     private readonly walletRepository: EntityRepository<Wallet>,
     @InjectRepository(Transaction)
@@ -380,15 +384,17 @@ export class UsersService {
     `,
       [uuid, uuid],
     );
-    let jobGoal = 15;
-    switch (user.tier) {
-      case AccountTier.SILVER:
-        jobGoal = 50;
-        break;
-      case AccountTier.GOLD:
-        jobGoal = 200;
-        break;
-    }
+    const tierSettings = await this.accountTierRepository.findAll({
+      orderBy: { displayOrder: QueryOrder.ASC, minJobs: QueryOrder.ASC },
+    });
+    const currentIndex = tierSettings.findIndex(
+      (setting) => setting.tier === user.tier,
+    );
+    const currentSetting =
+      currentIndex >= 0 ? tierSettings[currentIndex] : null;
+    const nextSetting =
+      currentIndex >= 0 ? tierSettings[currentIndex + 1] ?? null : null;
+    const jobGoal = nextSetting?.minJobs ?? currentSetting?.minJobs ?? 0;
     return { status: true, data: { user, ...providerStats[0], jobGoal } };
   }
 

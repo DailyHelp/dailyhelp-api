@@ -28,7 +28,7 @@ import { JobReview } from 'src/entities/job-review.entity';
 import { ExpiredJwtStrategy } from 'src/strategies/expired-jwt.strategy';
 import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { JwtModule } from '@nestjs/jwt';
-import { SubCategory } from '../admin/admin.entities';
+import { AccountTierSetting, SubCategory } from '../admin/admin.entities';
 import { Transaction, Wallet } from '../wallet/wallet.entity';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import { ProvidersController } from './providers.controller';
@@ -54,6 +54,7 @@ import { WsModule } from '../ws/ws.module';
         Report,
         JobTimeline,
         SubCategory,
+        AccountTierSetting,
         Wallet,
         Transaction,
         JobDispute,

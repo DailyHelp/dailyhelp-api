@@ -11,6 +11,7 @@ import { Conversation } from '../conversations/conversations.entity';
 import { ProviderJobsController } from './provider-jobs.controller';
 import { JobReport } from './job-reports.entity';
 import { WsModule } from '../ws/ws.module';
+import { AccountTierSetting } from '../admin/admin.entities';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { WsModule } from '../ws/ws.module';
         JobDispute,
         Conversation,
         JobReport,
+        AccountTierSetting,
       ],
     }),
     WsModule,

@@ -37,6 +37,7 @@ import { JobReview } from 'src/entities/job-review.entity';
 import { JobDispute } from './job-dispute.entity';
 import { Conversation } from '../conversations/conversations.entity';
 import { JobReport } from './job-reports.entity';
+import { AccountTierSetting } from '../admin/admin.entities';
 import { SocketGateway } from '../ws/socket.gateway';
 import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
 
@@ -62,6 +63,8 @@ export class JobService {
     private readonly conversationRepository: EntityRepository<Conversation>,
     @InjectRepository(JobReport)
     private readonly jobReportRepository: EntityRepository<JobReport>,
+    @InjectRepository(AccountTierSetting)
+    private readonly accountTierRepository: EntityRepository<AccountTierSetting>,
     private readonly ws: SocketGateway,
   ) {}
 
@@ -385,49 +388,9 @@ export class JobService {
       this.em.persist(requestorTransactionModel);
     }
     await this.em.flush();
-    const providerProgress = await this.em.getConnection().execute(`
-      SELECT
-        u.uuid,
-        u.tier AS currentTier,
-        COUNT(j.uuid) AS ratedCompletedJobs,
-        ROUND(AVG(r.rating), 2) AS avgRating,
-
-        CASE
-          WHEN COUNT(j.uuid) >= 200 AND AVG(r.rating) >= 4 THEN 'PLATINUM'
-          WHEN COUNT(j.uuid) >= 50 AND AVG(r.rating) >= 4 THEN 'GOLD'
-          WHEN COUNT(j.uuid) >= 15 AND AVG(r.rating) >= 4 THEN 'SILVER'
-          ELSE 'BRONZE'
-        END AS eligibleTier,
-
-        CASE 
-          WHEN u.tier = 'BRONZE' AND AVG(r.rating) >= 4 THEN
-            CONCAT(LEAST(ROUND(100 * COUNT(j.uuid) / 15, 0), 100), '%')
-          WHEN u.tier = 'SILVER' AND AVG(r.rating) >= 4 THEN
-            CONCAT(LEAST(ROUND(100 * (COUNT(j.uuid) - 15) / (50 - 15), 0), 100), '%')
-          WHEN u.tier = 'GOLD' AND AVG(r.rating) >= 4 THEN
-            CONCAT(LEAST(ROUND(100 * (COUNT(j.uuid) - 50) / (200 - 50), 0), 100), '%')
-          ELSE '0%'
-        END AS progressToNextTier,
-
-        CASE 
-          WHEN u.tier = 'BRONZE' THEN 'SILVER'
-          WHEN u.tier = 'SILVER' THEN 'GOLD'
-          WHEN u.tier = 'GOLD' THEN 'PLATINUM'
-          ELSE NULL
-        END AS nextTier
-
-      FROM users u
-      LEFT JOIN jobs j ON j.service_provider = u.uuid AND j.status = 'completed'
-      LEFT JOIN job_reviews r ON r.job = j.uuid AND r.reviewed_for = u.uuid
-      WHERE u.uuid = '${job.serviceProvider?.uuid}'
-      GROUP BY u.uuid, u.tier;
-    `);
-    provider.tier = providerProgress[0].eligibleTier;
-    provider.ratedCompletedJobs = providerProgress[0].ratedCompletedJobs;
-    provider.avgRating = providerProgress[0].avgRating;
-    provider.progressToNextTier = providerProgress[0].progressToNextTier;
-    provider.nextTier = providerProgress[0].nextTier;
-    this.em.flush();
+    if (provider?.uuid) {
+      await this.recalculateProviderTier(provider.uuid);
+    }
     return { status: true };
   }
 
@@ -554,6 +517,89 @@ export class JobService {
       .map((type) => type.trim())
       .filter((type) => type.length > 0)[0];
     return primary ? (primary.toUpperCase() as UserType) : null;
+  }
+
+  private computeTierProgress(
+    completedJobs: number,
+    avgRating: number,
+    current: AccountTierSetting | null,
+    next: AccountTierSetting,
+  ) {
+    const currentJobs = current?.minJobs ?? 0;
+    const nextJobs = next.minJobs ?? 0;
+    const jobWindow = Math.max(0, nextJobs - currentJobs);
+    const jobsDelta = Math.max(0, completedJobs - currentJobs);
+    const jobProgress = jobWindow
+      ? Math.min(1, jobsDelta / jobWindow)
+      : 1;
+
+    const currentRating = current?.minAvgRating ?? 0;
+    const nextRating = next.minAvgRating ?? 0;
+    const ratingWindow = Math.max(0, nextRating - currentRating);
+    const ratingDelta = Math.max(0, avgRating - currentRating);
+    const ratingProgress = ratingWindow
+      ? Math.min(1, ratingDelta / ratingWindow)
+      : 1;
+
+    const progress = Math.min(jobProgress, ratingProgress);
+    return `${Math.min(100, Math.round(progress * 100))}%`;
+  }
+
+  private async recalculateProviderTier(providerUuid: string) {
+    const tierSettings = await this.accountTierRepository.findAll({
+      orderBy: { displayOrder: QueryOrder.ASC, minJobs: QueryOrder.ASC },
+    });
+    if (!tierSettings.length) return;
+
+    const [stats] = await this.em.getConnection().execute(
+      `
+        SELECT
+          COUNT(CASE WHEN j.status = 'completed' THEN j.uuid END) AS completedJobs,
+          COUNT(r.uuid) AS ratedCompletedJobs,
+          ROUND(AVG(r.rating), 2) AS avgRating
+        FROM jobs j
+        LEFT JOIN job_reviews r
+          ON r.job = j.uuid
+          AND r.reviewed_for = ?
+        WHERE j.service_provider = ?
+      `,
+      [providerUuid, providerUuid],
+    );
+
+    const completedJobs = Number(stats?.completedJobs ?? 0);
+    const ratedCompletedJobs = Number(stats?.ratedCompletedJobs ?? 0);
+    const avgRating = Number(stats?.avgRating ?? 0) || 0;
+
+    let resolvedIndex = 0;
+    for (let index = 0; index < tierSettings.length; index += 1) {
+      const setting = tierSettings[index];
+      const meetsJobs = completedJobs >= (setting.minJobs ?? 0);
+      const meetsRating = avgRating >= (setting.minAvgRating ?? 0);
+      if (meetsJobs && meetsRating) {
+        resolvedIndex = index;
+      }
+    }
+
+    const resolvedSetting = tierSettings[resolvedIndex];
+    const nextSetting = tierSettings[resolvedIndex + 1] ?? null;
+
+    const provider = await this.usersRepository.findOne({ uuid: providerUuid });
+    if (!provider) return;
+
+    provider.tier = resolvedSetting.tier;
+    provider.completedJobs = completedJobs;
+    provider.ratedCompletedJobs = ratedCompletedJobs;
+    provider.avgRating = avgRating;
+    provider.nextTier = nextSetting ? nextSetting.tier : resolvedSetting.tier;
+    provider.progressToNextTier = nextSetting
+      ? this.computeTierProgress(
+          completedJobs,
+          avgRating,
+          resolvedSetting,
+          nextSetting,
+        )
+      : '100%';
+    await this.em.flush();
   }
 
   async disputeJob(
