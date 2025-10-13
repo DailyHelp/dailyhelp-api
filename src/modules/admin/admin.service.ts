@@ -167,6 +167,14 @@ export class AdminService {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 
+  private toNullableNumber(value: unknown) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const numeric = Number(value);
+    return Number.isNaN(numeric) ? null : numeric;
+  }
+
   private collectPermissionCodesFromRoles(roles: AdminRole[]) {
     const permissionSet = new Set<string>();
     roles.forEach((role) => {
@@ -745,12 +753,15 @@ export class AdminService {
     };
     const monthsSeries = this.buildMonthlySeries(monthlyEnd);
 
-    const financialsParams: any[] = [];
-    const financialsWhere = this.buildDateWhere(
+    const commissionRate = this.platformCommissionRate;
+    const paymentTotalsParams: any[] = [];
+    const paymentTotalsWhere = this.buildDateWhere(
       'p.created_at',
       range,
-      financialsParams,
+      paymentTotalsParams,
     );
+    const commissionParams: any[] = [commissionRate];
+    const commissionWhere = this.buildDateWhere('j.end_date', range, commissionParams);
     const usersParams: any[] = [];
     const usersWhere = this.buildDateWhere('u.created_at', range, usersParams);
     const jobsParams: any[] = [];
@@ -761,11 +772,17 @@ export class AdminService {
       range,
       categoryParams,
     );
-    const monthlyRevenueParams: any[] = [];
-    const monthlyRevenueWhere = this.buildDateWhere(
+    const monthlyCommissionParams: any[] = [commissionRate];
+    const monthlyCommissionWhere = this.buildDateWhere(
+      'COALESCE(j.end_date, j.created_at)',
+      range,
+      monthlyCommissionParams,
+    );
+    const monthlyIncomingParams: any[] = [];
+    const monthlyIncomingWhere = this.buildDateWhere(
       'p.created_at',
       monthlyRange,
-      monthlyRevenueParams,
+      monthlyIncomingParams,
     );
     const customerGrowthParams: any[] = [];
     const customerGrowthWhere = this.buildDateWhere(
@@ -784,18 +801,6 @@ export class AdminService {
       'u.created_at',
       range,
       providersByCategoryParams,
-    );
-    const tierParams: any[] = [];
-    const tierWhere = this.buildDateWhere(
-      'u.created_at',
-      range,
-      tierParams,
-    );
-    const ratingParams: any[] = [];
-    const ratingWhere = this.buildDateWhere(
-      'u.created_at',
-      range,
-      ratingParams,
     );
 
     const categoriesPagination = this.resolvePagination(
@@ -825,7 +830,7 @@ export class AdminService {
       SELECT
         sc.uuid,
         sc.name,
-        COALESCE(SUM(CASE WHEN j.status = 'COMPLETED' THEN j.price ELSE 0 END), 0) AS revenue
+        COALESCE(SUM(CASE WHEN j.status = 'COMPLETED' THEN j.price * ? ELSE 0 END), 0) AS revenue
       ${categoryBaseSql}
       ORDER BY revenue DESC, sc.name ASC
       LIMIT ? OFFSET ?
@@ -893,24 +898,36 @@ export class AdminService {
     `;
 
     const [
-      financials,
+      paymentTotalsRows,
+      jobCommissionRows,
       userTotals,
       jobStatusRows,
-      monthlyRevenueRows,
+      monthlyCommissionRows,
+      monthlyIncomingRows,
       customerGrowthRows,
-      tierRows,
       ratingRows,
     ] = await Promise.all([
       connection.execute(
         `
           SELECT
-            COALESCE(SUM(CASE WHEN p.type = 'INCOMING' THEN p.amount ELSE 0 END), 0) AS totalRevenue,
-            COALESCE(SUM(CASE WHEN p.type = 'OUTGOING' THEN p.amount ELSE 0 END), 0) AS totalPayout
+            COALESCE(SUM(CASE WHEN p.type = 'OUTGOING' THEN p.amount ELSE 0 END), 0) AS totalPayout,
+            COALESCE(SUM(CASE WHEN p.type = 'INCOMING' THEN p.amount ELSE 0 END), 0) AS totalIncoming
           FROM payments p
           WHERE p.deleted_at IS NULL
-          ${financialsWhere ? `AND ${financialsWhere}` : ''}
+            AND LOWER(COALESCE(p.status, '')) = 'success'
+          ${paymentTotalsWhere ? `AND ${paymentTotalsWhere}` : ''}
         `,
-        financialsParams,
+        paymentTotalsParams,
+      ),
+      connection.execute(
+        `
+          SELECT
+            COALESCE(SUM(CASE WHEN j.status = 'COMPLETED' THEN j.price * ? ELSE 0 END), 0) AS jobCommission
+          FROM jobs j
+          WHERE j.deleted_at IS NULL
+          ${commissionWhere ? `AND ${commissionWhere}` : ''}
+        `,
+        commissionParams,
       ),
       connection.execute(
         `
@@ -936,56 +953,39 @@ export class AdminService {
       connection.execute(
         `
           SELECT
-            sc.uuid,
-            sc.name,
-            COALESCE(SUM(CASE WHEN j.status = 'COMPLETED' THEN j.price ELSE 0 END), 0) AS revenue
-          FROM sub_categories sc
-          LEFT JOIN users u ON u.primary_job_role = sc.uuid
-            AND u.deleted_at IS NULL
-            AND LOWER(COALESCE(u.user_types, '')) LIKE '%provider%'
-          LEFT JOIN jobs j ON j.service_provider = u.uuid
-            AND j.deleted_at IS NULL
+            DATE_FORMAT(COALESCE(j.end_date, j.created_at), '%Y-%m-01') AS month,
+            COALESCE(SUM(CASE WHEN j.status = 'COMPLETED' THEN j.price * ? ELSE 0 END), 0) AS totalRevenue
+          FROM jobs j
+          WHERE j.deleted_at IS NULL
             AND j.status = 'COMPLETED'
-            ${categoryJobDate ? `AND ${categoryJobDate}` : ''}
-          WHERE sc.deleted_at IS NULL
-          GROUP BY sc.uuid, sc.name
-          ORDER BY revenue DESC, sc.name ASC
+            ${monthlyCommissionWhere ? `AND ${monthlyCommissionWhere}` : ''}
+            AND COALESCE(j.end_date, j.created_at) IS NOT NULL
+          GROUP BY DATE_FORMAT(COALESCE(j.end_date, j.created_at), '%Y-%m-01')
         `,
-        categoryParams,
+        monthlyCommissionParams,
       ),
       connection.execute(
         `
-          SELECT DATE_FORMAT(p.created_at, '%Y-%m-01') AS month, COALESCE(SUM(p.amount), 0) AS total
+          SELECT
+            DATE_FORMAT(p.created_at, '%Y-%m-01') AS month,
+            COALESCE(SUM(CASE WHEN p.type = 'INCOMING' THEN p.amount ELSE 0 END), 0) AS totalIncoming
           FROM payments p
           WHERE p.deleted_at IS NULL
-            AND p.type = 'INCOMING'
-            ${monthlyRevenueWhere ? `AND ${monthlyRevenueWhere}` : ''}
+            AND LOWER(COALESCE(p.status, '')) = 'success'
+          ${monthlyIncomingWhere ? `AND ${monthlyIncomingWhere}` : ''}
           GROUP BY DATE_FORMAT(p.created_at, '%Y-%m-01')
         `,
-        monthlyRevenueParams,
+        monthlyIncomingParams,
       ),
       connection.execute(
         `
           SELECT DATE_FORMAT(u.created_at, '%Y-%m-01') AS month, COUNT(*) AS total
           FROM users u
           WHERE u.deleted_at IS NULL
-            AND LOWER(COALESCE(u.user_types, '')) LIKE '%customer%'
-            ${customerGrowthWhere ? `AND ${customerGrowthWhere}` : ''}
+          ${customerGrowthWhere ? `AND ${customerGrowthWhere}` : ''}
           GROUP BY DATE_FORMAT(u.created_at, '%Y-%m-01')
         `,
         customerGrowthParams,
-      ),
-      connection.execute(
-        `
-          SELECT u.tier AS tier, COUNT(*) AS total
-          FROM users u
-          WHERE u.deleted_at IS NULL
-            AND LOWER(COALESCE(u.user_types, '')) LIKE '%provider%'
-            ${tierWhere ? `AND ${tierWhere}` : ''}
-          GROUP BY u.tier
-          ORDER BY total DESC, u.tier ASC
-        `,
-        tierParams,
       ),
       connection.execute(
         `
@@ -994,21 +994,21 @@ export class AdminService {
           WHERE u.deleted_at IS NULL
             AND u.avg_rating IS NOT NULL
             AND LOWER(COALESCE(u.user_types, '')) LIKE '%provider%'
-            ${ratingWhere ? `AND ${ratingWhere}` : ''}
           GROUP BY ROUND(u.avg_rating * 2) / 2
           HAVING rating BETWEEN 1 AND 5
+          ORDER BY rating DESC
         `,
-        ratingParams,
       ),
     ]);
 
     const categorySelectParams = [
+      commissionRate,
       ...categoryParams,
       categoriesPagination.limit,
       categoriesPagination.offset,
     ];
     const categoryCountParams = [...categoryParams];
-    const [categoryRevenueRows, categoryTotalRows] = await Promise.all([
+    const [categoryPageRows, categoryTotalRows] = await Promise.all([
       connection.execute(categorySelectSql, categorySelectParams),
       connection.execute(categoryCountSql, categoryCountParams),
     ]);
@@ -1036,9 +1036,12 @@ export class AdminService {
         connection.execute(providersCountSql, providersCountParams),
       ]);
 
-    const financialsRow: any = financials[0] ?? {};
-    const totalRevenue = Number(financialsRow.totalRevenue ?? 0);
-    const totalPayout = Number(financialsRow.totalPayout ?? 0);
+    const totalPayout = Number(paymentTotalsRows[0]?.totalPayout ?? 0);
+    const totalIncomingPayments = Number(
+      paymentTotalsRows[0]?.totalIncoming ?? 0,
+    );
+    const jobCommission = Number(jobCommissionRows[0]?.jobCommission ?? 0);
+    const totalRevenue = jobCommission;
 
     const userTotalsRow: any = userTotals[0] ?? {};
     const totalCustomers = Number(userTotalsRow.customers ?? 0);
@@ -1070,7 +1073,7 @@ export class AdminService {
     }
 
     const categoriesTotal = Number(categoryTotalRows[0]?.total ?? 0);
-    const revenueByCategoryItems = (categoryRevenueRows as any[]).map((row) => ({
+    const revenueByCategoryItems = (categoryPageRows as any[]).map((row) => ({
       uuid: row.uuid,
       name: row.name,
       revenue: Number(row.revenue ?? 0),
@@ -1081,18 +1084,74 @@ export class AdminService {
       categoriesPagination,
     );
 
-    const monthlyRevenueMap = new Map(
-      (monthlyRevenueRows as any[]).map((row) => [row.month, Number(row.total ?? 0)]),
-    );
+    const monthlyRevenueMap = new Map<string, number>();
+    (monthlyCommissionRows as any[]).forEach((row) => {
+      const rawMonth = row.month;
+      if (!rawMonth) {
+        return;
+      }
+      const parsed = new Date(rawMonth);
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+      const key = this.formatMonthKey(parsed);
+      const revenueTotal = Number(row.totalRevenue ?? row.total ?? 0);
+      monthlyRevenueMap.set(key, revenueTotal);
+    });
+
+    const monthlyAmountProcessedMap = new Map<string, number>();
+    (monthlyIncomingRows as any[]).forEach((row) => {
+      const rawMonth = row.month;
+      if (!rawMonth) {
+        return;
+      }
+      const parsed = new Date(rawMonth);
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+      const key = this.formatMonthKey(parsed);
+      const processedTotal = Number(
+        row.totalIncoming ?? row.total ?? 0,
+      );
+      monthlyAmountProcessedMap.set(key, processedTotal);
+    });
+
     const revenueByMonth = monthsSeries.map(({ key, label }) => ({
       month: label,
-      total: monthlyRevenueMap.get(key) ?? 0,
+      total: this.roundCurrency(monthlyRevenueMap.get(key) ?? 0),
       monthKey: key,
     }));
 
-    const customerGrowthMap = new Map(
-      (customerGrowthRows as any[]).map((row) => [row.month, Number(row.total ?? 0)]),
+    const amountProcessedByMonth = monthsSeries.map(({ key, label }) => ({
+      month: label,
+      total: this.roundCurrency(monthlyAmountProcessedMap.get(key) ?? 0),
+      monthKey: key,
+    }));
+
+    const totalAmountProcessedRaw = Array.from(
+      monthlyAmountProcessedMap.values(),
+    ).reduce((sum, value) => sum + value, 0);
+    const totalAmountProcessed = this.roundCurrency(totalIncomingPayments);
+    const monthlyIncomingSum = this.roundCurrency(totalAmountProcessedRaw);
+    const varianceFromMonthly = this.roundCurrency(
+      totalIncomingPayments - totalAmountProcessedRaw,
     );
+
+    const customerGrowthMap = new Map<string, number>();
+    (customerGrowthRows as any[]).forEach((row) => {
+      const rawMonth = row.month;
+      if (!rawMonth) {
+        return;
+      }
+      const parsedDate = new Date(rawMonth);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return;
+      }
+      const monthKey = this.formatMonthKey(parsedDate);
+      const previousTotal = customerGrowthMap.get(monthKey) ?? 0;
+      customerGrowthMap.set(monthKey, previousTotal + Number(row.total ?? 0));
+    });
+
     const customerGrowth = monthsSeries.map(({ key, label }) => ({
       month: label,
       total: customerGrowthMap.get(key) ?? 0,
@@ -1128,13 +1187,9 @@ export class AdminService {
       providersPagination,
     );
 
-    const tierDistribution = (tierRows as any[]).map((row) => ({
-      tier: row.tier,
-      totalProviders: Number(row.total ?? 0),
-    }));
-
+    const ratingRowsArray = ratingRows as any[];
     const ratingRowsMap = new Map(
-      (ratingRows as any[]).map((row) => [Number(row.rating).toFixed(1), Number(row.total ?? 0)]),
+      ratingRowsArray.map((row) => [Number(row.rating).toFixed(1), Number(row.total ?? 0)]),
     );
     const ratingBuckets: number[] = [];
     for (let index = 10; index >= 2; index--) {
@@ -1146,17 +1201,81 @@ export class AdminService {
         ratingRowsMap.get(rating.toFixed(1)) ?? 0,
     }));
 
+    const [tierSettings, tierCountRows] = await Promise.all([
+      this.accountTierRepository.findAll({
+        orderBy: { displayOrder: QueryOrder.ASC, createdAt: QueryOrder.ASC },
+      }),
+      connection.execute(
+        `
+          SELECT COALESCE(u.tier, 'UNKNOWN') AS tier, COUNT(*) AS total
+          FROM users u
+          WHERE u.deleted_at IS NULL
+            AND LOWER(COALESCE(u.user_types, '')) LIKE '%provider%'
+          GROUP BY COALESCE(u.tier, 'UNKNOWN')
+        `,
+      ),
+    ]);
+
+    const tierMeta = new Map(
+      tierSettings.map((setting) => [
+        setting.tier.toUpperCase(),
+        {
+          label: setting.label ?? setting.tier,
+          order: setting.displayOrder ?? Number.MAX_SAFE_INTEGER,
+        },
+      ]),
+    );
+
+    const tierCountsMap = new Map<string, number>();
+    (tierCountRows as any[]).forEach((row) => {
+      const key = String(row.tier ?? 'UNKNOWN').toUpperCase();
+      tierCountsMap.set(key, Number(row.total ?? 0));
+    });
+
+    const usedTierKeys = new Set<string>();
+    const tierDistributionEntries = tierSettings.map((setting) => {
+      const key = setting.tier.toUpperCase();
+      const meta = tierMeta.get(key);
+      const total = tierCountsMap.get(key) ?? 0;
+      usedTierKeys.add(key);
+      return {
+        tier: key,
+        name: meta?.label ?? key,
+        order: meta?.order ?? Number.MAX_SAFE_INTEGER,
+        totalProviders: total,
+      };
+    });
+
+    tierCountsMap.forEach((total, key) => {
+      if (usedTierKeys.has(key)) {
+        return;
+      }
+      const meta = tierMeta.get(key);
+      tierDistributionEntries.push({
+        tier: key,
+        name: meta?.label ?? key,
+        order: meta?.order ?? Number.MAX_SAFE_INTEGER,
+        totalProviders: total,
+      });
+    });
+
+    const tierDistribution = tierDistributionEntries
+      .sort((a, b) => a.order - b.order)
+      .map(({ order, ...rest }) => rest);
+
     return {
       status: true,
       data: {
         totals: {
           revenue: totalRevenue,
           payout: totalPayout,
+          totalAmountProcessed,
           customers: totalCustomers,
           providers: totalProviders,
           jobs: jobStats,
         },
         revenueByMonth,
+        amountProcessedByMonth,
         categoriesByRevenue,
         customerGrowthByMonth: customerGrowth,
         topLocations,
@@ -1436,7 +1555,18 @@ export class AdminService {
         j.status,
         j.price,
         j.tip,
+        j.service_provider,
+        j.service_requestor,
+        j.request_id,
+        j.dispute,
+        j.review,
+        j.payment,
+        j.cancelled_at,
+        j.cancellation_reason,
+        j.cancellation_category,
         j.created_at,
+        j.updated_at,
+        j.deleted_at,
         j.start_date,
         j.end_date,
         j.accepted_at,
@@ -1929,6 +2059,34 @@ export class AdminService {
     return { status: true };
   }
 
+  private buildJobRecord(row: any) {
+    return {
+      uuid: row.uuid,
+      serviceProviderUuid: row.service_provider ?? null,
+      serviceRequestorUuid: row.service_requestor ?? null,
+      requestId: row.request_id ?? null,
+      price: this.toNullableNumber(row.price),
+      status: row.status ?? null,
+      startDate: row.start_date ?? null,
+      endDate: row.end_date ?? null,
+      description: row.description ?? null,
+      pictures: row.pictures ?? null,
+      code: row.code ?? null,
+      jobCode: row.code ?? null,
+      tip: this.toNullableNumber(row.tip),
+      dispute: row.dispute ?? null,
+      review: row.review ?? null,
+      payment: row.payment ?? null,
+      acceptedAt: row.accepted_at ?? null,
+      cancelledAt: row.cancelled_at ?? null,
+      cancellationReason: row.cancellation_reason ?? null,
+      cancellationCategory: row.cancellation_category ?? null,
+      createdAt: row.created_at ?? null,
+      updatedAt: row.updated_at ?? null,
+      deletedAt: row.deleted_at ?? null,
+    };
+  }
+
   async resolveDispute(
     disputeUuid: string,
     { action, note, amount }: AdminResolveDisputeDto,
@@ -2124,7 +2282,18 @@ export class AdminService {
         j.status,
         j.price,
         j.tip,
+        j.service_provider,
+        j.service_requestor,
+        j.request_id,
+        j.dispute,
+        j.review,
+        j.payment,
+        j.cancelled_at,
+        j.cancellation_reason,
+        j.cancellation_category,
         j.created_at,
+        j.updated_at,
+        j.deleted_at,
         j.start_date,
         j.end_date,
         j.accepted_at,
@@ -2154,17 +2323,7 @@ export class AdminService {
 
     const total = Number(countRows[0]?.total ?? 0);
     const jobs = (rows as any[]).map((row) => ({
-      uuid: row.uuid,
-      code: row.code,
-      status: row.status,
-      price: row.price !== null && row.price !== undefined ? Number(row.price) : null,
-      tip: row.tip !== null && row.tip !== undefined ? Number(row.tip) : null,
-      createdAt: row.created_at,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      acceptedAt: row.accepted_at,
-      description: row.description,
-      pictures: row.pictures,
+      ...this.buildJobRecord(row),
       serviceProvider: row.service_provider_uuid
         ? {
             uuid: row.service_provider_uuid,
@@ -2177,7 +2336,6 @@ export class AdminService {
             serviceCategory: row.service_provider_category,
           }
         : null,
-      jobCode: row.code,
     }));
 
     return buildResponseDataWithPagination(jobs, total, {
@@ -2233,7 +2391,18 @@ export class AdminService {
         j.status,
         j.price,
         j.tip,
+        j.service_provider,
+        j.service_requestor,
+        j.request_id,
+        j.dispute,
+        j.review,
+        j.payment,
+        j.cancelled_at,
+        j.cancellation_reason,
+        j.cancellation_category,
         j.created_at,
+        j.updated_at,
+        j.deleted_at,
         j.start_date,
         j.end_date,
         j.accepted_at,
@@ -2260,18 +2429,7 @@ export class AdminService {
     const total = Number(countRows[0]?.total ?? 0);
 
     const jobs = (rows as any[]).map((row) => ({
-      uuid: row.uuid,
-      code: row.code,
-      status: row.status,
-      price:
-        row.price !== null && row.price !== undefined ? Number(row.price) : null,
-      tip: row.tip !== null && row.tip !== undefined ? Number(row.tip) : null,
-      createdAt: row.created_at,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      acceptedAt: row.accepted_at,
-      description: row.description,
-      pictures: row.pictures,
+      ...this.buildJobRecord(row),
       requestor: row.requestor_uuid
         ? {
             uuid: row.requestor_uuid,

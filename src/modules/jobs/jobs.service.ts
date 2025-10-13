@@ -236,8 +236,10 @@ export class JobService {
     });
     const providerWallet = await this.walletRepository.findOne({
       user: { uuid: job.serviceProvider?.uuid },
-      userType,
+      userType: UserType.PROVIDER,
     });
+    if (!providerWallet)
+      throw new NotFoundException('Provider wallet not found');
     providerWallet.totalBalance += job.price * 0.1;
     const transactionModel = this.transactionRepository.create({
       uuid: v4(),
@@ -289,8 +291,10 @@ export class JobService {
     job.cancelledAt = new Date();
     const requestorWallet = await this.walletRepository.findOne({
       user: { uuid: job.serviceRequestor?.uuid },
-      userType,
+      userType: UserType.CUSTOMER,
     });
+    if (!requestorWallet)
+      throw new NotFoundException('Customer wallet not found');
     requestorWallet.totalBalance += job.price;
     const requestorTransactionModel = this.transactionRepository.create({
       uuid: v4(),

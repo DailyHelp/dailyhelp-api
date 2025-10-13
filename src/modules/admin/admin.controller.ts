@@ -10,7 +10,16 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiQuery,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { AdminJwtAuthGuard } from './guards/jwt-auth-guard';
 import { AdminService } from './admin.service';
 import { AllowUnauthorizedRequest } from 'src/decorators/unauthorized.decorator';
@@ -204,13 +213,218 @@ export class AdminController {
   }
 
   @Get('dashboard')
-  @ApiBody({ type: dtos.AdminDashboardFilterDto })
+  @RequireAdminPermissions('dashboard.view')
+  @ApiExtraModels(
+    dtos.AdminDashboardFilterDto,
+    dtos.AdminDashboardPaginationDto,
+  )
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    enum: dtos.AdminDashboardDateFilter,
+    description: 'Preset analytics window. Use CUSTOM with startDate/endDate.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    example: '2025-01-01',
+    description: 'ISO start date when filter=CUSTOM.',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    example: '2025-01-31',
+    description: 'ISO end date when filter=CUSTOM.',
+  })
+  @ApiQuery({
+    name: 'categoriesPagination',
+    required: false,
+    style: 'deepObject',
+    explode: true,
+    description: 'Pagination for revenue-by-category list.',
+    schema: { $ref: getSchemaPath(dtos.AdminDashboardPaginationDto) },
+  })
+  @ApiQuery({
+    name: 'locationsPagination',
+    required: false,
+    style: 'deepObject',
+    explode: true,
+    description: 'Pagination for top locations list.',
+    schema: { $ref: getSchemaPath(dtos.AdminDashboardPaginationDto) },
+  })
+  @ApiQuery({
+    name: 'providersPagination',
+    required: false,
+    style: 'deepObject',
+    explode: true,
+    description: 'Pagination for providers-by-category list.',
+    schema: { $ref: getSchemaPath(dtos.AdminDashboardPaginationDto) },
+  })
   @ApiOkResponse({
     description: 'Dashboard analytics fetched successfully',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            status: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                totals: {
+                  type: 'object',
+                  properties: {
+                    revenue: { type: 'number', example: 540000 },
+                    payout: { type: 'number', example: 185000 },
+                    totalAmountProcessed: { type: 'number', example: 725000 },
+                    customers: { type: 'number', example: 1280 },
+                    providers: { type: 'number', example: 420 },
+                    jobs: {
+                      type: 'object',
+                      properties: {
+                        inProgress: { type: 'number', example: 18 },
+                        completed: { type: 'number', example: 342 },
+                        canceled: { type: 'number', example: 24 },
+                        disputed: { type: 'number', example: 6 },
+                      },
+                    },
+                  },
+                },
+                revenueByMonth: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      month: { type: 'string', example: 'Apr 2025' },
+                      monthKey: { type: 'string', example: '2025-04-01' },
+                      total: { type: 'number', example: 48000 },
+                    },
+                  },
+                },
+                amountProcessedByMonth: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      month: { type: 'string', example: 'Apr 2025' },
+                      monthKey: { type: 'string', example: '2025-04-01' },
+                      total: { type: 'number', example: 525000 },
+                    },
+                  },
+                },
+                categoriesByRevenue: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          uuid: { type: 'string', example: '7e3e0e4c-4716-4d0f-8f22-d957ca56f3d0' },
+                          name: { type: 'string', example: 'Home & Cleaning' },
+                          revenue: { type: 'number', example: 155000 },
+                        },
+                      },
+                    },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        page: { type: 'number', example: 1 },
+                        limit: { type: 'number', example: 5 },
+                        total: { type: 'number', example: 9 },
+                      },
+                    },
+                  },
+                },
+                customerGrowthByMonth: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      month: { type: 'string', example: 'Apr 2025' },
+                      monthKey: { type: 'string', example: '2025-04-01' },
+                      total: { type: 'number', example: 140 },
+                    },
+                  },
+                },
+                topLocations: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          name: { type: 'string', example: 'Victoria Island (Lagos)' },
+                          total: { type: 'number', example: 64 },
+                        },
+                      },
+                    },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        page: { type: 'number', example: 1 },
+                        limit: { type: 'number', example: 5 },
+                        total: { type: 'number', example: 15 },
+                      },
+                    },
+                  },
+                },
+                providersByCategory: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          uuid: { type: 'string', example: '52e2ed32-a08e-4e43-a401-5e41fd4100f6' },
+                          name: { type: 'string', example: 'Electricians' },
+                          totalProviders: { type: 'number', example: 36 },
+                        },
+                      },
+                    },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        page: { type: 'number', example: 1 },
+                        limit: { type: 'number', example: 5 },
+                        total: { type: 'number', example: 12 },
+                      },
+                    },
+                  },
+                },
+                tierDistribution: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      tier: { type: 'string', example: 'GOLD' },
+                      totalProviders: { type: 'number', example: 54 },
+                    },
+                  },
+                },
+                ratingDistribution: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      rating: { type: 'number', example: 4.5 },
+                      totalProviders: { type: 'number', example: 18 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   })
-  @RequireAdminPermissions('dashboard.view')
-  dashboard(@Body() body: dtos.AdminDashboardFilterDto) {
-    return this.service.fetchDashboardAnalytics(body);
+  dashboard(@Query() query: dtos.AdminDashboardFilterDto) {
+    return this.service.fetchDashboardAnalytics(query);
   }
 
   @Post('auth/login')

@@ -121,10 +121,21 @@ export class NotificationsService {
       const responses = await Promise.allSettled(
         c.map((t) => admin.messaging().send(this.buildMessage(t, payload))),
       );
-      for (const r of responses) {
-        if (r.status === 'fulfilled') success += 1;
-        else failure += 1;
-      }
+      responses.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          success += 1;
+          return;
+        }
+        failure += 1;
+        const token = c[index];
+        const reason = result.reason;
+        const message = reason?.message || reason;
+        const stack = reason?.stack;
+        this.logger.error(
+          `Push token ${token} failed → ${message}`,
+          stack || (typeof reason === 'string' ? reason : undefined),
+        );
+      });
     }
     this.logger.log(`Push sent → success=${success}, failure=${failure}`);
     return { success, failure };
@@ -147,4 +158,3 @@ export class NotificationsService {
     return this.sendToUserUuids(uuids, payload, excludeUuid);
   }
 }
-
