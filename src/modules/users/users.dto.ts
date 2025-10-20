@@ -95,12 +95,15 @@ export class SavePricesDto {
 
 export class SaveProviderDetails {
   @IsString()
+  @IsOptional()
   subCategoryUuid: string;
 
   @IsString()
+  @IsOptional()
   serviceDescription: string;
 
   @IsString()
+  @IsOptional()
   serviceImages: string;
 }
 
