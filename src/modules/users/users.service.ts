@@ -338,11 +338,25 @@ export class UsersService {
   async saveProviderDetails(dto: SaveProviderDetails, { uuid }: IAuthContext) {
     const userExists = await this.usersRepository.findOne({ uuid });
     if (!userExists) throw new NotFoundException('User not found');
-    userExists.primaryJobRole = this.subCategoryRepository.getReference(
-      dto.subCategoryUuid,
-    );
-    userExists.serviceDescription = dto.serviceDescription;
-    userExists.serviceImages = dto.serviceImages;
+    if (dto.subCategoryUuid !== undefined) {
+      if (dto.subCategoryUuid) {
+        const subCategory = await this.subCategoryRepository.findOne({
+          uuid: dto.subCategoryUuid,
+        });
+        if (!subCategory) {
+          throw new NotFoundException('Sub category not found');
+        }
+        userExists.primaryJobRole = subCategory;
+      } else {
+        userExists.primaryJobRole = null;
+      }
+    }
+    if (dto.serviceDescription !== undefined) {
+      userExists.serviceDescription = dto.serviceDescription;
+    }
+    if (dto.serviceImages !== undefined) {
+      userExists.serviceImages = dto.serviceImages;
+    }
     userExists.providerOnboarding = {
       ...userExists.providerOnboarding,
       step2: true,
