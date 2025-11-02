@@ -829,7 +829,12 @@ export class UsersService {
       throw new ForbiddenException(`Offer status cannot be updated`);
     if (offer.amount) offerExists.price = offer.amount;
     if (offer.description) offerExists.description = offer.description;
-    if (offer.attachments) offerExists.pictures = offer.attachments.join(',');
+    const offerAttachments = offer.attachments as unknown;
+    if (Array.isArray(offerAttachments)) {
+      offerExists.pictures = offerAttachments.join(',');
+    } else if (typeof offerAttachments === 'string') {
+      offerExists.pictures = offerAttachments;
+    }
     await this.em.flush();
     this.ws.offerUpdated({
       uuid: offerExists.uuid,
@@ -1068,11 +1073,17 @@ export class UsersService {
     }
     conversationExists.locked = false;
     conversationExists.lastLockedAt = null;
+    const offerAttachments = offer.attachments as unknown;
+    const serializedPictures = Array.isArray(offerAttachments)
+      ? offerAttachments.join(',')
+      : typeof offerAttachments === 'string'
+        ? offerAttachments
+        : '';
     const offerModel = this.offerRepository.create({
       uuid: v4(),
       price: offer.amount,
       description: offer.description,
-      pictures: offer.attachments.join(','),
+      pictures: serializedPictures,
     });
     const messageModel = this.messageRepository.create({
       uuid: v4(),

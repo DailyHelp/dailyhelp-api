@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseGuards } from '@nestjs/common';
+import { Inject, Injectable, Logger, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -11,6 +11,9 @@ import { Server, Socket } from 'socket.io';
 import { ReadStateService } from './read-state.service';
 import { PresenceService } from './presence.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import * as jwt from 'jsonwebtoken';
+import { ConfigType } from '@nestjs/config';
+import { JwtAuthConfiguration } from 'src/config/configuration';
 
 type WSUser = { uuid: string; userType: string; email?: string };
 
@@ -28,13 +31,34 @@ export class SocketGateway {
     private readonly readState: ReadStateService,
     private readonly presence: PresenceService,
     private readonly notify: NotificationsService,
+    @Inject(JwtAuthConfiguration.KEY)
+    private readonly jwtConfig: ConfigType<typeof JwtAuthConfiguration>,
   ) {}
 
   private getClientUser(client: Socket): WSUser | null {
-    const user: WSUser | undefined = (client as any).user;
+    let user: WSUser | undefined = (client as any).user;
     if (!user?.uuid) {
-      this.logger.warn(`Socket ${client.id} missing authenticated user metadata`);
-      return null;
+      const token =
+        client.handshake?.auth?.token ||
+        client.handshake?.headers?.authorization?.replace(/^Bearer\s+/i, '');
+      if (!token) {
+        this.logger.warn(`Socket ${client.id} missing authenticated user metadata`);
+        return null;
+      }
+      try {
+        const payload = jwt.verify(token, this.jwtConfig.secretKey) as any;
+        user = {
+          uuid: payload.uuid,
+          userType: payload.userType,
+          email: payload.email,
+        };
+        (client as any).user = user;
+      } catch (error) {
+        this.logger.warn(
+          `Socket ${client.id} provided invalid token: ${(error as Error).message}`,
+        );
+        return null;
+      }
     }
     return user;
   }
