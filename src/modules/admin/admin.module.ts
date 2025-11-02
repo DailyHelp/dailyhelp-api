@@ -62,7 +62,7 @@ import { AdminPermissionsGuard } from './guards/permissions.guard';
       imports: [ConfigModule.forFeature(JwtAuthConfiguration)],
       useFactory: (jwtAuthConfig: ConfigType<typeof JwtAuthConfiguration>) => ({
         secret: jwtAuthConfig.adminSecretKey,
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '24h' },
       }),
       inject: [JwtAuthConfiguration.KEY],
     }),

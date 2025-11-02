@@ -1,4 +1,4 @@
-import { Injectable, UseGuards } from '@nestjs/common';
+import { Injectable, Logger, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -21,6 +21,8 @@ const convRoom = (c: string) => `conv:${c}`;
 @UseGuards(WsJwtGuard)
 @Injectable()
 export class SocketGateway {
+  private readonly logger = new Logger(SocketGateway.name);
+
   @WebSocketServer() server: Server;
   constructor(
     private readonly readState: ReadStateService,
@@ -28,8 +30,21 @@ export class SocketGateway {
     private readonly notify: NotificationsService,
   ) {}
 
+  private getClientUser(client: Socket): WSUser | null {
+    const user: WSUser | undefined = (client as any).user;
+    if (!user?.uuid) {
+      this.logger.warn(`Socket ${client.id} missing authenticated user metadata`);
+      return null;
+    }
+    return user;
+  }
+
   async handleConnection(client: Socket) {
-    const user: WSUser = (client as any).user;
+    const user = this.getClientUser(client);
+    if (!user) {
+      client.disconnect(true);
+      return;
+    }
     client.join(userRoom(user.uuid));
     const count = await this.presence.addConnection(user.uuid, client.id);
     if (count === 1) {
@@ -42,7 +57,8 @@ export class SocketGateway {
   }
 
   async handleDisconnect(client: Socket) {
-    const user: WSUser = (client as any).user;
+    const user = this.getClientUser(client);
+    if (!user) return;
     const count = await this.presence.removeConnection(user.uuid, client.id);
     if (count === 0) {
       this.server.emit('presence:update', {
@@ -80,7 +96,8 @@ export class SocketGateway {
     @MessageBody() data: { messageUuid: string; conversationUuid: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const user: WSUser = (client as any).user;
+    const user = this.getClientUser(client);
+    if (!user) return;
     await this.readState.markMessageRead(
       user.uuid,
       data.messageUuid,
@@ -93,7 +110,8 @@ export class SocketGateway {
     @MessageBody() data: { conversationUuid: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const user: WSUser = (client as any).user;
+    const user = this.getClientUser(client);
+    if (!user) return;
     await this.readState.markConversationRead(user.uuid, data.conversationUuid);
   }
 

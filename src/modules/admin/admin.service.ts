@@ -1599,20 +1599,8 @@ export class AdminService {
     const toNumberOrNull = (value: unknown) =>
       value !== null && value !== undefined ? Number(value) : null;
 
-    const jobs = (rows as any[]).map((row) => ({
-      uuid: row.uuid,
-      code: row.code,
-      jobCode: row.code,
-      status: row.status,
-      price: toNumberOrNull(row.price),
-      tip: toNumberOrNull(row.tip),
-      createdAt: row.created_at,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      acceptedAt: row.accepted_at,
-      description: row.description,
-      pictures: row.pictures,
-      serviceProvider: row.service_provider_uuid
+    const jobs = (rows as any[]).map((row) => {
+      const serviceProviderProfile = row.service_provider_uuid
         ? {
             uuid: row.service_provider_uuid,
             firstname: row.service_provider_firstname,
@@ -1625,8 +1613,9 @@ export class AdminService {
             phone: row.service_provider_phone,
             picture: row.service_provider_picture,
           }
-        : null,
-      requestor: row.requestor_uuid
+        : null;
+
+      const requestorProfile = row.requestor_uuid
         ? {
             uuid: row.requestor_uuid,
             firstname: row.requestor_firstname,
@@ -1639,8 +1628,36 @@ export class AdminService {
             phone: row.requestor_phone,
             picture: row.requestor_picture,
           }
-        : null,
-    }));
+        : null;
+
+      return {
+        uuid: row.uuid,
+        code: row.code,
+        jobCode: row.code,
+        status: row.status,
+        price: toNumberOrNull(row.price),
+        tip: toNumberOrNull(row.tip),
+        serviceProviderUuid: row.service_provider,
+        serviceRequestorUuid: row.service_requestor,
+        requestId: row.request_id,
+        dispute: row.dispute,
+        review: row.review,
+        payment: row.payment,
+        cancelledAt: row.cancelled_at,
+        cancellationReason: row.cancellation_reason,
+        cancellationCategory: row.cancellation_category,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        deletedAt: row.deleted_at,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        acceptedAt: row.accepted_at,
+        description: row.description,
+        pictures: row.pictures,
+        serviceProvider: serviceProviderProfile,
+        requestor: requestorProfile,
+      };
+    });
 
     return buildResponseDataWithPagination(jobs, total, {
       page: parsedPage,
