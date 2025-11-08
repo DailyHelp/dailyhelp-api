@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Length,
   Min,
   ValidateIf,
@@ -383,8 +384,8 @@ export class AdminFetchReportsDto {
 export class AdminResolveReportDto {
   @IsOptional()
   @IsString()
-  @Length(1, 500)
-  note: string;
+  @MaxLength(500)
+  note?: string;
 }
 
 export class AdminFetchFeedbacksDto {
