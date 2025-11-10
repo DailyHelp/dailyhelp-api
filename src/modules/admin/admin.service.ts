@@ -3378,8 +3378,12 @@ export class AdminService {
       throw new ConflictException(
         `Main category with name: ${dto.name} already exists`,
       );
-    categoryExists.name = dto.name;
-    categoryExists.icon = dto.icon;
+    if (dto.name !== undefined) {
+      categoryExists.name = dto.name;
+    }
+    if (dto.icon !== undefined) {
+      categoryExists.icon = dto.icon;
+    }
     await this.em.flush();
     return { status: true };
   }
