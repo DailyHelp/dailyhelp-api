@@ -350,8 +350,23 @@ export class AuthService {
     const otp = generateOtp();
     const user = await this.usersRepository.findOne({ uuid: userUuid });
     if (!user) throw new NotFoundException('User does not exist');
-    if (phone) {
-      await this.sharedService.sendOtp(otp, phone, {} as any);
+    let smsRecipient: string | null = null;
+    if (otpActionType === OTPActionType.VERIFY_PHONE) {
+      if (phone) {
+        const validatedPhone = this.sharedService.validatePhoneNumber(phone);
+        smsRecipient = validatedPhone;
+        user.phone = validatedPhone.substring(1);
+        user.phoneVerified = false;
+      } else if (user.phone) {
+        smsRecipient = `+${user.phone}`;
+      } else {
+        throw new BadRequestException(
+          'Phone number is required to verify phone',
+        );
+      }
+    }
+    if (smsRecipient) {
+      await this.sharedService.sendOtp(otp, smsRecipient, {} as any);
     } else {
       if (otpActionType === OTPActionType.VERIFY_ACCOUNT) {
         await this.sharedService.sendOtp(otp, null, {
