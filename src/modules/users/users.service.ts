@@ -355,7 +355,10 @@ export class UsersService {
       userExists.serviceDescription = dto.serviceDescription;
     }
     if (dto.serviceImages !== undefined) {
-      userExists.serviceImages = dto.serviceImages;
+      const sanitizedImages = (dto.serviceImages ?? [])
+        .map((image) => image?.trim())
+        .filter((image): image is string => Boolean(image));
+      userExists.serviceImages = sanitizedImages.join(',');
     }
     userExists.providerOnboarding = {
       ...userExists.providerOnboarding,

@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsNumber,
@@ -102,9 +103,10 @@ export class SaveProviderDetails {
   @IsOptional()
   serviceDescription: string;
 
-  @IsString()
   @IsOptional()
-  serviceImages: string;
+  @IsArray()
+  @IsString({ each: true })
+  serviceImages: string[];
 }
 
 export class PriceFilter {
