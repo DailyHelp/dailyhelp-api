@@ -9,6 +9,7 @@ import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { WalletService } from './wallet.service';
 import { PaginatedTransactionsDto, PaginationQuery } from '../users/users.dto';
 import { Request } from 'express';
+import { OrderDir } from 'src/types';
 
 @Controller('wallets')
 @ApiTags('wallets')
@@ -20,6 +21,12 @@ export class WalletController {
   @Get('transactions')
   @ApiQuery({ name: 'pagination[page]', required: true, type: Number })
   @ApiQuery({ name: 'pagination[limit]', required: true, type: Number })
+  @ApiQuery({
+    name: 'pagination[orderDir]',
+    required: false,
+    enum: OrderDir,
+    description: 'Sort direction for transactions (defaults to DESC)',
+  })
   @ApiOkResponse({
     type: PaginatedTransactionsDto,
   })
