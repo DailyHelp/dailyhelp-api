@@ -682,7 +682,7 @@ export class UsersService {
     return buildResponseDataWithPagination(data, total, { page, limit });
   }
 
-  async fetchProviderRatingSummary({ uuid }: IAuthContext) {
+  async fetchProviderRatingSummary(uuid: string) {
     const qb = this.reviewRepository.qb('review');
     qb.select(['review.rating', 'count(*) as count'])
       .where({ reviewedFor: { uuid } })

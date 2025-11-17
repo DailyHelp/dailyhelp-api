@@ -37,6 +37,7 @@ import {
   PaginatedMessageDto,
   PaginatedReviewsDto,
   PaginationQuery,
+  ProviderRatingSummaryDto,
   PaymentInfo,
   ReportConversationDto,
   SaveLocationDto,
@@ -262,6 +263,15 @@ export class CustomersController {
   })
   async switchUserType(@Body() body: SwitchUserType, @Req() req: Request) {
     return this.userService.switchUserType(body.userType, req.user as any);
+  }
+
+  @Get('providers/:uuid/reviews/summary')
+  @ApiOkResponse({
+    type: ProviderRatingSummaryDto,
+    description: 'Provider rating summary fetched successfully',
+  })
+  async fetchProviderReviewSummary(@Param('uuid') uuid: string) {
+    return this.userService.fetchProviderRatingSummary(uuid);
   }
 
   @Post('initialize-paystack-payment')

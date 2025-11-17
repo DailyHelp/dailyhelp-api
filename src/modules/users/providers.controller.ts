@@ -96,7 +96,8 @@ export class ProvidersController {
     description: 'Provider rating summary fetched successfully',
   })
   async fetchReviewSummary(@Req() req: Request) {
-    return this.userService.fetchProviderRatingSummary(req.user as any);
+    const { uuid } = req.user as any as IAuthContext;
+    return this.userService.fetchProviderRatingSummary(uuid);
   }
 
   @Patch('service-description')
