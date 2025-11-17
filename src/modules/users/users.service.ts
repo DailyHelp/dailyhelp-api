@@ -6,6 +6,7 @@ import {
   QueryOrder,
   wrap,
 } from '@mikro-orm/core';
+import { SqlEntityRepository } from '@mikro-orm/knex';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
@@ -99,10 +100,10 @@ export class UsersService {
     private readonly em: EntityManager,
     @InjectRepository(Users)
     private readonly usersRepository: EntityRepository<Users>,
-    @InjectRepository(Location)
-    private readonly locationRepository: EntityRepository<Location>,
-    @InjectRepository(JobReview)
-    private readonly reviewRepository: EntityRepository<JobReview>,
+  @InjectRepository(Location)
+  private readonly locationRepository: EntityRepository<Location>,
+  @InjectRepository(JobReview)
+  private readonly reviewRepository: SqlEntityRepository<JobReview>,
     @InjectRepository(Conversation)
     private readonly conversationRepository: EntityRepository<Conversation>,
     @InjectRepository(Message)
@@ -679,6 +680,65 @@ export class UsersService {
       { limit, offset: (page - 1) * limit, orderBy: { createdAt: 'DESC' } },
     );
     return buildResponseDataWithPagination(data, total, { page, limit });
+  }
+
+  async fetchProviderRatingSummary({ uuid }: IAuthContext) {
+    const qb = this.reviewRepository.qb('review');
+    qb.select(['review.rating', 'count(*) as count'])
+      .where({ reviewedFor: { uuid } })
+      .andWhere({ rating: { $ne: null } })
+      .andWhere({ deletedAt: null })
+      .groupBy('review.rating');
+
+    const rows = await qb.execute<{ rating: number; count: number }[]>();
+
+    const breakdown = {
+      fiveStar: 0,
+      fourStar: 0,
+      threeStar: 0,
+      twoStar: 0,
+      oneStar: 0,
+    };
+
+    let totalReviews = 0;
+    let totalScore = 0;
+
+    for (const row of rows) {
+      const rating = Number(row.rating);
+      const count = Number(row.count);
+      if (![1, 2, 3, 4, 5].includes(rating)) continue;
+      totalReviews += count;
+      totalScore += rating * count;
+      switch (rating) {
+        case 5:
+          breakdown.fiveStar = count;
+          break;
+        case 4:
+          breakdown.fourStar = count;
+          break;
+        case 3:
+          breakdown.threeStar = count;
+          break;
+        case 2:
+          breakdown.twoStar = count;
+          break;
+        case 1:
+          breakdown.oneStar = count;
+          break;
+      }
+    }
+
+    const averageRating =
+      totalReviews === 0 ? 0 : Number((totalScore / totalReviews).toFixed(2));
+
+    return {
+      status: true,
+      data: {
+        averageRating,
+        totalReviews,
+        breakdown,
+      },
+    };
   }
 
   async updateServiceDescription(

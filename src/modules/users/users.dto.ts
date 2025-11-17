@@ -506,6 +506,34 @@ export const PaginatedTransactionsDto = createPaginatedSwaggerDto(
   'PaginatedTransactionsDto',
 );
 
+export class ProviderRatingBreakdownDto {
+  @ApiProperty()
+  fiveStar: number;
+
+  @ApiProperty()
+  fourStar: number;
+
+  @ApiProperty()
+  threeStar: number;
+
+  @ApiProperty()
+  twoStar: number;
+
+  @ApiProperty()
+  oneStar: number;
+}
+
+export class ProviderRatingSummaryDto {
+  @ApiProperty()
+  averageRating: number;
+
+  @ApiProperty()
+  totalReviews: number;
+
+  @ApiProperty({ type: ProviderRatingBreakdownDto })
+  breakdown: ProviderRatingBreakdownDto;
+}
+
 export class ClientDashboardDto {
   @ApiProperty({ type: TopRatedProvider, isArray: true })
   topRatedProviders: TopRatedProvider[];

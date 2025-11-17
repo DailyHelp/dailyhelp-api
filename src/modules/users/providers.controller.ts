@@ -38,6 +38,7 @@ import {
   PaginatedMessageDto,
   PaginatedReviewsDto,
   PaginationQuery,
+  ProviderRatingSummaryDto,
   ProvidersDashboardDto,
   ReportConversationDto,
   ResolveBankAccountDto,
@@ -87,6 +88,15 @@ export class ProvidersController {
   async fetchUserReviews(@Query() query: PaginationQuery, @Req() req: Request) {
     const { uuid } = req.user as any as IAuthContext;
     return this.userService.fetchUserReviews(uuid, query.pagination);
+  }
+
+  @Get('reviews/summary')
+  @ApiOkResponse({
+    type: ProviderRatingSummaryDto,
+    description: 'Provider rating summary fetched successfully',
+  })
+  async fetchReviewSummary(@Req() req: Request) {
+    return this.userService.fetchProviderRatingSummary(req.user as any);
   }
 
   @Patch('service-description')
