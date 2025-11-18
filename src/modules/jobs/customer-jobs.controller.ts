@@ -53,6 +53,11 @@ export class CustomerJobsController {
     return this.jobService.verifyPin(uuid, body.pin);
   }
 
+  @Post(':uuid/share-code')
+  async shareJobCode(@Param('uuid') uuid: string, @Req() request: Request) {
+    return this.jobService.shareJobCode(uuid, request.user as any);
+  }
+
   @Get(':uuid/timelines')
   @ApiOkResponse({
     description: 'Job timelines fetched successfully',

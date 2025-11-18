@@ -162,6 +162,26 @@ export class JobService {
     return { status: true };
   }
 
+  async shareJobCode(jobUuid: string, { uuid }: IAuthContext) {
+    const job = await this.jobRepository.findOne(
+      { uuid: jobUuid, serviceRequestor: { uuid } },
+      { populate: ['serviceProvider', 'serviceRequestor'] },
+    );
+    if (!job) throw new NotFoundException('Job not found');
+    const providerUuid = job.serviceProvider?.uuid;
+    if (!providerUuid) throw new NotFoundException('Provider not found');
+    if (!job.code) throw new NotAcceptableException('Job code is not available');
+
+    this.ws.jobCodeShared({
+      uuid: job.uuid,
+      serviceProviderUuid: providerUuid,
+      serviceRequestorUuid: job.serviceRequestor?.uuid,
+      code: job.code,
+    });
+
+    return { status: true };
+  }
+
   async fetchJobTimelines(jobUuid: string) {
     const timelines = await this.jobTimelineRepository.find(
       { job: { uuid: jobUuid } },

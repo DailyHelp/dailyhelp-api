@@ -382,4 +382,28 @@ export class SocketGateway {
       },
     );
   }
+
+  jobCodeShared(payload: {
+    uuid: string;
+    serviceProviderUuid: string;
+    serviceRequestorUuid?: string;
+    code: string;
+  }) {
+    this.server
+      .to(userRoom(payload.serviceProviderUuid))
+      .emit('job:code-shared', payload);
+
+    this.notify.sendToUserUuids(
+      [payload.serviceProviderUuid],
+      {
+        title: 'Job Code',
+        body: `Job code: ${payload.code}`,
+        data: {
+          type: 'JOB_CODE_SHARED',
+          payload: JSON.stringify(payload),
+        },
+      },
+    );
+  }
+
 }
