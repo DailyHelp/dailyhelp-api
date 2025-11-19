@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, UseGuards } from '@nestjs/common';
+import { Inject, Injectable, Logger, UseGuards, forwardRef } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -14,6 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as jwt from 'jsonwebtoken';
 import { ConfigType } from '@nestjs/config';
 import { JwtAuthConfiguration } from 'src/config/configuration';
+import { JobService } from '../jobs/jobs.service';
 
 type WSUser = { uuid: string; userType: string; email?: string };
 
@@ -33,6 +34,8 @@ export class SocketGateway {
     private readonly notify: NotificationsService,
     @Inject(JwtAuthConfiguration.KEY)
     private readonly jwtConfig: ConfigType<typeof JwtAuthConfiguration>,
+    @Inject(forwardRef(() => JobService))
+    private readonly jobService: JobService,
   ) {}
 
   private getClientUser(client: Socket): WSUser | null {
@@ -315,6 +318,37 @@ export class SocketGateway {
         payload: JSON.stringify(payload),
       },
     });
+  }
+
+  @SubscribeMessage('job:share-code')
+  async onJobCodeShare(
+    @MessageBody() data: { jobUuid: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user = this.getClientUser(client);
+    if (!user) return;
+    if (!data?.jobUuid) {
+      client.emit('job:code-share:error', {
+        message: 'jobUuid is required',
+      });
+      return;
+    }
+
+    try {
+      await this.jobService.shareJobCode(data.jobUuid, user as any);
+      client.emit('job:code-share:success', {
+        jobUuid: data.jobUuid,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const err = error as Error;
+      this.logger.warn(
+        `job:share-code failed for ${user.uuid}: ${err?.message || err}`,
+      );
+      client.emit('job:code-share:error', {
+        message: err?.message || 'Unable to share job code',
+      });
+    }
   }
 
   jobCreated(payload: {

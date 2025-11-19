@@ -9,10 +9,12 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotAcceptableException,
   NotFoundException,
   UnauthorizedException,
+  forwardRef,
 } from '@nestjs/common';
 import { Job, JobTimeline } from './jobs.entity';
 import { PaginationInput } from 'src/base/dto';
@@ -65,6 +67,7 @@ export class JobService {
     private readonly jobReportRepository: EntityRepository<JobReport>,
     @InjectRepository(AccountTierSetting)
     private readonly accountTierRepository: EntityRepository<AccountTierSetting>,
+    @Inject(forwardRef(() => SocketGateway))
     private readonly ws: SocketGateway,
   ) {}
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SocketGateway } from './socket.gateway';
 import { ReadStateService } from './read-state.service';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
@@ -14,6 +14,7 @@ import { JwtAuthConfiguration } from 'src/config/configuration';
 import { PresenceService } from './presence.service';
 import { RedisProvider } from './redis.provider';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { JobsModule } from '../jobs/jobs.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       ],
     }),
     ConfigModule.forFeature(JwtAuthConfiguration),
+    forwardRef(() => JobsModule),
     NotificationsModule,
   ],
   providers: [SocketGateway, ReadStateService, PresenceService, RedisProvider],

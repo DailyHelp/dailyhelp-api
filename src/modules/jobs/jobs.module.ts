@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CustomerJobsController } from './customer-jobs.controller';
 import { JobService } from './jobs.service';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
@@ -29,7 +29,7 @@ import { AccountTierSetting } from '../admin/admin.entities';
         AccountTierSetting,
       ],
     }),
-    WsModule,
+    forwardRef(() => WsModule),
   ],
   controllers: [CustomerJobsController, ProviderJobsController],
   providers: [JobService],
