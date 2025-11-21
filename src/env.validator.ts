@@ -23,15 +23,7 @@ class EnvironmentVariables {
   @IsString()
   DATABASE_USER: string;
   @IsString()
-  SMTP_HOST: string;
-  @IsNumber()
-  SMTP_PORT: number;
-  @IsString()
-  SMTP_USERNAME: string;
-  @IsString()
-  SMTP_PASSWORD: string;
-  @IsString()
-  SMTP_FROM: string;
+  SENDGRID_API_KEY: string;
   @IsString()
   TERMII_BASE_URL: string;
   @IsString()

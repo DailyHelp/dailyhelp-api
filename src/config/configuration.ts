@@ -1,18 +1,17 @@
 import { registerAs } from '@nestjs/config';
-import { SmtpConfig } from './types/smtp.config';
 import { TermiiConfig } from './types/termii.config';
 import { JwtAuthConfig } from './types/jwt-auth.config';
 import { QoreIDConfig } from './types/qoreid.config';
 import { PaystackConfig } from './types/paystack.config';
 import { FirebaseAdminConfig } from './types/firebase.config';
+import { SendgridConfig } from './types/sendgrid.config';
 
-export const SmtpConfiguration = registerAs(
-  'smtpConfig',
-  (): SmtpConfig => ({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    username: process.env.SMTP_USERNAME,
-    password: process.env.SMTP_PASSWORD,
+export const SendgridConfiguration = registerAs(
+  'sendgridConfig',
+  (): SendgridConfig => ({
+    apiKey: process.env.SENDGRID_API_KEY,
+    defaultFrom: process.env.SENDGRID_DEFAULT_FROM,
+    defaultBcc: process.env.SENDGRID_DEFAULT_BCC,
   }),
 );
 

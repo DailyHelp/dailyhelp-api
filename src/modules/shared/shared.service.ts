@@ -11,25 +11,31 @@ import {
 import { ConfigType } from '@nestjs/config';
 import {
   QoreIDConfiguration,
-  SmtpConfiguration,
+  SendgridConfiguration,
   TermiiConfiguration,
 } from 'src/config/configuration';
 import { NotificationTemplates } from 'src/entities/notification-templates.entity';
 import phone from 'phone';
-import mailer from 'nodemailer-promise';
 import { IEmailDto } from 'src/types';
 import { replacer } from 'src/utils';
 import axios from 'axios';
 
+type MailAddress = {
+  email: string;
+  name?: string;
+};
+
 @Injectable()
 export class SharedService {
   private readonly logger: Logger = new Logger(SharedService.name);
+  private readonly sendgridEndpoint = 'https://api.sendgrid.com/v3/mail/send';
+  private readonly defaultFrom = 'DailyHelp <no-reply@fonu.com>';
 
   constructor(
     @InjectRepository(NotificationTemplates)
     private readonly notificationTemplatesRepository: EntityRepository<NotificationTemplates>,
-    @Inject(SmtpConfiguration.KEY)
-    private readonly smtpConfig: ConfigType<typeof SmtpConfiguration>,
+    @Inject(SendgridConfiguration.KEY)
+    private readonly sendgridConfig: ConfigType<typeof SendgridConfiguration>,
     @Inject(TermiiConfiguration.KEY)
     private readonly termiiConfig: ConfigType<typeof TermiiConfiguration>,
     @Inject(QoreIDConfiguration.KEY)
@@ -45,17 +51,34 @@ export class SharedService {
     return phoneNumber;
   }
 
+  private parseAddress(address?: string): MailAddress | null {
+    if (!address) return null;
+    const trimmed = address.trim();
+    if (!trimmed) return null;
+    const match = trimmed.match(/^(.*)<(.+)>$/);
+    if (match) {
+      const name = match[1]?.trim().replace(/^"(.*)"$/, '$1');
+      const email = match[2]?.trim();
+      if (!email) return null;
+      return name ? { email, name } : { email };
+    }
+    return { email: trimmed };
+  }
+
+  private parseAddressList(addresses?: string): MailAddress[] {
+    if (!addresses) return [];
+    return addresses
+      .split(',')
+      .map((entry) => this.parseAddress(entry))
+      .filter(
+        (addr): addr is MailAddress => Boolean(addr?.email),
+      );
+  }
+
   async sendEmail(email: IEmailDto) {
-    const sendMail = mailer.config({
-      host: this.smtpConfig.host,
-      port: this.smtpConfig.port,
-      secure: true,
-      from: 'DailyHelp <no-reply@fonu.com>',
-      auth: {
-        user: this.smtpConfig.username,
-        pass: this.smtpConfig.password,
-      },
-    });
+    if (!this.sendgridConfig.apiKey) {
+      throw new InternalServerErrorException('SendGrid is not configured');
+    }
     const notificationTemplate =
       await this.notificationTemplatesRepository.findOne({
         code: email.templateCode,
@@ -64,13 +87,61 @@ export class SharedService {
       throw new NotFoundException(
         `Notification template: ${email.templateCode} does not exist`,
       );
-    email.html = email.data
+    const html = email.data
       ? replacer(0, Object.entries(email.data), notificationTemplate.body)
       : notificationTemplate.body;
-    delete email.templateCode;
-    if (!email.bcc) email.bcc = 'admin@dailyhelp.ng';
-    if (!email.from) email.from = 'DailyHelp <no-reply@fonu.com>';
-    sendMail(email);
+    const fromAddress =
+      this.parseAddress(email.from ?? this.sendgridConfig.defaultFrom) ??
+      this.parseAddress(this.defaultFrom);
+    if (!fromAddress) {
+      throw new InternalServerErrorException('Default sender email is not set');
+    }
+    if (!email.to) {
+      throw new BadRequestException('Recipient email is required');
+    }
+    const toAddress = this.parseAddress(email.to);
+    if (!toAddress) {
+      throw new BadRequestException('Recipient email is invalid');
+    }
+    const bccAddresses = this.parseAddressList(
+      email.bcc ?? this.sendgridConfig.defaultBcc ?? 'admin@dailyhelp.ng',
+    );
+    const payload: Record<string, any> = {
+      personalizations: [
+        {
+          to: [toAddress],
+          ...(bccAddresses.length ? { bcc: bccAddresses } : {}),
+        },
+      ],
+      from: fromAddress,
+      subject: email.subject,
+      content: [
+        {
+          type: 'text/html',
+          value: html,
+        },
+      ],
+    };
+    try {
+      await axios.post(this.sendgridEndpoint, payload, {
+        headers: {
+          Authorization: `Bearer ${this.sendgridConfig.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      const err = error as any;
+      const responseDetails =
+        err?.response?.data || err?.message || 'Unknown error';
+      this.logger.error(
+        `Error sending email via SendGrid: ${
+          typeof responseDetails === 'string'
+            ? responseDetails
+            : JSON.stringify(responseDetails)
+        }`,
+      );
+      throw new InternalServerErrorException('Unable to send email');
+    }
   }
 
   async sendOtp(
