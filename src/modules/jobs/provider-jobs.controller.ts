@@ -168,6 +168,42 @@ export class ProviderJobsController {
     );
   }
 
+  @Post(':uuid/call-token')
+  @ApiOkResponse({
+    description: 'Call token generated successfully',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            status: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                appId: { type: 'string', example: 'your-agora-app-id' },
+                channel: { type: 'string', example: 'job-a1b2c3d4' },
+                token: { type: 'string', example: '006appId...agoraToken' },
+                uid: { type: 'string', example: 'user-uuid' },
+                expiresAt: {
+                  type: 'string',
+                  format: 'date-time',
+                  example: '2025-01-12T10:00:00.000Z',
+                },
+                ttlSeconds: { type: 'number', example: 3600 },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  async generateCallToken(
+    @Param('uuid') uuid: string,
+    @Req() request: Request,
+  ) {
+    return this.jobService.generateCallToken(uuid, request.user as any);
+  }
+
   @Get(':uuid')
   @ApiOkResponse({
     description: 'Job details fetched successfully',

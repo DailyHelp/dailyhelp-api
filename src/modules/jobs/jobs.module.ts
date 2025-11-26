@@ -12,9 +12,12 @@ import { ProviderJobsController } from './provider-jobs.controller';
 import { JobReport } from './job-reports.entity';
 import { WsModule } from '../ws/ws.module';
 import { AccountTierSetting } from '../admin/admin.entities';
+import { ConfigModule } from '@nestjs/config';
+import { AgoraConfiguration } from 'src/config/configuration';
 
 @Module({
   imports: [
+    ConfigModule.forFeature(AgoraConfiguration),
     MikroOrmModule.forFeature({
       entities: [
         Job,

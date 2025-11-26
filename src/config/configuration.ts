@@ -5,6 +5,7 @@ import { QoreIDConfig } from './types/qoreid.config';
 import { PaystackConfig } from './types/paystack.config';
 import { FirebaseAdminConfig } from './types/firebase.config';
 import { SendgridConfig } from './types/sendgrid.config';
+import { AgoraConfig } from './types/agora.config';
 
 export const SendgridConfiguration = registerAs(
   'sendgridConfig',
@@ -69,5 +70,16 @@ export const FirebaseConfiguration = registerAs(
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
+  }),
+);
+
+export const AgoraConfiguration = registerAs(
+  'agoraConfig',
+  (): AgoraConfig => ({
+    appId: process.env.AGORA_APP_ID,
+    appCertificate: process.env.AGORA_APP_CERTIFICATE,
+    tokenTtlSeconds: process.env.AGORA_TOKEN_TTL_SECONDS
+      ? Number(process.env.AGORA_TOKEN_TTL_SECONDS)
+      : undefined,
   }),
 );

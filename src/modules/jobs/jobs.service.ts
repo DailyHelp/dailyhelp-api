@@ -11,11 +11,13 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotAcceptableException,
   NotFoundException,
   UnauthorizedException,
   forwardRef,
 } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { Job, JobTimeline } from './jobs.entity';
 import { PaginationInput } from 'src/base/dto';
 import {
@@ -42,6 +44,8 @@ import { JobReport } from './job-reports.entity';
 import { AccountTierSetting } from '../admin/admin.entities';
 import { SocketGateway } from '../ws/socket.gateway';
 import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
+import { AgoraRtcRole, buildRtcToken } from 'src/lib/agora-rtc-token';
+import { AgoraConfiguration } from 'src/config/configuration';
 
 @Injectable()
 export class JobService {
@@ -69,6 +73,8 @@ export class JobService {
     private readonly accountTierRepository: EntityRepository<AccountTierSetting>,
     @Inject(forwardRef(() => SocketGateway))
     private readonly ws: SocketGateway,
+    @Inject(AgoraConfiguration.KEY)
+    private readonly agoraConfig: ConfigType<typeof AgoraConfiguration>,
   ) {}
 
   async fetchJobs(
@@ -509,6 +515,60 @@ export class JobService {
     };
 
     return { status: true, data: response };
+  }
+
+  async generateCallToken(jobUuid: string, requester: IAuthContext) {
+    const job = await this.jobRepository.findOne(
+      { uuid: jobUuid },
+      { populate: ['serviceProvider', 'serviceRequestor', 'payment'] },
+    );
+    if (!job) throw new NotFoundException('Job not found');
+
+    const isParticipant =
+      job.serviceProvider?.uuid === requester.uuid ||
+      job.serviceRequestor?.uuid === requester.uuid;
+    if (!isParticipant)
+      throw new ForbiddenException('You are not part of this job');
+
+    if (
+      job.status !== JobStatus.PENDING &&
+      job.status !== JobStatus.IN_PROGRESS
+    )
+      throw new ForbiddenException('Calls are only available for active jobs');
+
+    const paymentStatus = (job.payment?.status || '').toLowerCase();
+    if (!job.payment || paymentStatus !== 'success')
+      throw new ForbiddenException('Job payment has not been completed');
+
+    if (!this.agoraConfig?.appId || !this.agoraConfig?.appCertificate) {
+      throw new InternalServerErrorException('Agora is not configured');
+    }
+
+    const ttlSeconds = Number(this.agoraConfig.tokenTtlSeconds || 3600);
+    const expiresAtSeconds =
+      Math.floor(Date.now() / 1000) + Math.max(ttlSeconds, 60);
+    const channelName = `job-${job.uuid}`;
+
+    const token = buildRtcToken({
+      appId: this.agoraConfig.appId,
+      appCertificate: this.agoraConfig.appCertificate,
+      channelName,
+      account: requester.uuid,
+      role: AgoraRtcRole.PUBLISHER,
+      expireTimestamp: expiresAtSeconds,
+    });
+
+    return {
+      status: true,
+      data: {
+        appId: this.agoraConfig.appId,
+        channel: channelName,
+        token,
+        uid: requester.uuid,
+        expiresAt: new Date(expiresAtSeconds * 1000).toISOString(),
+        ttlSeconds,
+      },
+    };
   }
 
   private buildUserSummary(user?: Users | null) {

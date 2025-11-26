@@ -1,4 +1,10 @@
-import { IsEnum, IsString, IsNumber, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsNumber,
+  IsOptional,
+  validateSync,
+} from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 
 export enum Environment {
@@ -32,6 +38,13 @@ class EnvironmentVariables {
   API_BASE_URL: string;
   @IsString()
   PAYSTACK_SUCCESS_REDIRECT_PATH: string;
+  @IsString()
+  AGORA_APP_ID: string;
+  @IsString()
+  AGORA_APP_CERTIFICATE: string;
+  @IsOptional()
+  @IsNumber()
+  AGORA_TOKEN_TTL_SECONDS?: number = 3600;
 }
 
 export function validate(config: Record<string, unknown>) {
