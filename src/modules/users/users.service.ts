@@ -1293,6 +1293,15 @@ export class UsersService {
     c.last_locked_at AS lastLockedAt,
     c.locked,
     c.restricted,
+    CASE 
+      WHEN EXISTS (
+        SELECT 1 
+        FROM jobs j 
+        WHERE j.service_provider = c.service_provider
+          AND j.service_requestor = c.service_requestor
+          AND j.status IN ('PENDING','IN_PROGRESS')
+      ) THEN 1 ELSE 0
+    END AS hasActiveJob,
     c.cancellation_chances AS cancellationChances,
     c.created_at AS createdAt,
 
@@ -1372,6 +1381,7 @@ export class UsersService {
       ...row,
       locked: !!Number(row.locked),
       restricted: !!Number(row.restricted),
+      hasActiveJob: !!Number(row.hasActiveJob),
       unreadCount: row.myUnreadCount,
       iReadLastMessage: !!Number(row.iReadLastMessage),
       otherReadLastMessage: !!Number(row.otherReadLastMessage),
@@ -1433,6 +1443,15 @@ export class UsersService {
     c.last_locked_at AS lastLockedAt,
     c.locked,
     c.restricted,
+    CASE 
+      WHEN EXISTS (
+        SELECT 1
+        FROM jobs j
+        WHERE j.service_provider = c.service_provider
+          AND j.service_requestor = c.service_requestor
+          AND j.status IN ('PENDING','IN_PROGRESS')
+      ) THEN 1 ELSE 0
+    END AS hasActiveJob,
     c.cancellation_chances AS cancellationChances,
     c.created_at AS createdAt,
 
@@ -1512,6 +1531,7 @@ export class UsersService {
       ...row,
       locked: !!Number(row.locked),
       restricted: !!Number(row.restricted),
+      hasActiveJob: !!Number(row.hasActiveJob),
       unreadCount: row.myUnreadCount,
       iReadLastMessage: !!Number(row.iReadLastMessage),
       otherReadLastMessage: !!Number(row.otherReadLastMessage),

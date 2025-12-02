@@ -450,6 +450,9 @@ export class ConversationDto {
   restricted: boolean;
 
   @ApiProperty()
+  hasActiveJob: boolean;
+
+  @ApiProperty()
   cancellationChances: number;
 
   @ApiProperty()
