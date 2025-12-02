@@ -48,7 +48,6 @@ import {
   VerifyIdentityDto,
 } from './users.dto';
 import { Location } from 'src/entities/location.entity';
-import { ExpiredJwtAuthGuard } from 'src/guards/expired-jwt-auth-guard';
 import { Wallet } from '../wallet/wallet.entity';
 import { ReadStateService } from '../ws/read-state.service';
 
@@ -301,41 +300,6 @@ export class CustomersController {
     @Req() request: Request,
   ) {
     return this.userService.initializePaystackPayment(
-      paymentInfo,
-      request.user as any,
-    );
-  }
-
-  @Post('verify-transaction/:transactionId')
-  @UseGuards(ExpiredJwtAuthGuard)
-  @ApiBody({
-    schema: { $ref: getSchemaPath(PaymentInfo) },
-    examples: {
-      FundWallet: {
-        summary: 'Fund wallet',
-        value: {
-          purpose: PaymentPurpose.FUND_WALLET,
-          amount: 5000,
-        },
-      },
-      JobOffer: {
-        summary: 'Pay for job offer',
-        value: {
-          purpose: PaymentPurpose.JOB_OFFER,
-          offerUuid: 'offer-uuid',
-          conversationUuid: 'conversation-uuid',
-          description: 'Payment for accepted offer',
-        },
-      },
-    },
-  })
-  verifyPayment(
-    @Param('transactionId') transactionId: string,
-    @Body() paymentInfo: PaymentInfo,
-    @Req() request: Request,
-  ) {
-    return this.userService.verifyPayment(
-      transactionId,
       paymentInfo,
       request.user as any,
     );

@@ -114,18 +114,12 @@ export class IntegrationsService {
     if (payment.status === 'success' || payment.status === 'processing') return;
     const offerUuid = payment.offer?.uuid;
     if (offerUuid) {
-      const [offer, existingSettlement] = await Promise.all([
-        this.offerRepository.findOne({ uuid: offerUuid }),
-        this.paymentRepository.findOne({
-          offer: { uuid: offerUuid },
-          status: { $in: ['success', 'processing'] },
-          uuid: { $ne: payment.uuid },
-        }),
-      ]);
-      if (
-        offer?.status === OfferStatus.ACCEPTED ||
-        Boolean(existingSettlement)
-      ) {
+      const existingSettlement = await this.paymentRepository.findOne({
+        offer: { uuid: offerUuid },
+        status: { $in: ['success', 'processing'] },
+        uuid: { $ne: payment.uuid },
+      });
+      if (Boolean(existingSettlement)) {
         const meta = payment.metadata ? JSON.parse(payment.metadata) : {};
         payment.status = 'failed';
         payment.transactionId = String(data.id);
