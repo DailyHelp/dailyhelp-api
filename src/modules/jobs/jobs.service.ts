@@ -517,24 +517,36 @@ export class JobService {
     return { status: true, data: response };
   }
 
-  async generateCallToken(jobUuid: string, requester: IAuthContext) {
-    const job = await this.jobRepository.findOne(
-      { uuid: jobUuid },
-      { populate: ['serviceProvider', 'serviceRequestor', 'payment'] },
+  async generateCallToken(conversationUuid: string, requester: IAuthContext) {
+    const conversation = await this.conversationRepository.findOne(
+      { uuid: conversationUuid },
+      { populate: ['serviceProvider', 'serviceRequestor'] },
     );
-    if (!job) throw new NotFoundException('Job not found');
+    if (!conversation) throw new NotFoundException('Conversation not found');
+
+    const providerUuid = conversation.serviceProvider?.uuid;
+    const requestorUuid = conversation.serviceRequestor?.uuid;
+    if (!providerUuid || !requestorUuid)
+      throw new NotFoundException('Conversation participants not found');
 
     const isParticipant =
-      job.serviceProvider?.uuid === requester.uuid ||
-      job.serviceRequestor?.uuid === requester.uuid;
+      providerUuid === requester.uuid || requestorUuid === requester.uuid;
     if (!isParticipant)
-      throw new ForbiddenException('You are not part of this job');
+      throw new ForbiddenException('You are not part of this conversation');
 
-    if (
-      job.status !== JobStatus.PENDING &&
-      job.status !== JobStatus.IN_PROGRESS
-    )
-      throw new ForbiddenException('Calls are only available for active jobs');
+    const job = await this.jobRepository.findOne(
+      {
+        serviceProvider: { uuid: providerUuid },
+        serviceRequestor: { uuid: requestorUuid },
+        status: { $in: [JobStatus.PENDING, JobStatus.IN_PROGRESS] },
+      },
+      { populate: ['payment'], orderBy: { createdAt: QueryOrder.DESC } },
+    );
+
+    if (!job)
+      throw new NotFoundException(
+        'No active job found for this conversation',
+      );
 
     const paymentStatus = (job.payment?.status || '').toLowerCase();
     if (!job.payment || paymentStatus !== 'success')

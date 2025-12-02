@@ -88,10 +88,13 @@ export class CustomerJobsController {
     },
   })
   async generateCallToken(
-    @Param('uuid') uuid: string,
+    @Param('uuid') conversationUuid: string,
     @Req() request: Request,
   ) {
-    return this.jobService.generateCallToken(uuid, request.user as any);
+    return this.jobService.generateCallToken(
+      conversationUuid,
+      request.user as any,
+    );
   }
 
   @Get(':uuid/timelines')
