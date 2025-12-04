@@ -109,6 +109,12 @@ export class SaveProviderDetails {
   serviceImages: string[];
 }
 
+export class UpdateAvailabilityDto {
+  @ApiProperty()
+  @IsBoolean()
+  availability: boolean;
+}
+
 export class PriceFilter {
   @IsOptional()
   @IsNumber()
@@ -554,6 +560,9 @@ export class ProvidersDashboardDto {
 
   @ApiProperty()
   jobGoal: number;
+
+  @ApiProperty()
+  ratingGoal: number;
 
   @ApiProperty()
   todaysEarnings: number;

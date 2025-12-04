@@ -47,6 +47,7 @@ import {
   SaveProviderDetails,
   SendMessageDto,
   SwitchUserType,
+  UpdateAvailabilityDto,
   UpdatePricesDto,
   UpdateServiceDescriptionDto,
   VerifyIdentityDto,
@@ -114,6 +115,33 @@ export class ProvidersController {
   @Patch('prices')
   async updatePrices(@Body() body: UpdatePricesDto, @Req() req: Request) {
     return this.userService.updatePrices(body, req.user as any);
+  }
+
+  @Patch('availability')
+  @ApiBody({ type: UpdateAvailabilityDto })
+  @ApiOkResponse({
+    description: 'Provider availability updated',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            availability: { type: 'boolean', example: true },
+          },
+        },
+      },
+    },
+  })
+  async updateAvailability(
+    @Body() body: UpdateAvailabilityDto,
+    @Req() req: Request,
+  ) {
+    return this.userService.updateAvailability(
+      body.availability,
+      req.user as any,
+    );
   }
 
   @Get('dashboard')

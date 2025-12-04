@@ -65,6 +65,10 @@ export class Job extends Timestamp {
   @Property({ nullable: true })
   code: string;
 
+  @ApiProperty({ nullable: true })
+  @Property({ type: 'boolean', nullable: true })
+  providerIdentityVerified: boolean | null;
+
   @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   tip: number;
 

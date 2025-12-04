@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   Post,
   Query,
@@ -12,13 +13,19 @@ import {
   ApiBearerAuth,
   ApiExtraModels,
   ApiOkResponse,
+  ApiBody,
   ApiQuery,
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { JobService } from './jobs.service';
-import { CancelJobDto, JobQuery, ReportClientDto } from './jobs.dto';
+import {
+  CancelJobDto,
+  JobQuery,
+  ReportClientDto,
+  UpdateProviderIdentityVerificationDto,
+} from './jobs.dto';
 import { Job } from './jobs.entity';
 import { JobStatus } from 'src/types';
 import { Request } from 'express';
@@ -203,6 +210,35 @@ export class ProviderJobsController {
   ) {
     return this.jobService.generateCallToken(
       conversationUuid,
+      request.user as any,
+    );
+  }
+
+  @Patch(':uuid/provider-identity-verification')
+  @ApiBody({ type: UpdateProviderIdentityVerificationDto })
+  @ApiOkResponse({
+    description: 'Provider identity verification status updated',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            providerIdentityVerified: { type: 'boolean', nullable: true },
+          },
+        },
+      },
+    },
+  })
+  async updateProviderIdentityVerification(
+    @Param('uuid') jobUuid: string,
+    @Body() body: UpdateProviderIdentityVerificationDto,
+    @Req() request: Request,
+  ) {
+    return this.jobService.updateProviderIdentityVerification(
+      jobUuid,
+      body.verified,
       request.user as any,
     );
   }

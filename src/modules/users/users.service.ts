@@ -224,9 +224,12 @@ export class UsersService {
     if (userType === UserType.PROVIDER) {
       userExists.providerAddress =
         this.locationRepository.getReference(locationUuid);
-      if (!dto.utilityBill)
+      const onboardingCompleted = Boolean(userExists.onboardingCompleted);
+      if (!onboardingCompleted && !dto.utilityBill)
         throw new BadRequestException(`Utility bill is required`);
-      userExists.utilityBill = dto.utilityBill;
+      if (dto.utilityBill) {
+        userExists.utilityBill = dto.utilityBill;
+      }
       userExists.providerOnboarding = {
         ...userExists.providerOnboarding,
         step1: true,
@@ -369,6 +372,18 @@ export class UsersService {
     return { status: true };
   }
 
+  async updateAvailability(availability: boolean, requester: IAuthContext) {
+    if (requester.userType !== UserType.PROVIDER)
+      throw new ForbiddenException('Only providers can update availability');
+    const user = await this.usersRepository.findOne({
+      uuid: requester.uuid,
+    });
+    if (!user) throw new NotFoundException('User not found');
+    user.availability = availability;
+    await this.em.flush();
+    return { status: true, data: { availability: user.availability } };
+  }
+
   async fetchProviderDashboard({ uuid }: IAuthContext) {
     const user = await this.usersRepository.findOne({ uuid });
     if (!user) throw new NotFoundException('User not found');
@@ -405,15 +420,21 @@ export class UsersService {
     const tierSettings = await this.accountTierRepository.findAll({
       orderBy: { displayOrder: QueryOrder.ASC, minJobs: QueryOrder.ASC },
     });
-    const currentIndex = tierSettings.findIndex(
+    const currentSetting = tierSettings.find(
       (setting) => setting.tier === user.tier,
     );
-    const currentSetting =
-      currentIndex >= 0 ? tierSettings[currentIndex] : null;
-    const nextSetting =
-      currentIndex >= 0 ? tierSettings[currentIndex + 1] ?? null : null;
+    const nextSetting = currentSetting
+      ? tierSettings
+          .filter((setting) => setting.displayOrder > currentSetting.displayOrder)
+          .sort((a, b) => a.displayOrder - b.displayOrder)[0] ?? null
+      : null;
     const jobGoal = nextSetting?.minJobs ?? currentSetting?.minJobs ?? 0;
-    return { status: true, data: { user, ...providerStats[0], jobGoal } };
+    const ratingGoal =
+      nextSetting?.minAvgRating ?? currentSetting?.minAvgRating ?? 0;
+    return {
+      status: true,
+      data: { user, ...providerStats[0], jobGoal, ratingGoal },
+    };
   }
 
   async fetchTopRatedProviders(conn: Connection) {

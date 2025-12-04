@@ -7,6 +7,7 @@ import {
 } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -14,7 +15,6 @@ import {
   InternalServerErrorException,
   NotAcceptableException,
   NotFoundException,
-  UnauthorizedException,
   forwardRef,
 } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
@@ -167,8 +167,34 @@ export class JobService {
   async verifyPin(jobUuid: string, pin: string) {
     const job = await this.jobRepository.findOne({ uuid: jobUuid });
     if (!job) throw new NotFoundException(`Job not found`);
-    if (job.code !== pin) throw new UnauthorizedException(`Pin is not valid`);
+    if (job.code !== pin) throw new BadRequestException(`Pin is not valid`);
     return { status: true };
+  }
+
+  async updateProviderIdentityVerification(
+    jobUuid: string,
+    verified: boolean,
+    requester: IAuthContext,
+  ) {
+    const job = await this.jobRepository.findOne(
+      { uuid: jobUuid },
+      { populate: ['serviceProvider', 'serviceRequestor'] },
+    );
+    if (!job) throw new NotFoundException('Job not found');
+
+    const isParticipant =
+      job.serviceProvider?.uuid === requester.uuid ||
+      job.serviceRequestor?.uuid === requester.uuid;
+    if (!isParticipant)
+      throw new ForbiddenException('You are not part of this job');
+
+    job.providerIdentityVerified = verified;
+    await this.em.flush();
+
+    return {
+      status: true,
+      data: { providerIdentityVerified: job.providerIdentityVerified },
+    };
   }
 
   async shareJobCode(jobUuid: string, { uuid }: IAuthContext) {
@@ -469,6 +495,7 @@ export class JobService {
         pictures: job.pictures,
         tip: job.tip,
         code: job.code,
+        providerIdentityVerified: job.providerIdentityVerified,
         acceptedAt: job.acceptedAt,
         cancelledAt: job.cancelledAt,
         cancellationReason: job.cancellationReason,

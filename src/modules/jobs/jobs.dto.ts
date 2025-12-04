@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsNumber,
   IsNumberString,
@@ -79,4 +80,10 @@ export class RateServiceProviderDto {
   @IsOptional()
   @IsNumber()
   tip: number;
+}
+
+export class UpdateProviderIdentityVerificationDto {
+  @ApiProperty()
+  @IsBoolean()
+  verified: boolean;
 }
