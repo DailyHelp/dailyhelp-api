@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
   Param,
   Post,
   Query,
@@ -13,7 +12,6 @@ import {
   ApiBearerAuth,
   ApiExtraModels,
   ApiOkResponse,
-  ApiBody,
   ApiQuery,
   ApiTags,
   getSchemaPath,
@@ -24,7 +22,6 @@ import {
   CancelJobDto,
   JobQuery,
   ReportClientDto,
-  UpdateProviderIdentityVerificationDto,
 } from './jobs.dto';
 import { Job } from './jobs.entity';
 import { JobStatus } from 'src/types';
@@ -214,33 +211,119 @@ export class ProviderJobsController {
     );
   }
 
-  @Patch(':uuid/provider-identity-verification')
-  @ApiBody({ type: UpdateProviderIdentityVerificationDto })
+  @Get(':uuid/timelines')
   @ApiOkResponse({
-    description: 'Provider identity verification status updated',
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'boolean', example: true },
-        data: {
+    description: 'Job timelines fetched successfully',
+    content: {
+      'application/json': {
+        schema: {
           type: 'object',
           properties: {
-            providerIdentityVerified: { type: 'boolean', nullable: true },
+            status: { type: 'boolean', example: true },
+            data: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  uuid: { type: 'string', example: 'timeline-entry-uuid' },
+                  event: {
+                    type: 'string',
+                    example: 'Job Created',
+                  },
+                  createdAt: {
+                    type: 'string',
+                    format: 'date-time',
+                    example: '2025-01-10T09:15:32.000Z',
+                  },
+                  updatedAt: {
+                    type: 'string',
+                    format: 'date-time',
+                    example: '2025-01-10T09:15:32.000Z',
+                  },
+                  actor: {
+                    type: 'object',
+                    nullable: true,
+                    properties: {
+                      uuid: { type: 'string', example: 'user-uuid' },
+                      firstname: { type: 'string', example: 'Ada' },
+                      lastname: { type: 'string', example: 'Okafor' },
+                      middlename: {
+                        type: 'string',
+                        nullable: true,
+                        example: null,
+                      },
+                      picture: {
+                        type: 'string',
+                        nullable: true,
+                        example: 'https://cdn.dailyhelp.ng/users/ada.png',
+                      },
+                      email: {
+                        type: 'string',
+                        nullable: true,
+                        example: 'ada@example.com',
+                      },
+                      phone: {
+                        type: 'string',
+                        nullable: true,
+                        example: '+2348012345678',
+                      },
+                      userType: {
+                        type: 'string',
+                        enum: ['CUSTOMER', 'PROVIDER'],
+                        example: 'CUSTOMER',
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
+        },
+        example: {
+          status: true,
+          data: [
+            {
+              uuid: 'timeline-created-uuid',
+              event: 'Job Created',
+              createdAt: '2025-01-10T09:15:32.000Z',
+              updatedAt: '2025-01-10T09:15:32.000Z',
+              actor: {
+                uuid: 'customer-uuid',
+                firstname: 'Ada',
+                lastname: 'Okafor',
+                middlename: null,
+                picture: null,
+                email: 'ada@example.com',
+                phone: '+2348012345678',
+                userType: 'CUSTOMER',
+              },
+            },
+            {
+              uuid: 'timeline-accepted-uuid',
+              event: 'Job Accepted',
+              createdAt: '2025-01-11T08:00:00.000Z',
+              updatedAt: '2025-01-11T08:00:00.000Z',
+              actor: {
+                uuid: 'provider-uuid',
+                firstname: 'Musa',
+                lastname: 'Hassan',
+                middlename: null,
+                picture: 'https://cdn.dailyhelp.ng/users/musa.png',
+                email: 'musa@example.com',
+                phone: '+2348098765432',
+                userType: 'PROVIDER',
+              },
+            },
+          ],
         },
       },
     },
   })
-  async updateProviderIdentityVerification(
-    @Param('uuid') jobUuid: string,
-    @Body() body: UpdateProviderIdentityVerificationDto,
+  async fetchJobTimelines(
+    @Param('uuid') uuid: string,
     @Req() request: Request,
   ) {
-    return this.jobService.updateProviderIdentityVerification(
-      jobUuid,
-      body.verified,
-      request.user as any,
-    );
+    return this.jobService.fetchJobTimelines(uuid, request.user as any);
   }
 
   @Get(':uuid')

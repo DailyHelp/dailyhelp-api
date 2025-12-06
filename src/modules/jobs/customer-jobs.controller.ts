@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   Post,
   Query,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOkResponse,
   ApiQuery,
   ApiTags,
@@ -21,6 +23,7 @@ import {
   DisputeJobDto,
   JobQuery,
   RateServiceProviderDto,
+  UpdateProviderIdentityVerificationDto,
   VerifyJobDto,
 } from './jobs.dto';
 import { Request } from 'express';
@@ -93,6 +96,35 @@ export class CustomerJobsController {
   ) {
     return this.jobService.generateCallToken(
       conversationUuid,
+      request.user as any,
+    );
+  }
+
+  @Patch(':uuid/provider-identity-verification')
+  @ApiBody({ type: UpdateProviderIdentityVerificationDto })
+  @ApiOkResponse({
+    description: 'Provider identity verification status updated',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            providerIdentityVerified: { type: 'boolean', nullable: true },
+          },
+        },
+      },
+    },
+  })
+  async updateProviderIdentityVerification(
+    @Param('uuid') jobUuid: string,
+    @Body() body: UpdateProviderIdentityVerificationDto,
+    @Req() request: Request,
+  ) {
+    return this.jobService.updateProviderIdentityVerification(
+      jobUuid,
+      body.verified,
       request.user as any,
     );
   }
@@ -205,8 +237,11 @@ export class CustomerJobsController {
       },
     },
   })
-  async fetchJobTimelines(@Param('uuid') uuid: string) {
-    return this.jobService.fetchJobTimelines(uuid);
+  async fetchJobTimelines(
+    @Param('uuid') uuid: string,
+    @Req() request: Request,
+  ) {
+    return this.jobService.fetchJobTimelines(uuid, request.user as any);
   }
 
   @Get(':uuid')

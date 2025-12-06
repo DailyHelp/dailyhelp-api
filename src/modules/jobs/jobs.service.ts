@@ -82,16 +82,20 @@ export class JobService {
     filter: JobFilter,
     { uuid, userType }: IAuthContext,
   ) {
+    const normalizedUserType = this.normalizeUserType(userType);
+    if (!normalizedUserType)
+      throw new ForbiddenException('Invalid user type');
+
     const { page: pageRaw = 1, limit: limitRaw = 20 } = pagination || {};
     const page = Math.max(1, Number(pageRaw) || 1);
     const limit = Math.max(1, Number(limitRaw) || 20);
     const offset = (page - 1) * limit;
 
     const where: FilterQuery<Job> = {
-      ...(userType === UserType.CUSTOMER
+      ...(normalizedUserType === UserType.CUSTOMER
         ? { serviceRequestor: { uuid } }
         : {}),
-      ...(userType === UserType.PROVIDER
+      ...(normalizedUserType === UserType.PROVIDER
         ? { serviceProvider: { uuid } }
         : {}),
       ...(filter?.status ? { status: filter.status } : {}),
@@ -217,7 +221,22 @@ export class JobService {
     return { status: true };
   }
 
-  async fetchJobTimelines(jobUuid: string) {
+  async fetchJobTimelines(jobUuid: string, requester: IAuthContext) {
+    const normalizedUserType = this.normalizeUserType(requester.userType);
+    if (!normalizedUserType)
+      throw new ForbiddenException('Invalid user type');
+
+    const job = await this.jobRepository.findOne({
+      uuid: jobUuid,
+      ...(normalizedUserType === UserType.CUSTOMER
+        ? { serviceRequestor: { uuid: requester.uuid } }
+        : {}),
+      ...(normalizedUserType === UserType.PROVIDER
+        ? { serviceProvider: { uuid: requester.uuid } }
+        : {}),
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
     const timelines = await this.jobTimelineRepository.find(
       { job: { uuid: jobUuid } },
       { orderBy: { createdAt: QueryOrder.ASC }, populate: ['actor'] },
@@ -236,6 +255,8 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.PENDING)
       throw new ForbiddenException(`This job is not startable`);
+    if (!job.providerIdentityVerified)
+      throw new ForbiddenException('Provider identity is not verified');
     const provider = await this.usersRepository.findOne({
       uuid: job.serviceProvider?.uuid,
     });
@@ -454,12 +475,16 @@ export class JobService {
   }
 
   async fetchJobDetail(jobUuid: string, { uuid, userType }: IAuthContext) {
+    const normalizedUserType = this.normalizeUserType(userType);
+    if (!normalizedUserType)
+      throw new ForbiddenException('Invalid user type');
+
     const where: FilterQuery<Job> = {
       uuid: jobUuid,
-      ...(userType === UserType.CUSTOMER
+      ...(normalizedUserType === UserType.CUSTOMER
         ? { serviceRequestor: { uuid } }
         : {}),
-      ...(userType === UserType.PROVIDER
+      ...(normalizedUserType === UserType.PROVIDER
         ? { serviceProvider: { uuid } }
         : {}),
     };
@@ -477,6 +502,16 @@ export class JobService {
     });
 
     if (!job) throw new NotFoundException('Job not found');
+
+    const review =
+      job.review ??
+      (await this.jobReviewRepository.findOne(
+        { job: { uuid: jobUuid } },
+        {
+          populate: ['reviewedBy', 'reviewedFor'],
+          orderBy: { createdAt: QueryOrder.DESC },
+        },
+      ));
 
     const timelines = await this.jobTimelineRepository.find(
       { job: { uuid: jobUuid } },
@@ -504,15 +539,15 @@ export class JobService {
         updatedAt: job.updatedAt,
         serviceProvider: this.buildUserSummary(job.serviceProvider),
         serviceRequestor: this.buildUserSummary(job.serviceRequestor),
-        review: job.review
+        review: review
           ? {
-              uuid: job.review.uuid,
-              rating: job.review.rating,
-              review: job.review.review,
-              createdAt: job.review.createdAt,
-              updatedAt: job.review.updatedAt,
-              reviewedBy: this.buildUserSummary(job.review.reviewedBy),
-              reviewedFor: this.buildUserSummary(job.review.reviewedFor),
+              uuid: review.uuid,
+              rating: review.rating,
+              review: review.review,
+              createdAt: review.createdAt,
+              updatedAt: review.updatedAt,
+              reviewedBy: this.buildUserSummary(review.reviewedBy),
+              reviewedFor: this.buildUserSummary(review.reviewedFor),
             }
           : null,
         dispute: job.dispute
@@ -634,6 +669,14 @@ export class JobService {
       updatedAt: timeline.updatedAt,
       actor: this.buildUserSummary(timeline.actor),
     };
+  }
+
+  private normalizeUserType(userType?: UserType | string | null): UserType | null {
+    if (!userType) return null;
+    const normalized = `${userType}`.trim().toUpperCase();
+    if (normalized === UserType.CUSTOMER) return UserType.CUSTOMER;
+    if (normalized === UserType.PROVIDER) return UserType.PROVIDER;
+    return null;
   }
 
   private resolvePrimaryUserType(userTypes?: string | null) {
