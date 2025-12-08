@@ -1,4 +1,8 @@
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import {
+  EntityManager,
+  EntityRepository,
+  UseRequestContext,
+} from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Injectable } from '@nestjs/common';
 import {
@@ -26,6 +30,7 @@ export class ReadStateService {
     private readonly conversationRepository: EntityRepository<Conversation>,
   ) {}
 
+  @UseRequestContext()
   async markMessageRead(
     userUuid: string,
     messageUuid: string,
@@ -48,6 +53,7 @@ export class ReadStateService {
     await this.em.flush();
   }
 
+  @UseRequestContext()
   async markConversationRead(userUuid: string, conversationUuid: string) {
     const now = new Date();
     const conn = this.em.getConnection();

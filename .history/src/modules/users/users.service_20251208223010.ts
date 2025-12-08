@@ -100,10 +100,10 @@ export class UsersService {
     private readonly em: EntityManager,
     @InjectRepository(Users)
     private readonly usersRepository: EntityRepository<Users>,
-    @InjectRepository(Location)
-    private readonly locationRepository: EntityRepository<Location>,
-    @InjectRepository(JobReview)
-    private readonly reviewRepository: SqlEntityRepository<JobReview>,
+  @InjectRepository(Location)
+  private readonly locationRepository: EntityRepository<Location>,
+  @InjectRepository(JobReview)
+  private readonly reviewRepository: SqlEntityRepository<JobReview>,
     @InjectRepository(Conversation)
     private readonly conversationRepository: EntityRepository<Conversation>,
     @InjectRepository(Message)
@@ -207,7 +207,7 @@ export class UsersService {
     const locationExists = await this.locationRepository.findOne({
       address: dto.address,
       user: { uuid },
-      userType,
+      userType
     });
     if (locationExists) throw new ConflictException(`Duplicate address`);
     const locationUuid = v4();
@@ -425,11 +425,9 @@ export class UsersService {
       (setting) => setting.tier === user.tier,
     );
     const nextSetting = currentSetting
-      ? (tierSettings
-          .filter(
-            (setting) => setting.displayOrder > currentSetting.displayOrder,
-          )
-          .sort((a, b) => a.displayOrder - b.displayOrder)[0] ?? null)
+      ? tierSettings
+          .filter((setting) => setting.displayOrder > currentSetting.displayOrder)
+          .sort((a, b) => a.displayOrder - b.displayOrder)[0] ?? null
       : null;
     const jobGoal = nextSetting?.minJobs ?? currentSetting?.minJobs ?? 0;
     const ratingGoal =
