@@ -91,6 +91,13 @@ export class JobService {
     const limit = Math.max(1, Number(limitRaw) || 20);
     const offset = (page - 1) * limit;
 
+    const statusQuery =
+      filter?.status === JobStatus.COMPLETED
+        ? { status: { $in: [JobStatus.COMPLETED, JobStatus.CANCELED] } }
+        : filter?.status
+        ? { status: filter.status }
+        : {};
+
     const where: FilterQuery<Job> = {
       ...(normalizedUserType === UserType.CUSTOMER
         ? { serviceRequestor: { uuid } }
@@ -98,7 +105,7 @@ export class JobService {
       ...(normalizedUserType === UserType.PROVIDER
         ? { serviceProvider: { uuid } }
         : {}),
-      ...(filter?.status ? { status: filter.status } : {}),
+      ...statusQuery,
     };
 
     const [jobs, total] = await Promise.all([
