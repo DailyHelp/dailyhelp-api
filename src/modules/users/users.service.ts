@@ -202,6 +202,7 @@ export class UsersService {
   }
 
   async saveLocation(dto: SaveLocationDto, { uuid, userType }: IAuthContext) {
+    console.log("dto", dto);
     const userExists = await this.usersRepository.findOne({ uuid });
     if (!userExists) throw new NotFoundException(`User does not exist`);
     const locationExists = await this.locationRepository.findOne({
