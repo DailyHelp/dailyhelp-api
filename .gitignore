@@ -38,3 +38,4 @@ lerna-debug.log*
 *.p8
 
 dailyhelp-firebase-service-account.json
+.history
