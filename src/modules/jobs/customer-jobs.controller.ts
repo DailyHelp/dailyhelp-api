@@ -12,6 +12,7 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiExtraModels,
   ApiOkResponse,
   ApiQuery,
   ApiTags,
@@ -26,12 +27,14 @@ import {
   UpdateProviderIdentityVerificationDto,
   VerifyJobDto,
 } from './jobs.dto';
+import { TopRatedProvider } from '../users/users.dto';
 import { Request } from 'express';
 import { Job } from './jobs.entity';
 
 @Controller('customer/jobs')
 @ApiTags('customer-jobs')
 @ApiBearerAuth()
+@ApiExtraModels(TopRatedProvider)
 @UseGuards(JwtAuthGuard)
 export class CustomerJobsController {
   constructor(private readonly jobService: JobService) {}
@@ -1045,6 +1048,22 @@ export class CustomerJobsController {
   })
   async fetchJobDetail(@Param('uuid') uuid: string, @Req() request: Request) {
     return this.jobService.fetchJobDetail(uuid, request.user as any);
+  }
+
+  @Get(':uuid/alternate-providers')
+  @ApiOkResponse({
+    description: 'Alternate providers fetched successfully',
+    type: TopRatedProvider,
+    isArray: true,
+  })
+  async fetchAlternateProviders(
+    @Param('uuid') uuid: string,
+    @Req() request: Request,
+  ) {
+    return this.jobService.fetchAlternateProvidersForJob(
+      uuid,
+      request.user as any,
+    );
   }
 
   @Post(':uuid/cancel')

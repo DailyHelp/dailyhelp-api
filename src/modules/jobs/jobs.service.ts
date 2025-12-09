@@ -175,6 +175,72 @@ export class JobService {
     return buildResponseDataWithPagination(shapedJobs, total, { page, limit });
   }
 
+  async fetchAlternateProvidersForJob(jobUuid: string, requester: IAuthContext) {
+    const normalizedUserType = this.normalizeUserType(requester.userType);
+    if (normalizedUserType !== UserType.CUSTOMER)
+      throw new ForbiddenException('Only customers can fetch alternate providers');
+
+    const job = await this.jobRepository.findOne(
+      { uuid: jobUuid, serviceRequestor: { uuid: requester.uuid } },
+      { populate: ['serviceProvider', 'serviceProvider.primaryJobRole'] },
+    );
+    if (!job) throw new NotFoundException('Job not found');
+
+    const primaryRoleUuid = job.serviceProvider?.primaryJobRole?.uuid;
+    if (!primaryRoleUuid)
+      throw new NotFoundException('Job provider primary role not found');
+
+    const providers = await this.em
+      .getConnection()
+      .execute(
+        `
+          SELECT 
+            u.uuid,
+            u.firstname,
+            u.lastname,
+            u.avg_rating AS avgRating,
+            u.service_description AS serviceDescription,
+            r.name AS primaryJobRole,
+            u.offer_starting_price AS offerStartingPrice,
+            u.availability,
+            u.engaged,
+            COUNT(j.uuid) AS completedJobs,
+            u.tier,
+            u.picture,
+            u.service_images AS serviceImages
+          FROM users u
+          LEFT JOIN jobs j 
+            ON j.service_provider = u.uuid 
+           AND j.status = 'completed'
+          LEFT JOIN sub_categories r 
+            ON u.primary_job_role = r.uuid
+          WHERE u.availability = TRUE
+            AND COALESCE(u.engaged, 0) = 0
+            AND u.primary_job_role = ?
+            AND u.uuid <> ?
+            AND u.uuid <> ?
+          GROUP BY u.uuid
+          ORDER BY (
+            (COALESCE(u.avg_rating, 0) * 2) +
+            (CASE u.tier 
+              WHEN 'PLATINUM' THEN 7
+              WHEN 'GOLD' THEN 5
+              WHEN 'SILVER' THEN 3
+              WHEN 'BRONZE' THEN 1
+              ELSE 0
+            END) +
+            (CASE COALESCE(u.engaged, 0) WHEN 0 THEN 2 ELSE -2 END) +
+            (DATEDIFF(CURDATE(), u.last_logged_in) * -0.3)
+          ) DESC,
+          u.last_logged_in DESC
+          LIMIT 10
+        `,
+        [primaryRoleUuid, job.serviceProvider?.uuid ?? '', requester.uuid],
+      );
+
+    return { status: true, data: providers };
+  }
+
   async verifyPin(jobUuid: string, pin: string) {
     const job = await this.jobRepository.findOne({ uuid: jobUuid });
     if (!job) throw new NotFoundException(`Job not found`);
@@ -413,6 +479,9 @@ export class JobService {
     dto: RateServiceProviderDto,
     { uuid, userType }: IAuthContext,
   ) {
+    if (dto.rating < 1 || dto.rating > 5)
+      throw new NotAcceptableException('Rating must be between 1 and 5');
+
     const job = await this.jobRepository.findOne({
       uuid: jobUuid,
       serviceRequestor: { uuid },
@@ -420,6 +489,15 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.COMPLETED)
       throw new ForbiddenException(`This job is not reviewable`);
+
+    const existingReview =
+      job.review ??
+      (await this.jobReviewRepository.findOne({
+        job: { uuid: jobUuid },
+      }));
+    if (existingReview)
+      throw new NotAcceptableException('Job has already been reviewed');
+
     const provider = await this.usersRepository.findOne({
       uuid: job.serviceProvider?.uuid,
     });
@@ -435,28 +513,35 @@ export class JobService {
     });
     job.review = this.jobReviewRepository.getReference(reviewUuid);
     this.em.persist(jobReviewModel);
-    if (dto.tip) {
+    if (dto.tip !== undefined && dto.tip !== null) {
+      const tipAmount = Number(dto.tip);
+      if (tipAmount <= 0)
+        throw new NotAcceptableException('Tip must be greater than zero');
       const [providerWallet, requestorWallet] = await Promise.all([
         this.walletRepository.findOne({
           user: { uuid: job.serviceProvider?.uuid },
-          userType,
+          userType: UserType.PROVIDER,
         }),
         this.walletRepository.findOne({
           user: { uuid },
-          userType,
+          userType: UserType.CUSTOMER,
         }),
       ]);
-      if (requestorWallet.availableBalance < dto.tip)
+      if (!providerWallet)
+        throw new NotFoundException('Provider wallet not found');
+      if (!requestorWallet)
+        throw new NotFoundException('Customer wallet not found');
+      if (requestorWallet.availableBalance < tipAmount)
         throw new NotAcceptableException(`Insufficient balance`);
-      providerWallet.availableBalance += dto.tip;
-      providerWallet.totalBalance += dto.tip;
-      requestorWallet.availableBalance -= dto.tip;
-      requestorWallet.totalBalance -= dto.tip;
-      job.tip = dto.tip;
+      providerWallet.availableBalance += tipAmount;
+      providerWallet.totalBalance += tipAmount;
+      requestorWallet.availableBalance -= tipAmount;
+      requestorWallet.totalBalance -= tipAmount;
+      job.tip = tipAmount;
       const providerTransactionModel = this.transactionRepository.create({
         uuid: v4(),
         type: TransactionType.CREDIT,
-        amount: job.price,
+        amount: tipAmount,
         wallet: this.walletRepository.getReference(providerWallet.uuid),
         job: this.jobRepository.getReference(jobUuid),
         remark: 'Job Tip',
@@ -465,7 +550,7 @@ export class JobService {
       const requestorTransactionModel = this.transactionRepository.create({
         uuid: v4(),
         type: TransactionType.DEBIT,
-        amount: job.price,
+        amount: tipAmount,
         wallet: this.walletRepository.getReference(requestorWallet.uuid),
         job: this.jobRepository.getReference(jobUuid),
         remark: 'Job Tip',

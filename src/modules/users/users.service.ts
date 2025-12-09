@@ -2043,7 +2043,7 @@ export class UsersService {
       FROM users u
       LEFT JOIN jobs j 
         ON j.service_provider = u.uuid AND j.status = 'completed'
-      LEFT JOIN sub_category r 
+      LEFT JOIN sub_categories r 
         ON u.primary_job_role = r.uuid
       LEFT JOIN location l 
         ON u.default_location = l.uuid
