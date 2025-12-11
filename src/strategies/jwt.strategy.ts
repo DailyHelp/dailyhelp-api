@@ -6,7 +6,7 @@ import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtAuthConfiguration } from 'src/config/configuration';
 import { BlacklistedTokens } from 'src/modules/users/users.entity';
-import { IAuthContext } from 'src/types';
+import { IAuthContext, UserType } from 'src/types';
 import { PassportStrategy } from '@nestjs/passport';
 
 @Injectable()
@@ -31,13 +31,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       token,
     });
     if (blacklisted) throw new UnauthorizedException('Invalid token');
+    const rawUserType = (payload.userType || '') as string;
+    const normalizedUserType =
+      rawUserType &&
+      [UserType.CUSTOMER, UserType.PROVIDER].includes(
+        rawUserType.toUpperCase() as UserType,
+      )
+        ? (rawUserType.toUpperCase() as UserType)
+        : (rawUserType as UserType);
+
     return {
       uuid: payload.uuid,
       email: payload.email,
       firstname: payload.firstname,
       lastname: payload.lastname,
       phone: payload.phone,
-      userType: payload.userType,
+      userType: normalizedUserType,
     };
   }
 }
