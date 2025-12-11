@@ -22,7 +22,7 @@ import {
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/guards/jwt-auth-guard';
 import { Request } from 'express';
-import { IAuthContext, PaymentPurpose } from 'src/types';
+import { IAuthContext, PaymentMethod, PaymentPurpose } from 'src/types';
 import { Users } from './users.entity';
 import {
   CancelOfferDto,
@@ -285,16 +285,27 @@ export class CustomersController {
         },
       },
       JobOffer: {
-        summary: 'Pay for job offer',
-        value: {
-          purpose: PaymentPurpose.JOB_OFFER,
-          offerUuid: 'offer-uuid',
-          conversationUuid: 'conversation-uuid',
-          description: 'Payment for accepted offer',
+          summary: 'Pay for job offer',
+          value: {
+            purpose: PaymentPurpose.JOB_OFFER,
+            paymentMethod: PaymentMethod.PAYSTACK,
+            offerUuid: 'offer-uuid',
+            conversationUuid: 'conversation-uuid',
+            description: 'Payment for accepted offer',
+          },
+        },
+        JobOfferWallet: {
+          summary: 'Pay for job offer using wallet',
+          value: {
+            purpose: PaymentPurpose.JOB_OFFER,
+            paymentMethod: PaymentMethod.WALLET,
+            offerUuid: 'offer-uuid',
+            conversationUuid: 'conversation-uuid',
+            description: 'Payment for accepted offer',
+          },
         },
       },
-    },
-  })
+    })
   initializePaystackPayment(
     @Body() paymentInfo: PaymentInfo,
     @Req() request: Request,

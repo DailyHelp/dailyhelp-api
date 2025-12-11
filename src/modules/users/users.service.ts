@@ -55,6 +55,7 @@ import {
   JobStatus,
   MessageType,
   OfferStatus,
+  PaymentMethod,
   PaymentPurpose,
   PaymentType,
   TransactionStatus,
@@ -1904,12 +1905,15 @@ export class UsersService {
     { uuid, userType, email }: IAuthContext,
   ) {
     const reference = v4();
+    const paymentMethod = dto.paymentMethod ?? PaymentMethod.PAYSTACK;
 
     // Determine amount and validate references based on purpose
     let amountKobo = 0;
     let amountNaira = 0;
     let offerRef: any = null;
     let conversationRef: any = null;
+    let offer: Offer | null = null;
+    let conversation: Conversation | null = null;
 
     if (dto.purpose === PaymentPurpose.JOB_OFFER) {
       if (!dto.offerUuid || !dto.conversationUuid)
@@ -1917,7 +1921,7 @@ export class UsersService {
           'offerUuid and conversationUuid are required for JOB_OFFER',
         );
 
-      const [conversation, offer] = await Promise.all([
+      [conversation, offer] = await Promise.all([
         this.conversationRepository.findOne({ uuid: dto.conversationUuid }),
         this.offerRepository.findOne({ uuid: dto.offerUuid }),
       ]);
@@ -1958,7 +1962,77 @@ export class UsersService {
       conversationRef = this.conversationRepository.getReference(
         dto.conversationUuid,
       );
+
+      if (paymentMethod === PaymentMethod.WALLET) {
+        if (amountNaira <= 0)
+          throw new BadRequestException('Offer amount must be greater than zero');
+        const wallet = await this.walletRepository.findOne({
+          user: { uuid },
+          userType,
+        });
+        if (!wallet) throw new NotFoundException('Wallet not found');
+        if (wallet.availableBalance < amountNaira)
+          throw new ForbiddenException('Insufficient wallet balance');
+
+        const paymentModel = this.paymentRepository.create({
+          uuid: reference,
+          reference,
+          amount: amountNaira,
+          currency: Currencies.NGN,
+          user: this.usersRepository.getReference(uuid),
+          type: PaymentType.INCOMING,
+          userType,
+          offer: offerRef,
+          conversation: conversationRef,
+          status: 'success',
+          processedAt: new Date(),
+          channel: PaymentMethod.WALLET,
+          metadata: JSON.stringify({
+            purpose: dto.purpose,
+            description: dto.description,
+            paymentMethod,
+          }),
+        });
+
+        const transactionModel = this.transactionRepository.create({
+          uuid: v4(),
+          type: TransactionType.DEBIT,
+          status: TransactionStatus.SUCCESS,
+          amount: amountNaira,
+          wallet: this.walletRepository.getReference(wallet.uuid),
+          payment: this.paymentRepository.getReference(paymentModel.uuid),
+          remark: 'Job Offer Payment',
+          locked: false,
+        });
+
+        wallet.availableBalance -= amountNaira;
+        wallet.totalBalance -= amountNaira;
+
+        this.em.persist(paymentModel);
+        this.em.persist(transactionModel);
+
+        await this.createJobAfterSuccessfulPayment({
+          conversation,
+          offer,
+          payment: paymentModel,
+          description: dto.description,
+        });
+
+        await this.em.flush();
+
+        return {
+          status: true,
+          data: {
+            reference,
+            paymentMethod,
+          },
+        };
+      }
     } else if (dto.purpose === PaymentPurpose.FUND_WALLET) {
+      if (paymentMethod === PaymentMethod.WALLET)
+        throw new BadRequestException(
+          'Wallet cannot be used to fund wallet; select PAYSTACK',
+        );
       if (!dto.amount || dto.amount < 1)
         throw new BadRequestException('Amount is required to fund wallet');
       amountNaira = Number(dto.amount);
@@ -1979,6 +2053,7 @@ export class UsersService {
         conversationUuid: dto.conversationUuid ?? null,
         userUuid: uuid,
         userType,
+        paymentMethod,
       },
     };
     if (this.paystackConfig.successRedirectUrl) {
@@ -2009,6 +2084,7 @@ export class UsersService {
       metadata: JSON.stringify({
         purpose: dto.purpose,
         description: dto.description,
+        paymentMethod,
       }),
     });
     this.em.persist(paymentModel);
@@ -2020,8 +2096,59 @@ export class UsersService {
         authorizationUrl: authorization_url,
         accessCode: access_code,
         reference,
+        paymentMethod,
       },
     };
+  }
+
+  private async createJobAfterSuccessfulPayment(params: {
+    conversation: Conversation;
+    offer: Offer;
+    payment: Payment;
+    description?: string;
+  }) {
+    const { conversation, offer, payment, description } = params;
+
+    offer.status = OfferStatus.ACCEPTED;
+    conversation.locked = false;
+    conversation.lastLockedAt = null;
+    conversation.cancellationChances = 3;
+    conversation.restricted = false;
+
+    const jobUuid = v4();
+    const jobModel = this.jobRepository.create({
+      uuid: jobUuid,
+      serviceProvider: this.usersRepository.getReference(
+        conversation.serviceProvider?.uuid,
+      ),
+      serviceRequestor: this.usersRepository.getReference(
+        conversation.serviceRequestor?.uuid,
+      ),
+      description: description ?? offer.description,
+      requestId: `DH${generateOtp(4)}`,
+      price: offer.price,
+      pictures: offer.pictures,
+      code: generateOtp(4),
+      payment: this.paymentRepository.getReference(payment.uuid),
+      acceptedAt: new Date(),
+    });
+    const jobTimelineModel = this.jobTimelineRepository.create({
+      uuid: v4(),
+      job: this.jobRepository.getReference(jobUuid),
+      event: 'Offer Accepted',
+      actor: this.usersRepository.getReference(payment.user?.uuid),
+    });
+    this.em.persist(jobModel);
+    this.em.persist(jobTimelineModel);
+    this.ws.jobCreated({
+      uuid: jobModel.uuid,
+      conversationUuid: conversation.uuid,
+      serviceProviderUuid: conversation.serviceProvider?.uuid,
+      serviceRequestorUuid: conversation.serviceRequestor?.uuid,
+      price: offer.price,
+      status: jobModel.status,
+      ...jobModel,
+    });
   }
 
   async fetchSimilarProviders(selectedUserUuid: string) {

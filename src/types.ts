@@ -25,6 +25,11 @@ export enum PaymentPurpose {
   FUND_WALLET = 'FUND_WALLET',
 }
 
+export enum PaymentMethod {
+  PAYSTACK = 'PAYSTACK',
+  WALLET = 'WALLET',
+}
+
 export enum DisputeStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',

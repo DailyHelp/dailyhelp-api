@@ -13,7 +13,14 @@ import {
 import { Users } from './users.entity';
 import { Transform, Type } from 'class-transformer';
 import { createPaginatedSwaggerDto, PaginationInput } from 'src/base/dto';
-import { AccountTier, OfferStatus, PaymentPurpose, UserType, DisputeStatus } from 'src/types';
+import {
+  AccountTier,
+  OfferStatus,
+  PaymentPurpose,
+  PaymentMethod,
+  UserType,
+  DisputeStatus,
+} from 'src/types';
 import { ApiProperty } from '@nestjs/swagger';
 import { JobDispute } from '../jobs/job-dispute.entity';
 import { JobReview } from 'src/entities/job-review.entity';
@@ -321,6 +328,15 @@ export class PaymentInfo {
   @IsEnum(PaymentPurpose)
   @ApiProperty({ enum: PaymentPurpose, enumName: 'PaymentPurpose' })
   purpose: PaymentPurpose;
+
+  @IsEnum(PaymentMethod)
+  @ApiProperty({
+    enum: PaymentMethod,
+    enumName: 'PaymentMethod',
+    required: false,
+    description: 'PAYSTACK by default; WALLET only supported for JOB_OFFER',
+  })
+  paymentMethod?: PaymentMethod;
 }
 
 export class SwitchUserType {
