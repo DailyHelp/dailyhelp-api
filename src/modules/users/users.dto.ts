@@ -329,11 +329,13 @@ export class PaymentInfo {
   @ApiProperty({ enum: PaymentPurpose, enumName: 'PaymentPurpose' })
   purpose: PaymentPurpose;
 
+  @IsOptional()
   @IsEnum(PaymentMethod)
   @ApiProperty({
     enum: PaymentMethod,
     enumName: 'PaymentMethod',
     required: false,
+    default: PaymentMethod.PAYSTACK,
     description: 'PAYSTACK by default; WALLET only supported for JOB_OFFER',
   })
   paymentMethod?: PaymentMethod;
