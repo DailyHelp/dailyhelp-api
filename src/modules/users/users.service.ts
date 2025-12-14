@@ -959,11 +959,33 @@ export class UsersService {
       conversation.lastLockedAt = new Date();
       conversation.cancellationChances = 3;
     }
+    const messageModel = this.messageRepository.create({
+      uuid: v4(),
+      conversation: this.conversationRepository.getReference(conversation.uuid),
+      from: this.usersRepository.getReference(uuid),
+      to: this.usersRepository.getReference(messageExists.to?.uuid),
+      type: MessageType.OFFER,
+      offer: this.offerRepository.getReference(offerExists.uuid),
+      message: dto.reason || 'Offer cancelled',
+    });
+    conversation.lastMessage = this.messageRepository.getReference(
+      messageModel.uuid,
+    );
+    this.em.persist(messageModel);
     await this.em.flush();
     this.ws.offerUpdated({
       uuid: offerExists.uuid,
       conversationUuid: messageExists.conversation?.uuid,
       ...offerExists,
+    });
+    this.ws.messageCreated({
+      uuid: messageModel.uuid,
+      conversationUuid: conversation.uuid,
+      fromUuid: uuid,
+      toUuid: messageExists.to?.uuid,
+      message: messageModel.message,
+      type: MessageType.OFFER,
+      createdAt: messageModel.createdAt,
     });
     return { status: true };
   }
@@ -979,12 +1001,40 @@ export class UsersService {
     if (offerExists.status !== OfferStatus.PENDING)
       throw new ForbiddenException(`Offer status cannot be updated`);
     offerExists.status = OfferStatus.ACCEPTED;
+    const conversation = await this.conversationRepository.findOne({
+      uuid: messageExists.conversation.uuid,
+    });
+    const messageModel = this.messageRepository.create({
+      uuid: v4(),
+      conversation: this.conversationRepository.getReference(
+        conversation.uuid,
+      ),
+      from: this.usersRepository.getReference(uuid),
+      to: this.usersRepository.getReference(messageExists.from?.uuid),
+      type: MessageType.OFFER,
+      offer: this.offerRepository.getReference(offerExists.uuid),
+      message: 'Offer accepted',
+    });
+    conversation.lastMessage = this.messageRepository.getReference(
+      messageModel.uuid,
+    );
+    this.em.persist(messageModel);
     await this.em.flush();
     this.ws.offerUpdated({
       uuid: offerExists.uuid,
       conversationUuid: messageExists.conversation?.uuid,
       ...offerExists,
     });
+    this.ws.messageCreated({
+      uuid: messageModel.uuid,
+      conversationUuid: conversation.uuid,
+      fromUuid: uuid,
+      toUuid: messageExists.from?.uuid,
+      message: messageModel.message,
+      type: MessageType.OFFER,
+      createdAt: messageModel.createdAt,
+    });
+    this.readService.markConversationRead(uuid, conversation.uuid);
     return { status: true };
   }
 
@@ -1022,6 +1072,7 @@ export class UsersService {
       to: this.usersRepository.getReference(messageExists.from?.uuid),
       type: MessageType.OFFER,
       offer: this.offerRepository.getReference(offerModel.uuid),
+      message: dto.reason || 'Counter offer sent',
     });
     conversation.lastMessage = this.messageRepository.getReference(
       messageModel.uuid,
@@ -1034,6 +1085,15 @@ export class UsersService {
       toUuid: messageExists.from?.uuid,
       oldOffer: offerExists,
       newOffer: offerModel,
+    });
+    this.ws.messageCreated({
+      uuid: messageModel.uuid,
+      conversationUuid: conversation.uuid,
+      fromUuid: uuid,
+      toUuid: messageExists.from?.uuid,
+      message: messageModel.message,
+      type: MessageType.OFFER,
+      createdAt: messageModel.createdAt,
     });
     this.readService.markConversationRead(
       uuid,
@@ -1087,6 +1147,15 @@ export class UsersService {
       conversationUuid: conversation.uuid,
       status: OfferStatus.DECLINED,
       ...offerExists,
+    });
+    this.ws.messageCreated({
+      uuid: messageModel.uuid,
+      conversationUuid: conversation.uuid,
+      fromUuid: uuid,
+      toUuid: messageExists.from?.uuid,
+      message: messageModel.message,
+      type: MessageType.OFFER,
+      createdAt: messageModel.createdAt,
     });
     this.readService.markConversationRead(uuid, conversation.uuid);
     return { status: true };

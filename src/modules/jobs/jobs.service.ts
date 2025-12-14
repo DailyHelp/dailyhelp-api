@@ -112,6 +112,11 @@ export class JobService {
       this.jobRepository.find(where, {
         limit,
         offset,
+        orderBy: {
+          endDate: QueryOrder.DESC,
+          startDate: QueryOrder.DESC,
+          createdAt: QueryOrder.DESC,
+        },
       }),
       this.jobRepository.count(where),
     ]);
