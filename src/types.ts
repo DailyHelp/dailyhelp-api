@@ -78,6 +78,7 @@ export enum OfferStatus {
   PENDING = 'PENDING',
   CANCELLED = 'CANCELLED',
   ACCEPTED = 'ACCEPTED',
+  PAID = 'PAID',
   DECLINED = 'DECLINED',
   COUNTERED = 'COUNTERED',
 }

@@ -202,7 +202,7 @@ export class IntegrationsService {
       uuid: payment.conversation?.uuid,
     });
     if (!conversation) throw new NotFoundException(`Conversation not found`);
-    offer.status = OfferStatus.ACCEPTED;
+    offer.status = OfferStatus.PAID;
     conversation.locked = false;
     conversation.lastLockedAt = null;
     conversation.cancellationChances = 3;
