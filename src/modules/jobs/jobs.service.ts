@@ -785,7 +785,7 @@ export class JobService {
       fromName: callerName,
     });
 
-    return {
+    const response = {
       status: true,
       data: {
         appId: this.agoraConfig.appId,
@@ -796,6 +796,14 @@ export class JobService {
         ttlSeconds,
       },
     };
+
+    this.logger.debug(
+      `Call token response for conversation=${conversationUuid}: ${JSON.stringify(
+        response,
+      )}`,
+    );
+
+    return response;
   }
 
   private buildAgoraRtcToken(
