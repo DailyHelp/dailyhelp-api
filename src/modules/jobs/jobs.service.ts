@@ -718,6 +718,27 @@ export class JobService {
       throw new InternalServerErrorException('Agora is not configured');
     }
 
+    const buildDisplayName = (
+      user?: {
+        firstname?: string | null;
+        lastname?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        uuid?: string;
+      } | null,
+      fallback?: string,
+    ) => {
+      if (!user) return fallback || null;
+      const full = [user.firstname, user.lastname]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (full) return full;
+      if (user.email) return user.email;
+      if (user.phone) return user.phone;
+      return fallback || user.uuid || null;
+    };
+
     const ttlSeconds = Math.max(
       60,
       Number(this.agoraConfig.tokenTtlSeconds || 3600),
@@ -725,6 +746,15 @@ export class JobService {
     const expiresAtSeconds = Math.floor(Date.now() / 1000) + ttlSeconds;
     const channelName = `job-${job.uuid}`;
     const agoraUid = 0;
+    const recipientUuid =
+      requester.uuid === providerUuid ? requestorUuid : providerUuid;
+    const callerUser =
+      requester.uuid === providerUuid
+        ? conversation.serviceProvider
+        : conversation.serviceRequestor;
+    const callerName =
+      buildDisplayName(requester, buildDisplayName(callerUser, requester.uuid)) ||
+      'Someone';
 
     let token: string;
     try {
@@ -740,6 +770,21 @@ export class JobService {
       `Generated Agora token payload → channel=${channelName}, uid=${agoraUid}, requester=${requester.uuid}, role=${RtcRole.PUBLISHER}, exp=${expiresAtSeconds}`,
     );
 
+    const expiresAtIso = new Date(expiresAtSeconds * 1000).toISOString();
+    this.ws.callInitiated({
+      conversationUuid,
+      jobUuid: job.uuid,
+      fromUuid: requester.uuid,
+      toUuid: recipientUuid,
+      appId: this.agoraConfig.appId,
+      channel: channelName,
+      token,
+      uid: agoraUid,
+      expiresAt: expiresAtIso,
+      ttlSeconds,
+      fromName: callerName,
+    });
+
     return {
       status: true,
       data: {
@@ -747,7 +792,7 @@ export class JobService {
         channel: channelName,
         token,
         uid: agoraUid,
-        expiresAt: new Date(expiresAtSeconds * 1000).toISOString(),
+        expiresAt: expiresAtIso,
         ttlSeconds,
       },
     };

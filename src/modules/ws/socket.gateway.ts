@@ -440,4 +440,40 @@ export class SocketGateway {
     );
   }
 
+  callInitiated(payload: {
+    conversationUuid: string;
+    jobUuid: string;
+    fromUuid: string;
+    toUuid: string;
+    fromName: string;
+    appId: string;
+    channel: string;
+    token: string;
+    uid: number;
+    expiresAt: string;
+    ttlSeconds: number;
+  }) {
+    this.server.to(userRoom(payload.toUuid)).emit('call:incoming', payload);
+
+    const callerName = payload.fromName || 'Someone';
+    const body = `${callerName} is calling you`;
+
+    this.notify.sendToUserUuids(
+      [payload.toUuid],
+      {
+        title: 'Incoming call',
+        body,
+        data: {
+          type: 'CALL_INCOMING',
+          conversationUuid: payload.conversationUuid,
+          jobUuid: payload.jobUuid,
+          channel: payload.channel,
+          uid: String(payload.uid),
+          expiresAt: payload.expiresAt,
+          callerName,
+        },
+      },
+      payload.fromUuid,
+    );
+  }
 }
