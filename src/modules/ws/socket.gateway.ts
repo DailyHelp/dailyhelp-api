@@ -38,8 +38,16 @@ export class SocketGateway {
     private readonly jobService: JobService,
   ) {}
 
-  private getRoomSize(room: string) {
-    return this.server?.sockets?.adapter?.rooms?.get(room)?.size ?? 0;
+  private async getRoomSize(room: string) {
+    try {
+      const sockets = await this.server.in(room).fetchSockets();
+      return sockets.length;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch sockets for room=${room}: ${(error as Error)?.message || error}`,
+      );
+      return 0;
+    }
   }
 
   private getClientUser(client: Socket): WSUser | null {
@@ -77,9 +85,9 @@ export class SocketGateway {
       return;
     }
     const room = userRoom(user.uuid);
-    client.join(room);
+    await client.join(room);
     const count = await this.presence.addConnection(user.uuid, client.id);
-    const socketsInRoom = this.getRoomSize(room);
+    const socketsInRoom = await this.getRoomSize(room);
     this.logger.log(
       `WS connected → user=${user.uuid}, room=${room}, socketsInRoom=${socketsInRoom}, presenceConnections=${count}`,
     );
@@ -449,7 +457,7 @@ export class SocketGateway {
     );
   }
 
-  callInitiated(payload: {
+  async callInitiated(payload: {
     conversationUuid: string;
     jobUuid: string;
     fromUuid: string;
@@ -463,9 +471,11 @@ export class SocketGateway {
     ttlSeconds: number;
   }) {
     const room = userRoom(payload.toUuid);
-    const socketsInRoom = this.getRoomSize(room);
+    const sockets = await this.server.in(room).fetchSockets();
+    const socketsInRoom = sockets.length;
+    const socketIds = sockets.map((s) => s.id);
     this.logger.log(
-      `Emitting call:incoming → to=${payload.toUuid} room=${room} sockets=${socketsInRoom} from=${payload.fromUuid} conversation=${payload.conversationUuid}`,
+      `Emitting call:incoming → to=${payload.toUuid} room=${room} sockets=${socketsInRoom} socketIds=${socketIds.join(',')} from=${payload.fromUuid} conversation=${payload.conversationUuid}`,
     );
     this.server.to(room).emit('call:incoming', payload);
     if (socketsInRoom === 0) {

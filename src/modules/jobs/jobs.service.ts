@@ -771,7 +771,7 @@ export class JobService {
     );
 
     const expiresAtIso = new Date(expiresAtSeconds * 1000).toISOString();
-    this.ws.callInitiated({
+    await this.ws.callInitiated({
       conversationUuid,
       jobUuid: job.uuid,
       fromUuid: requester.uuid,
