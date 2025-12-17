@@ -23,7 +23,7 @@ const config: Options = {
   driverOptions: {
     typeCast: booleanTinyIntTypeCast,
   },
-  debug: ['query'],
+  debug: false,
 };
 
 export default defineConfig(config);

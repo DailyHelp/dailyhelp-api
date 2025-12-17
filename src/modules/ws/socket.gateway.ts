@@ -38,6 +38,10 @@ export class SocketGateway {
     private readonly jobService: JobService,
   ) {}
 
+  private getRoomSize(room: string) {
+    return this.server?.sockets?.adapter?.rooms?.get(room)?.size ?? 0;
+  }
+
   private getClientUser(client: Socket): WSUser | null {
     let user: WSUser | undefined = (client as any).user;
     if (!user?.uuid) {
@@ -72,8 +76,13 @@ export class SocketGateway {
       client.disconnect(true);
       return;
     }
-    client.join(userRoom(user.uuid));
+    const room = userRoom(user.uuid);
+    client.join(room);
     const count = await this.presence.addConnection(user.uuid, client.id);
+    const socketsInRoom = this.getRoomSize(room);
+    this.logger.log(
+      `WS connected → user=${user.uuid}, room=${room}, socketsInRoom=${socketsInRoom}, presenceConnections=${count}`,
+    );
     if (count === 1) {
       this.server.emit('presence:update', {
         userUuid: user.uuid,
@@ -453,7 +462,17 @@ export class SocketGateway {
     expiresAt: string;
     ttlSeconds: number;
   }) {
-    this.server.to(userRoom(payload.toUuid)).emit('call:incoming', payload);
+    const room = userRoom(payload.toUuid);
+    const socketsInRoom = this.getRoomSize(room);
+    this.logger.log(
+      `Emitting call:incoming → to=${payload.toUuid} room=${room} sockets=${socketsInRoom} from=${payload.fromUuid} conversation=${payload.conversationUuid}`,
+    );
+    this.server.to(room).emit('call:incoming', payload);
+    if (socketsInRoom === 0) {
+      this.logger.warn(
+        `call:incoming emitted but no active sockets in room=${room} for user=${payload.toUuid}`,
+      );
+    }
 
     const callerName = payload.fromName || 'Someone';
     const body = `${callerName} is calling you`;
