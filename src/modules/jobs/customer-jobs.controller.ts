@@ -79,7 +79,7 @@ export class CustomerJobsController {
                 appId: { type: 'string', example: 'your-agora-app-id' },
                 channel: { type: 'string', example: 'job-a1b2c3d4' },
                 token: { type: 'string', example: '006appId...agoraToken' },
-                uid: { type: 'string', example: 'user-uuid' },
+                uid: { type: 'number', example: 0 },
                 expiresAt: {
                   type: 'string',
                   format: 'date-time',

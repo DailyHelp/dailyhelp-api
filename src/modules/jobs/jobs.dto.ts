@@ -57,17 +57,21 @@ export class ReportClientDto {
 }
 
 export class DisputeJobDto {
+  @IsOptional()
   @IsString()
-  reason: string;
+  reason?: string;
 
+  @IsOptional()
   @IsString()
-  reasonCategory: string;
+  reasonCategory?: string;
 
+  @IsOptional()
   @IsString({ each: true })
-  pictures: string[];
+  pictures?: string[];
 
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 }
 
 export class RateServiceProviderDto {

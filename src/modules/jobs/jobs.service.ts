@@ -15,6 +15,7 @@ import {
   InternalServerErrorException,
   NotAcceptableException,
   NotFoundException,
+  Logger,
   forwardRef,
 } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
@@ -44,7 +45,7 @@ import { JobReport } from './job-reports.entity';
 import { AccountTierSetting } from '../admin/admin.entities';
 import { SocketGateway } from '../ws/socket.gateway';
 import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
-import { AgoraRtcRole, buildRtcToken } from 'src/lib/agora-rtc-token';
+import { RtcRole, RtcTokenBuilder } from 'agora-token';
 import { AgoraConfiguration } from 'src/config/configuration';
 
 @Injectable()
@@ -76,6 +77,8 @@ export class JobService {
     @Inject(AgoraConfiguration.KEY)
     private readonly agoraConfig: ConfigType<typeof AgoraConfiguration>,
   ) {}
+
+  private readonly logger = new Logger(JobService.name);
 
   async fetchJobs(
     pagination: PaginationInput,
@@ -715,19 +718,27 @@ export class JobService {
       throw new InternalServerErrorException('Agora is not configured');
     }
 
-    const ttlSeconds = Number(this.agoraConfig.tokenTtlSeconds || 3600);
-    const expiresAtSeconds =
-      Math.floor(Date.now() / 1000) + Math.max(ttlSeconds, 60);
+    const ttlSeconds = Math.max(
+      60,
+      Number(this.agoraConfig.tokenTtlSeconds || 3600),
+    );
+    const expiresAtSeconds = Math.floor(Date.now() / 1000) + ttlSeconds;
     const channelName = `job-${job.uuid}`;
+    const agoraUid = 0;
 
-    const token = buildRtcToken({
-      appId: this.agoraConfig.appId,
-      appCertificate: this.agoraConfig.appCertificate,
-      channelName,
-      account: requester.uuid,
-      role: AgoraRtcRole.PUBLISHER,
-      expireTimestamp: expiresAtSeconds,
-    });
+    let token: string;
+    try {
+      token = this.buildAgoraRtcToken(channelName, agoraUid, ttlSeconds);
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate Agora token for channel=${channelName}, uid=${agoraUid}, requester=${requester.uuid}: ${error?.message || error}`,
+      );
+      throw new InternalServerErrorException('Failed to generate Agora token');
+    }
+
+    this.logger.debug(
+      `Generated Agora token payload → channel=${channelName}, uid=${agoraUid}, requester=${requester.uuid}, role=${RtcRole.PUBLISHER}, exp=${expiresAtSeconds}`,
+    );
 
     return {
       status: true,
@@ -735,11 +746,36 @@ export class JobService {
         appId: this.agoraConfig.appId,
         channel: channelName,
         token,
-        uid: requester.uuid,
+        uid: agoraUid,
         expiresAt: new Date(expiresAtSeconds * 1000).toISOString(),
         ttlSeconds,
       },
     };
+  }
+
+  private buildAgoraRtcToken(
+    channelName: string,
+    uid: number,
+    ttlSeconds: number,
+  ) {
+    try {
+      this.logger.debug(
+        `Agora token input → appId=${this.agoraConfig.appId}, channel=${channelName}, uid=${uid}, role=${RtcRole.PUBLISHER}, tokenTtlSeconds=${ttlSeconds}, privilegeTtlSeconds=${ttlSeconds}`,
+      );
+      return RtcTokenBuilder.buildTokenWithUid(
+        this.agoraConfig.appId,
+        this.agoraConfig.appCertificate,
+        channelName,
+        uid,
+        RtcRole.PUBLISHER,
+        ttlSeconds,
+        ttlSeconds,
+      );
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Agora token build failed: ${error?.message || error}`,
+      );
+    }
   }
 
   private buildUserSummary(user?: Users | null) {
@@ -893,13 +929,17 @@ export class JobService {
     provider.completedJobs += provider.completedJobs;
     conversation.restricted = true;
     job.status = JobStatus.DISPUTED;
+    const pictures =
+      Array.isArray(dto.pictures) && dto.pictures.length
+        ? dto.pictures.filter(Boolean)
+        : [];
     const disputeModel = this.jobDisputeRepository.create({
       uuid: v4(),
       job: this.jobRepository.getReference(jobUuid),
       code: `DH${generateOtp(4)}`,
-      category: dto.reasonCategory,
-      description: dto.description,
-      pictures: dto.pictures.join(','),
+      category: dto.reasonCategory ?? null,
+      description: dto.description ?? null,
+      pictures: pictures.length ? pictures.join(',') : null,
       submittedBy: this.usersRepository.getReference(uuid),
       submittedFor: this.usersRepository.getReference(
         job.serviceProvider?.uuid,

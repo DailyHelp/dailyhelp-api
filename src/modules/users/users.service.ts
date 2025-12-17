@@ -1465,68 +1465,82 @@ export class UsersService {
 	    m.message AS lastMessage,
 	    o.description AS offerDescription,
 	    o.status AS offerStatus,
-    o.price AS offerPrice,
-    c.last_locked_at AS lastLockedAt,
-    c.locked,
-    c.restricted,
-    CASE 
-      WHEN EXISTS (
-        SELECT 1
-        FROM jobs j
-        WHERE j.service_provider = c.service_provider
-          AND j.service_requestor = c.service_requestor
-          AND j.status IN ('PENDING','IN_PROGRESS')
-      ) THEN 1 ELSE 0
-    END AS hasActiveJob,
-    c.cancellation_chances AS cancellationChances,
-    c.created_at AS createdAt,
+      o.price AS offerPrice,
+      c.last_locked_at AS lastLockedAt,
+      c.locked,
+      c.restricted,
+      CASE 
+        WHEN EXISTS (
+          SELECT 1
+          FROM jobs j
+          WHERE j.service_provider = c.service_provider
+            AND j.service_requestor = c.service_requestor
+            AND j.status IN ('PENDING','IN_PROGRESS')
+        ) THEN 1 ELSE 0
+      END AS hasActiveJob,
+      c.cancellation_chances AS cancellationChances,
+      c.created_at AS createdAt,
 
-    crs_me.last_read_at   AS myLastReadAt,
-    crs_sp.last_read_at   AS otherLastReadAt,
+      crs_me.last_read_at   AS myLastReadAt,
+      crs_sp.last_read_at   AS otherLastReadAt,
 
-    CASE 
-      WHEN m.created_at IS NOT NULL
-        AND crs_me.last_read_at IS NOT NULL
-        AND m.created_at <= crs_me.last_read_at
-      THEN 1 ELSE 0
-    END AS iReadLastMessage,
+      CASE 
+        WHEN m.created_at IS NOT NULL
+          AND crs_me.last_read_at IS NOT NULL
+          AND m.created_at <= crs_me.last_read_at
+        THEN 1 ELSE 0
+      END AS iReadLastMessage,
 
-    CASE 
-      WHEN m.created_at IS NOT NULL
-        AND crs_sp.last_read_at IS NOT NULL
-        AND m.created_at <= crs_sp.last_read_at
-      THEN 1 ELSE 0
-    END AS otherReadLastMessage,
+      CASE 
+        WHEN m.created_at IS NOT NULL
+          AND crs_sp.last_read_at IS NOT NULL
+          AND m.created_at <= crs_sp.last_read_at
+        THEN 1 ELSE 0
+      END AS otherReadLastMessage,
 
-    crs_me.unread_count AS myUnreadCount
+      crs_me.unread_count AS myUnreadCount
 
-  FROM conversations c
-  LEFT JOIN users sp ON c.service_provider = sp.uuid
-  LEFT JOIN users rq ON c.service_requestor = rq.uuid
-  LEFT JOIN messages m ON c.last_message = m.uuid
-  LEFT JOIN offers o ON m.offer = o.uuid
+    FROM conversations c
+    LEFT JOIN users sp ON c.service_provider = sp.uuid
+    LEFT JOIN users rq ON c.service_requestor = rq.uuid
+    LEFT JOIN messages m ON c.last_message = m.uuid
+    /* latest offer per conversation */
+    LEFT JOIN (
+      SELECT mo.conversation, mo.offer
+      FROM messages mo
+      INNER JOIN (
+        SELECT conversation, MAX(created_at) AS last_offer_created_at
+        FROM messages
+        WHERE offer IS NOT NULL
+        GROUP BY conversation
+      ) latest_offer
+        ON latest_offer.conversation = mo.conversation
+       AND latest_offer.last_offer_created_at = mo.created_at
+      WHERE mo.offer IS NOT NULL
+    ) lo ON lo.conversation = c.uuid
+    LEFT JOIN offers o ON lo.offer = o.uuid
 
-  /* pre-aggregate to ensure one row per (conversation,user) */
-  LEFT JOIN (
-    SELECT conversation, user, 
-           MAX(last_read_at)   AS last_read_at,
-           MAX(unread_count)   AS unread_count
-    FROM conversation_read_states
-    GROUP BY conversation, user
-  ) crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_requestor
+    /* pre-aggregate to ensure one row per (conversation,user) */
+    LEFT JOIN (
+      SELECT conversation, user, 
+             MAX(last_read_at)   AS last_read_at,
+             MAX(unread_count)   AS unread_count
+      FROM conversation_read_states
+      GROUP BY conversation, user
+    ) crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_requestor
 
-  LEFT JOIN (
-    SELECT conversation, user, 
-           MAX(last_read_at)   AS last_read_at,
-           MAX(unread_count)   AS unread_count
-    FROM conversation_read_states
-    GROUP BY conversation, user
-  ) crs_sp ON crs_sp.conversation = c.uuid AND crs_sp.user = sp.uuid
+    LEFT JOIN (
+      SELECT conversation, user, 
+             MAX(last_read_at)   AS last_read_at,
+             MAX(unread_count)   AS unread_count
+      FROM conversation_read_states
+      GROUP BY conversation, user
+    ) crs_sp ON crs_sp.conversation = c.uuid AND crs_sp.user = sp.uuid
 
-  WHERE ${whereClause}
-  ORDER BY COALESCE(m.created_at, c.created_at) DESC
-  LIMIT ? OFFSET ?
-    `;
+    WHERE ${whereClause}
+    ORDER BY COALESCE(m.created_at, c.created_at) DESC
+    LIMIT ? OFFSET ?
+      `;
 
     const countQuery = `
       SELECT COUNT(DISTINCT c.uuid) as total
@@ -1534,7 +1548,20 @@ export class UsersService {
       LEFT JOIN users rq ON c.service_requestor = rq.uuid
       LEFT JOIN users sp ON c.service_provider = sp.uuid
       LEFT JOIN messages m ON c.last_message = m.uuid
-      LEFT JOIN offers o ON m.offer = o.uuid
+      LEFT JOIN (
+        SELECT mo.conversation, mo.offer
+        FROM messages mo
+        INNER JOIN (
+          SELECT conversation, MAX(created_at) AS last_offer_created_at
+          FROM messages
+          WHERE offer IS NOT NULL
+          GROUP BY conversation
+        ) latest_offer
+          ON latest_offer.conversation = mo.conversation
+         AND latest_offer.last_offer_created_at = mo.created_at
+        WHERE mo.offer IS NOT NULL
+      ) lo ON lo.conversation = c.uuid
+      LEFT JOIN offers o ON lo.offer = o.uuid
       /* joins are not strictly needed for count, but harmless; DISTINCT avoids dupes */
       WHERE ${whereClause}
     `;
