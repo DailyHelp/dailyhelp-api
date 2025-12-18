@@ -487,29 +487,56 @@ export class JobService {
     dto: RateServiceProviderDto,
     { uuid, userType }: IAuthContext,
   ) {
-    if (dto.rating < 1 || dto.rating > 5)
+    this.logger.log(
+      `rateServiceProvider → job=${jobUuid}, requester=${uuid}, payload=${JSON.stringify(
+        dto,
+      )}`,
+    );
+    if (dto.rating < 1 || dto.rating > 5) {
+      this.logger.warn(
+        `rateServiceProvider rejected (invalid rating) → job=${jobUuid}, requester=${uuid}, rating=${dto.rating}`,
+      );
       throw new NotAcceptableException('Rating must be between 1 and 5');
+    }
 
     const job = await this.jobRepository.findOne({
       uuid: jobUuid,
       serviceRequestor: { uuid },
     });
-    if (!job) throw new NotFoundException(`Job not found`);
-    if (job.status !== JobStatus.COMPLETED)
+    if (!job) {
+      this.logger.warn(
+        `rateServiceProvider job not found → job=${jobUuid}, requester=${uuid}`,
+      );
+      throw new NotFoundException(`Job not found`);
+    }
+    if (job.status !== JobStatus.COMPLETED) {
+      this.logger.warn(
+        `rateServiceProvider blocked (status=${job.status}) → job=${jobUuid}, requester=${uuid}`,
+      );
       throw new ForbiddenException(`This job is not reviewable`);
+    }
 
     const existingReview =
       job.review ??
       (await this.jobReviewRepository.findOne({
         job: { uuid: jobUuid },
       }));
-    if (existingReview)
+    if (existingReview) {
+      this.logger.warn(
+        `rateServiceProvider blocked (already reviewed) → job=${jobUuid}, requester=${uuid}, review=${existingReview.uuid}`,
+      );
       throw new NotAcceptableException('Job has already been reviewed');
+    }
 
     const provider = await this.usersRepository.findOne({
       uuid: job.serviceProvider?.uuid,
     });
-    if (!provider) throw new NotFoundException('Provider not found');
+    if (!provider) {
+      this.logger.warn(
+        `rateServiceProvider provider not found → job=${jobUuid}, requester=${uuid}, provider=${job.serviceProvider?.uuid}`,
+      );
+      throw new NotFoundException('Provider not found');
+    }
     const reviewUuid = v4();
     const jobReviewModel = this.jobReviewRepository.create({
       uuid: reviewUuid,
@@ -521,10 +548,15 @@ export class JobService {
     });
     job.review = this.jobReviewRepository.getReference(reviewUuid);
     this.em.persist(jobReviewModel);
+    let tipAmount: number | null = null;
     if (dto.tip !== undefined && dto.tip !== null) {
-      const tipAmount = Number(dto.tip);
-      if (tipAmount <= 0)
+      tipAmount = Number(dto.tip);
+      if (tipAmount <= 0) {
+        this.logger.warn(
+          `rateServiceProvider rejected tip (<=0) → job=${jobUuid}, requester=${uuid}, tip=${dto.tip}`,
+        );
         throw new NotAcceptableException('Tip must be greater than zero');
+      }
       const [providerWallet, requestorWallet] = await Promise.all([
         this.walletRepository.findOne({
           user: { uuid: job.serviceProvider?.uuid },
@@ -541,6 +573,9 @@ export class JobService {
         throw new NotFoundException('Customer wallet not found');
       if (requestorWallet.availableBalance < tipAmount)
         throw new NotAcceptableException(`Insufficient balance`);
+      this.logger.debug(
+        `rateServiceProvider tip processing → job=${jobUuid}, requester=${uuid}, tip=${tipAmount}, providerWallet=${providerWallet.uuid}, requestorWallet=${requestorWallet.uuid}`,
+      );
       providerWallet.availableBalance += tipAmount;
       providerWallet.totalBalance += tipAmount;
       requestorWallet.availableBalance -= tipAmount;
@@ -571,6 +606,11 @@ export class JobService {
     if (provider?.uuid) {
       await this.recalculateProviderTier(provider.uuid);
     }
+    this.logger.log(
+      `rateServiceProvider completed → job=${jobUuid}, requester=${uuid}, review=${reviewUuid}, tip=${
+        tipAmount ?? 'none'
+      }`,
+    );
     return { status: true };
   }
 
