@@ -8,6 +8,7 @@ import {
   Query,
   Req,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -37,6 +38,8 @@ import { Job } from './jobs.entity';
 @ApiExtraModels(TopRatedProvider)
 @UseGuards(JwtAuthGuard)
 export class CustomerJobsController {
+  private readonly logger = new Logger(CustomerJobsController.name);
+
   constructor(private readonly jobService: JobService) {}
 
   @Get()
@@ -1091,6 +1094,11 @@ export class CustomerJobsController {
     @Body() body: RateServiceProviderDto,
     @Req() request: Request,
   ) {
+    this.logger.log(
+      `rateServiceProvider request → job=${uuid}, requester=${(request.user as any)?.uuid}, body=${JSON.stringify(
+        body,
+      )}`,
+    );
     return this.jobService.rateServiceProvider(uuid, body, request.user as any);
   }
 
