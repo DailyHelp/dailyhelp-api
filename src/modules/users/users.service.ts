@@ -1231,6 +1231,8 @@ export class UsersService {
     dto: SendMessageDto,
     { uuid }: IAuthContext,
   ) {
+    const message = dto.message?.trim();
+    if (!message) throw new BadRequestException('Message cannot be empty');
     const conversationExists = await this.conversationRepository.findOne({
       uuid: conversationUuid,
     });
@@ -1247,7 +1249,7 @@ export class UsersService {
       conversation: this.conversationRepository.getReference(conversationUuid),
       from: this.usersRepository.getReference(uuid),
       to: this.usersRepository.getReference(receiverUuid),
-      message: dto.message,
+      message,
       type: MessageType.TEXT,
     });
     this.em.persist(messageModel);
@@ -1257,7 +1259,7 @@ export class UsersService {
       conversationUuid: conversationExists.uuid,
       fromUuid: uuid,
       toUuid: receiverUuid,
-      message: dto.message,
+      message,
       type: MessageType.TEXT,
       createdAt: messageModel.createdAt,
       ...messageModel,

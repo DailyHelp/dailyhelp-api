@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsNumberString,
   IsOptional,
@@ -242,6 +243,10 @@ export class SendOfferDto {
 
 export class SendMessageDto {
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsNotEmpty()
   message: string;
 }
 
