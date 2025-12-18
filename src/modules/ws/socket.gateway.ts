@@ -15,6 +15,9 @@ import * as jwt from 'jsonwebtoken';
 import { ConfigType } from '@nestjs/config';
 import { JwtAuthConfiguration } from 'src/config/configuration';
 import { JobService } from '../jobs/jobs.service';
+import { EntityRepository } from '@mikro-orm/core';
+import { InjectRepository } from '@mikro-orm/nestjs';
+import { Conversation } from '../conversations/conversations.entity';
 
 type WSUser = { uuid: string; userType: string; email?: string };
 
@@ -36,6 +39,8 @@ export class SocketGateway {
     private readonly jwtConfig: ConfigType<typeof JwtAuthConfiguration>,
     @Inject(forwardRef(() => JobService))
     private readonly jobService: JobService,
+    @InjectRepository(Conversation)
+    private readonly conversationRepository: EntityRepository<Conversation>,
   ) {}
 
   private async getRoomSize(room: string) {
@@ -457,9 +462,149 @@ export class SocketGateway {
     );
   }
 
+  @SubscribeMessage('call:incoming:trigger')
+  async onCallIncomingTrigger(
+    @MessageBody()
+    data: {
+      conversationUuid?: string;
+      appId?: string;
+      channel?: string;
+      token?: string;
+      uid?: number;
+      expiresAt?: string;
+      ttlSeconds?: number;
+      data?: {
+        appId?: string;
+        channel?: string;
+        token?: string;
+        uid?: number;
+        expiresAt?: string;
+        ttlSeconds?: number;
+        conversationUuid?: string;
+        jobUuid?: string;
+      };
+      jobUuid?: string;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user = this.getClientUser(client);
+    if (!user) return;
+
+    const payload = data?.data?.channel ? data.data : data;
+    const conversationUuid =
+      data?.conversationUuid || payload?.conversationUuid;
+    const appId = payload?.appId;
+    const channel = payload?.channel;
+    const token = payload?.token;
+    const uid = payload?.uid;
+    const expiresAt = payload?.expiresAt;
+    const ttlSeconds = payload?.ttlSeconds;
+    const jobUuid =
+      payload?.jobUuid ||
+      (typeof channel === 'string' && channel.startsWith('job-')
+        ? channel.slice(4)
+        : undefined);
+
+    if (
+      !conversationUuid ||
+      !appId ||
+      !channel ||
+      !token ||
+      uid === undefined ||
+      uid === null ||
+      ttlSeconds === undefined ||
+      ttlSeconds === null ||
+      !expiresAt
+    ) {
+      client.emit('call:incoming:error', {
+        message: 'Incomplete call payload',
+      });
+      return;
+    }
+
+    const conversation = await this.conversationRepository.findOne(
+      { uuid: conversationUuid },
+      { populate: ['serviceProvider', 'serviceRequestor'] },
+    );
+    if (!conversation) {
+      client.emit('call:incoming:error', { message: 'Conversation not found' });
+      return;
+    }
+
+    const providerUuid = conversation.serviceProvider?.uuid;
+    const requestorUuid = conversation.serviceRequestor?.uuid;
+    if (!providerUuid || !requestorUuid) {
+      client.emit('call:incoming:error', {
+        message: 'Conversation participants not found',
+      });
+      return;
+    }
+
+    if (user.uuid !== providerUuid && user.uuid !== requestorUuid) {
+      client.emit('call:incoming:error', {
+        message: 'You are not a participant in this conversation',
+      });
+      return;
+    }
+
+    const toUuid = user.uuid === providerUuid ? requestorUuid : providerUuid;
+    const buildName = (u?: {
+      firstname?: string | null;
+      lastname?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      uuid?: string;
+    }) => {
+      const full = [u?.firstname, u?.lastname]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (full) return full;
+      return u?.email || u?.phone || u?.uuid || null;
+    };
+
+    const callerDetails =
+      user.uuid === providerUuid
+        ? conversation.serviceProvider
+        : conversation.serviceRequestor;
+    const fromName =
+      buildName(callerDetails) || user.email || user.uuid || 'Someone';
+
+    try {
+      await this.callInitiated({
+        conversationUuid,
+        jobUuid,
+        fromUuid: user.uuid,
+        toUuid,
+        fromName,
+        appId: String(appId),
+        channel: String(channel),
+        token: String(token),
+        uid: Number(uid),
+        expiresAt: String(expiresAt),
+        ttlSeconds: Number(ttlSeconds),
+      });
+      client.emit('call:incoming:dispatched', {
+        conversationUuid,
+        toUuid,
+        jobUuid,
+        channel,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const err = error as Error;
+      this.logger.warn(
+        `call:incoming:trigger failed for ${user.uuid}: ${err?.message || err}`,
+      );
+      client.emit('call:incoming:error', {
+        message: err?.message || 'Unable to emit call:incoming',
+      });
+    }
+  }
+
   async callInitiated(payload: {
     conversationUuid: string;
-    jobUuid: string;
+    jobUuid?: string;
     fromUuid: string;
     toUuid: string;
     fromName: string;
