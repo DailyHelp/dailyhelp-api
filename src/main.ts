@@ -8,6 +8,8 @@ import qs from 'qs';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { BasePaginatedResponseDto } from './base/dto';
 import { RedisIoAdapter } from './modules/ws/redis-adapter';
+import { SuccessMessageInterceptor } from './lib/success-message.interceptor';
+import { Reflector } from '@nestjs/core';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -30,6 +32,9 @@ async function bootstrap() {
     await adapter.connectToRedis();
     app.useWebSocketAdapter(adapter);
   }
+
+  const reflector = app.get(Reflector);
+  app.useGlobalInterceptors(new SuccessMessageInterceptor(reflector));
 
   const options = new DocumentBuilder()
     .setTitle('DailyHelp')

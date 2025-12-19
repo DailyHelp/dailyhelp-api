@@ -91,13 +91,12 @@ export class ProvidersController {
     return this.userService.fetchUserReviews(uuid, query.pagination);
   }
 
-  @Get('reviews/summary')
+  @Get(':uuid/reviews/summary')
   @ApiOkResponse({
     type: ProviderRatingSummaryDto,
     description: 'Provider rating summary fetched successfully',
   })
-  async fetchReviewSummary(@Req() req: Request) {
-    const { uuid } = req.user as any as IAuthContext;
+  async fetchReviewSummary(@Param('uuid') uuid: string) {
     return this.userService.fetchProviderRatingSummary(uuid);
   }
 
