@@ -381,7 +381,7 @@ export class JobService {
     ]);
     if (!conversation) throw new NotFoundException(`Conversation not found`);
     if (!provider) throw new NotFoundException(`Provider not found`);
-    provider.completedJobs += provider.completedJobs;
+    provider.completedJobs = (provider.completedJobs ?? 0) + 1;
     provider.engaged = false;
     conversation.restricted = true;
     job.status = JobStatus.COMPLETED;
@@ -397,11 +397,12 @@ export class JobService {
     });
     if (!providerWallet)
       throw new NotFoundException('Provider wallet not found');
-    providerWallet.totalBalance += job.price * 0.1;
+    const payoutAmount = Math.max(0, Number(job.price) * 0.9 || 0);
+    providerWallet.totalBalance += payoutAmount;
     const transactionModel = this.transactionRepository.create({
       uuid: v4(),
       type: TransactionType.CREDIT,
-      amount: job.price * 0.1,
+      amount: payoutAmount,
       wallet: this.walletRepository.getReference(providerWallet.uuid),
       job: this.jobRepository.getReference(jobUuid),
       remark: 'Job Payment',
