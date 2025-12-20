@@ -709,14 +709,19 @@ export class UsersService {
   }
 
   async fetchProviderRatingSummary(uuid: string) {
-    const qb = this.reviewRepository.qb('review');
-    qb.select(['review.rating', 'count(*) as count'])
-      .where({ reviewedFor: { uuid } })
-      .andWhere({ rating: { $ne: null } })
-      .andWhere({ deletedAt: null })
-      .groupBy('review.rating');
-
-    const rows = await qb.execute<{ rating: number; count: number }[]>();
+    const rows = await this.em
+      .getConnection()
+      .execute<{ rating: number; count: number }[]>(
+        `
+        SELECT rating, COUNT(*) AS count
+        FROM job_reviews
+        WHERE reviewed_for = ?
+          AND rating IS NOT NULL
+          AND deleted_at IS NULL
+        GROUP BY rating
+        `,
+        [uuid],
+      );
 
     const breakdown = {
       fiveStar: 0,
