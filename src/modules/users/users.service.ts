@@ -1226,7 +1226,6 @@ export class UsersService {
       conversation: this.conversationRepository.getReference(conversationUuid),
     });
     this.em.persist(reportModel);
-    conversationExists.blocked = true;
     await this.em.flush();
     return { status: true };
   }
@@ -1794,7 +1793,7 @@ export class UsersService {
   }
 
   async getAnalytics(startDate: Date, endDate: Date, { uuid }: IAuthContext) {
-    const start = startDate ? startOfDay(startDate) : startOfDay(new Date());
+    const start = startDate ? startOfDay(startDate) : new Date(0);
     const end = endDate ? endOfDay(endDate) : endOfDay(new Date());
     const jobsSql = `
       SELECT

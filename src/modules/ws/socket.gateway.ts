@@ -622,7 +622,8 @@ export class SocketGateway {
     this.logger.log(
       `Emitting call:incoming → to=${payload.toUuid} room=${room} sockets=${socketsInRoom} socketIds=${socketIds.join(',')} from=${payload.fromUuid} conversation=${payload.conversationUuid}`,
     );
-    this.server.to(room).emit('call:incoming', payload);
+    // Temporary: broadcast globally for testing (instead of only the target room)
+    this.server.emit('call:incoming', payload);
     if (socketsInRoom === 0) {
       this.logger.warn(
         `call:incoming emitted but no active sockets in room=${room} for user=${payload.toUuid}`,
