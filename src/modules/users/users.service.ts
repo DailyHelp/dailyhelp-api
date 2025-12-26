@@ -1261,6 +1261,9 @@ export class UsersService {
       message,
       type: MessageType.TEXT,
     });
+    conversationExists.lastMessage = this.messageRepository.getReference(
+      messageModel.uuid,
+    );
     this.em.persist(messageModel);
     await this.em.flush();
     this.ws.messageCreated({
