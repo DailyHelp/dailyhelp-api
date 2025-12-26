@@ -703,7 +703,12 @@ export class UsersService {
       {
         reviewedFor: { uuid },
       },
-      { limit, offset: (page - 1) * limit, orderBy: { createdAt: 'DESC' } },
+      {
+        limit,
+        offset: (page - 1) * limit,
+        orderBy: { createdAt: 'DESC' },
+        populate: ['reviewedBy', 'reviewedFor'],
+      },
     );
     return buildResponseDataWithPagination(data, total, { page, limit });
   }

@@ -44,6 +44,7 @@ import { Conversation } from '../conversations/conversations.entity';
 import { JobReport } from './job-reports.entity';
 import { AccountTierSetting } from '../admin/admin.entities';
 import { SocketGateway } from '../ws/socket.gateway';
+import { PresenceService } from '../ws/presence.service';
 import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
 import { RtcRole, RtcTokenBuilder } from 'agora-token';
 import { AgoraConfiguration } from 'src/config/configuration';
@@ -74,6 +75,7 @@ export class JobService {
     private readonly accountTierRepository: EntityRepository<AccountTierSetting>,
     @Inject(forwardRef(() => SocketGateway))
     private readonly ws: SocketGateway,
+    private readonly presence: PresenceService,
     @Inject(AgoraConfiguration.KEY)
     private readonly agoraConfig: ConfigType<typeof AgoraConfiguration>,
   ) {}
@@ -702,6 +704,19 @@ export class JobService {
       { orderBy: { createdAt: QueryOrder.ASC }, populate: ['actor'] },
     );
 
+    const conversation = await this.conversationRepository.findOne({
+      serviceProvider: { uuid: job.serviceProvider?.uuid },
+      serviceRequestor: { uuid: job.serviceRequestor?.uuid },
+    });
+
+    const conversationSummary = conversation
+      ? await this.buildConversationSummaryForJob(
+          conversation,
+          uuid,
+          normalizedUserType,
+        )
+      : null;
+
     const response = {
       job: {
         uuid: job.uuid,
@@ -758,6 +773,7 @@ export class JobService {
       timelines: timelines.map((timeline) =>
         this.buildJobTimelineResponse(timeline),
       ),
+      conversation: conversationSummary,
     };
 
     return { status: true, data: response };
@@ -938,6 +954,199 @@ export class JobService {
       createdAt: timeline.createdAt,
       updatedAt: timeline.updatedAt,
       actor: this.buildUserSummary(timeline.actor),
+    };
+  }
+
+  private async buildConversationSummaryForJob(
+    conversation: Conversation,
+    viewerUuid: string,
+    viewerType: UserType,
+  ) {
+    const providerUuid = conversation.serviceProvider?.uuid;
+    const requestorUuid = conversation.serviceRequestor?.uuid;
+    if (!providerUuid || !requestorUuid) return null;
+
+    const isProviderView = viewerType === UserType.PROVIDER;
+
+    const providerQuery = `
+      SELECT
+        c.uuid AS conversationId,
+        sp.uuid AS serviceProviderId,
+        sp.firstname AS spFirstname,
+        sp.lastname  AS spLastname,
+        sp.middlename AS spMiddlename,
+        sp.picture AS spPicture,
+        sp.tier AS spTier,
+        rq.uuid AS requestorId,
+        rq.firstname AS rqFirstname,
+        rq.lastname  AS rqLastname,
+        rq.middlename AS rqMiddlename,
+        rq.picture AS rqPicture,
+        rq.tier AS rqTier,
+        m.uuid  AS lastMessageId,
+        m.message AS lastMessage,
+        o.description AS offerDescription,
+        o.status AS offerStatus,
+        o.price AS offerPrice,
+        c.last_locked_at AS lastLockedAt,
+        c.locked,
+        c.restricted,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM jobs j
+            WHERE j.service_provider = c.service_provider
+              AND j.service_requestor = c.service_requestor
+              AND j.status IN ('PENDING','IN_PROGRESS')
+          ) THEN 1 ELSE 0
+        END AS hasActiveJob,
+        c.cancellation_chances AS cancellationChances,
+        c.created_at AS createdAt,
+        crs_me.last_read_at AS myLastReadAt,
+        crs_rq.last_read_at AS otherLastReadAt,
+        CASE
+          WHEN m.created_at IS NOT NULL
+           AND crs_me.last_read_at IS NOT NULL
+           AND m.created_at <= crs_me.last_read_at
+          THEN 1 ELSE 0
+        END AS iReadLastMessage,
+        CASE
+          WHEN m.created_at IS NOT NULL
+           AND crs_rq.last_read_at IS NOT NULL
+           AND m.created_at <= crs_rq.last_read_at
+          THEN 1 ELSE 0
+        END AS otherReadLastMessage,
+        crs_me.unread_count AS myUnreadCount
+      FROM conversations c
+      LEFT JOIN users sp ON c.service_provider = sp.uuid
+      LEFT JOIN users rq ON c.service_requestor = rq.uuid
+      LEFT JOIN messages m ON c.last_message = m.uuid
+      LEFT JOIN offers o   ON m.offer = o.uuid
+      LEFT JOIN (
+        SELECT conversation, user,
+               MAX(last_read_at) AS last_read_at,
+               MAX(unread_count) AS unread_count
+        FROM conversation_read_states
+        GROUP BY conversation, user
+      ) crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_provider
+      LEFT JOIN (
+        SELECT conversation, user,
+               MAX(last_read_at) AS last_read_at,
+               MAX(unread_count) AS unread_count
+        FROM conversation_read_states
+        GROUP BY conversation, user
+      ) crs_rq ON crs_rq.conversation = c.uuid AND crs_rq.user = rq.uuid
+      WHERE c.uuid = ? AND c.service_provider = ?
+      LIMIT 1
+    `;
+
+    const customerQuery = `
+      SELECT
+        c.uuid AS conversationId,
+        sp.uuid AS serviceProviderId,
+        sp.firstname AS spFirstname,
+        sp.lastname AS spLastname,
+        sp.middlename AS spMiddlename,
+        sp.picture AS spPicture,
+        rq.picture AS rqPicture,
+        rq.uuid AS requestorId,
+        rq.firstname AS rqFirstname,
+        rq.lastname AS rqLastname,
+        rq.middlename AS rqMiddlename,
+        rq.tier AS rqTier,
+        sp.tier AS spTier,
+        m.uuid AS lastMessageId,
+        m.message AS lastMessage,
+        o.description AS offerDescription,
+        o.status AS offerStatus,
+        o.price AS offerPrice,
+        c.last_locked_at AS lastLockedAt,
+        c.locked,
+        c.restricted,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM jobs j
+            WHERE j.service_provider = c.service_provider
+              AND j.service_requestor = c.service_requestor
+              AND j.status IN ('PENDING','IN_PROGRESS')
+          ) THEN 1 ELSE 0
+        END AS hasActiveJob,
+        c.cancellation_chances AS cancellationChances,
+        c.created_at AS createdAt,
+        crs_me.last_read_at   AS myLastReadAt,
+        crs_sp.last_read_at   AS otherLastReadAt,
+        CASE
+          WHEN m.created_at IS NOT NULL
+            AND crs_me.last_read_at IS NOT NULL
+            AND m.created_at <= crs_me.last_read_at
+          THEN 1 ELSE 0
+        END AS iReadLastMessage,
+        CASE
+          WHEN m.created_at IS NOT NULL
+            AND crs_sp.last_read_at IS NOT NULL
+            AND m.created_at <= crs_sp.last_read_at
+          THEN 1 ELSE 0
+        END AS otherReadLastMessage,
+        crs_me.unread_count AS myUnreadCount
+      FROM conversations c
+      LEFT JOIN users sp ON c.service_provider = sp.uuid
+      LEFT JOIN users rq ON c.service_requestor = rq.uuid
+      LEFT JOIN messages m ON c.last_message = m.uuid
+      LEFT JOIN (
+        SELECT mo.conversation, mo.offer
+        FROM messages mo
+        INNER JOIN (
+          SELECT conversation, MAX(created_at) AS last_offer_created_at
+          FROM messages
+          WHERE offer IS NOT NULL
+          GROUP BY conversation
+        ) latest_offer
+          ON latest_offer.conversation = mo.conversation
+         AND latest_offer.last_offer_created_at = mo.created_at
+        WHERE mo.offer IS NOT NULL
+      ) lo ON lo.conversation = c.uuid
+      LEFT JOIN offers o ON lo.offer = o.uuid
+      LEFT JOIN (
+        SELECT conversation, user, 
+               MAX(last_read_at)   AS last_read_at,
+               MAX(unread_count)   AS unread_count
+        FROM conversation_read_states
+        GROUP BY conversation, user
+      ) crs_me ON crs_me.conversation = c.uuid AND crs_me.user = c.service_requestor
+      LEFT JOIN (
+        SELECT conversation, user, 
+               MAX(last_read_at)   AS last_read_at,
+               MAX(unread_count)   AS unread_count
+        FROM conversation_read_states
+        GROUP BY conversation, user
+      ) crs_sp ON crs_sp.conversation = c.uuid AND crs_sp.user = sp.uuid
+      WHERE c.uuid = ? AND c.service_requestor = ?
+      LIMIT 1
+    `;
+
+    const dataQuery = isProviderView ? providerQuery : customerQuery;
+    const params = [conversation.uuid, viewerUuid];
+    const rows = await this.em.getConnection().execute(dataQuery, params);
+    const row = rows?.[0];
+    if (!row) return null;
+
+    const otherUuid = isProviderView ? requestorUuid : providerUuid;
+    const [viewerOnline, otherOnline] = await Promise.all([
+      this.presence.isOnline(viewerUuid),
+      this.presence.isOnline(otherUuid),
+    ]);
+
+    return {
+      ...row,
+      locked: !!Number(row.locked),
+      restricted: !!Number(row.restricted),
+      hasActiveJob: !!Number(row.hasActiveJob),
+      unreadCount: row.myUnreadCount,
+      iReadLastMessage: !!Number(row.iReadLastMessage),
+      otherReadLastMessage: !!Number(row.otherReadLastMessage),
+      spOnline: isProviderView ? !!viewerOnline : !!otherOnline,
+      srOnline: isProviderView ? !!otherOnline : !!viewerOnline,
     };
   }
 
