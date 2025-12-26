@@ -27,6 +27,7 @@ import {
   TransactionStatus,
   TransactionType,
   UserType,
+  DisputeStatus,
 } from 'src/types';
 import {
   CancelJobDto,
@@ -96,11 +97,22 @@ export class JobService {
     const limit = Math.max(1, Number(limitRaw) || 20);
     const offset = (page - 1) * limit;
 
-    const statusQuery =
-      filter?.status === JobStatus.COMPLETED
-        ? { status: { $in: [JobStatus.COMPLETED, JobStatus.CANCELED] } }
-        : filter?.status
-        ? { status: filter.status }
+    const statusFilter = filter?.status;
+    const statusQuery: FilterQuery<Job> =
+      statusFilter === JobStatus.COMPLETED
+        ? {
+            $or: [
+              { status: { $in: [JobStatus.COMPLETED, JobStatus.CANCELED] } },
+              {
+                status: JobStatus.DISPUTED,
+                dispute: { status: DisputeStatus.RESOLVED },
+              },
+            ],
+          }
+        : statusFilter === JobStatus.IN_PROGRESS
+        ? { status: { $in: [JobStatus.IN_PROGRESS, JobStatus.DISPUTED] } }
+        : statusFilter
+        ? { status: statusFilter }
         : {};
 
     const where: FilterQuery<Job> = {
