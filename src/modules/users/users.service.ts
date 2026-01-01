@@ -1889,7 +1889,7 @@ export class UsersService {
     const clientCancelled = Number(o.clientCancelled || 0);
     const pct = (n: number, d: number) => (d ? +((n / d) * 100).toFixed(1) : 0);
     const acceptanceRate = pct(youAccepted, totalOffers);
-    return {
+    const analytics = {
       range: { start, end },
       revenue: {
         rings: { earnings, tips, commission: -commission },
@@ -1939,6 +1939,7 @@ export class UsersService {
         },
       },
     };
+    return { status: true, data: analytics };
   }
 
   async initializePaystackPayment(
