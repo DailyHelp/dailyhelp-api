@@ -38,13 +38,9 @@ jobs:
 
       - name: Create deploy archive
         run: |
-          tar -czf release.tar.gz \
-            dist \
-            package.json \
-            pnpm-lock.yaml \
-            ecosystem.config.js \
-            notification_templates \
-            dailyhelp-firebase-service-account.json
+          set -euo pipefail
+          FILES=(dist package.json pnpm-lock.yaml ecosystem.config.js notification_templates)
+          tar -czf release.tar.gz "${FILES[@]}"
 
       - name: Upload archive to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -75,6 +71,7 @@ jobs:
             ARCHIVE_PATH="${ARCHIVE_DIR}/release.tar.gz"
             RELEASE_PATH="${DEPLOY_PATH}/releases/${RELEASE}"
             CURRENT_PATH="${DEPLOY_PATH}/current"
+            SA_PATH="${DEPLOY_PATH}/shared/dailyhelp-firebase-service-account.json"
 
             if [ -z "$DEPLOY_PATH" ]; then
               echo "Set the VPS_DEPLOY_PATH secret to the base deploy directory." >&2
@@ -88,6 +85,13 @@ jobs:
 
             if [ -f "$DEPLOY_PATH/shared/.env" ]; then
               ln -sfn "$DEPLOY_PATH/shared/.env" "$RELEASE_PATH/.env"
+            fi
+
+            if [ -f "$SA_PATH" ]; then
+              ln -sfn "$SA_PATH" "$RELEASE_PATH/dailyhelp-firebase-service-account.json"
+            else
+              echo "Missing shared Firebase service account file at $SA_PATH" >&2
+              exit 1
             fi
 
             cd "$RELEASE_PATH"
