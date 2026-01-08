@@ -8,8 +8,7 @@ on:
 
 env:
   APP_NAME: dailyhelp-api
-  NODE_VERSION: 20
-  PNPM_VERSION: 9
+  NODE_VERSION: 22
   DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
 
 jobs:
@@ -23,23 +22,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-
-      - name: Enable pnpm
-        run: corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm install
 
       - name: Build
-        run: pnpm run build
+        run: npm run build
 
       - name: Create deploy archive
         run: |
           tar -czf release.tar.gz \
             dist \
             package.json \
-            pnpm-lock.yaml \
             ecosystem.config.js \
             notification_templates \
             dailyhelp-firebase-service-account.json
@@ -68,7 +63,6 @@ jobs:
             APP_NAME="${{ env.APP_NAME }}"
             RELEASE="${{ github.sha }}"
             DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
-            PNPM_VERSION="${{ env.PNPM_VERSION }}"
             ARCHIVE_DIR="/tmp/${APP_NAME}-${RELEASE}"
             ARCHIVE_PATH="${ARCHIVE_DIR}/release.tar.gz"
             RELEASE_PATH="${DEPLOY_PATH}/releases/${RELEASE}"
@@ -94,13 +88,7 @@ jobs:
               npm install -g pm2
             fi
 
-            if command -v corepack >/dev/null 2>&1; then
-              corepack prepare "pnpm@${PNPM_VERSION}" --activate
-            elif ! command -v pnpm >/dev/null 2>&1; then
-              npm install -g "pnpm@${PNPM_VERSION}"
-            fi
-
-            pnpm install --frozen-lockfile --prod
+            npm install --omit=dev
 
             ln -sfn "$RELEASE_PATH" "$CURRENT_PATH"
 
