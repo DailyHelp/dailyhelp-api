@@ -105,6 +105,12 @@ jobs:
               npm install -g "pnpm@${PNPM_VERSION}"
             fi
 
+            export PATH="$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH"
+            if ! command -v pnpm >/dev/null 2>&1; then
+              echo "pnpm still not found after install; check PATH" >&2
+              exit 1
+            fi
+
             pnpm install --frozen-lockfile --prod
 
             ln -sfn "$RELEASE_PATH" "$CURRENT_PATH"
