@@ -1,0 +1,114 @@
+name: Deploy to VPS (PM2)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  APP_NAME: dailyhelp-api
+  NODE_VERSION: 20
+  PNPM_VERSION: 9
+  DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Create deploy archive
+        run: |
+          tar -czf release.tar.gz \
+            dist \
+            package.json \
+            pnpm-lock.yaml \
+            ecosystem.config.js \
+            notification_templates \
+            dailyhelp-firebase-service-account.json
+
+      - name: Upload archive to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: release.tar.gz
+          target: /tmp/${{ env.APP_NAME }}-${{ github.sha }}/
+
+      - name: Deploy and reload with PM2
+        uses: appleboy/ssh-action@v1.2.1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -eu
+
+            APP_NAME="${{ env.APP_NAME }}"
+            RELEASE="${{ github.sha }}"
+            DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
+            PNPM_VERSION="${{ env.PNPM_VERSION }}"
+            ARCHIVE_DIR="/tmp/${APP_NAME}-${RELEASE}"
+            ARCHIVE_PATH="${ARCHIVE_DIR}/release.tar.gz"
+            RELEASE_PATH="${DEPLOY_PATH}/releases/${RELEASE}"
+            CURRENT_PATH="${DEPLOY_PATH}/current"
+
+            if [ -z "$DEPLOY_PATH" ]; then
+              echo "Set the VPS_DEPLOY_PATH secret to the base deploy directory." >&2
+              exit 1
+            fi
+
+            mkdir -p "$DEPLOY_PATH/releases" "$DEPLOY_PATH/shared" "$DEPLOY_PATH/logs"
+            mkdir -p "$RELEASE_PATH"
+
+            tar -xzf "$ARCHIVE_PATH" -C "$RELEASE_PATH"
+
+            if [ -f "$DEPLOY_PATH/shared/.env" ]; then
+              ln -sfn "$DEPLOY_PATH/shared/.env" "$RELEASE_PATH/.env"
+            fi
+
+            cd "$RELEASE_PATH"
+
+            if ! command -v pm2 >/dev/null 2>&1; then
+              npm install -g pm2
+            fi
+
+            if command -v corepack >/dev/null 2>&1; then
+              corepack prepare "pnpm@${PNPM_VERSION}" --activate
+            elif ! command -v pnpm >/dev/null 2>&1; then
+              npm install -g "pnpm@${PNPM_VERSION}"
+            fi
+
+            pnpm install --frozen-lockfile --prod
+
+            ln -sfn "$RELEASE_PATH" "$CURRENT_PATH"
+
+            cd "$CURRENT_PATH"
+            pm2 startOrReload ecosystem.config.js --env production --only "$APP_NAME"
+            pm2 save
+
+            cd "$DEPLOY_PATH/releases"
+            ls -1dt */ 2>/dev/null | tail -n +4 | xargs -r rm -rf
+
+            rm -rf "$ARCHIVE_DIR"
