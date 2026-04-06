@@ -343,7 +343,7 @@ export class JobService {
     return {
       status: true,
       data: timelines.map((timeline) =>
-        this.buildJobTimelineResponse(timeline, job.status),
+        this.buildJobTimelineResponse(timeline, job.status, job.uuid),
       ),
     };
   }
@@ -754,10 +754,15 @@ export class JobService {
         cancellationCategory: job.cancellationCategory,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
-        serviceProvider: this.buildUserSummary(job.serviceProvider, job.status),
+        serviceProvider: this.buildUserSummary(
+          job.serviceProvider,
+          job.status,
+          job.uuid,
+        ),
         serviceRequestor: this.buildUserSummary(
           job.serviceRequestor,
           job.status,
+          job.uuid,
         ),
         review: review
           ? {
@@ -766,8 +771,16 @@ export class JobService {
               review: review.review,
               createdAt: review.createdAt,
               updatedAt: review.updatedAt,
-              reviewedBy: this.buildUserSummary(review.reviewedBy, job.status),
-              reviewedFor: this.buildUserSummary(review.reviewedFor, job.status),
+              reviewedBy: this.buildUserSummary(
+                review.reviewedBy,
+                job.status,
+                job.uuid,
+              ),
+              reviewedFor: this.buildUserSummary(
+                review.reviewedFor,
+                job.status,
+                job.uuid,
+              ),
             }
           : null,
         dispute: job.dispute
@@ -792,7 +805,7 @@ export class JobService {
           : null,
       },
       timelines: timelines.map((timeline) =>
-        this.buildJobTimelineResponse(timeline, job.status),
+        this.buildJobTimelineResponse(timeline, job.status, job.uuid),
       ),
       conversation: conversationSummary,
     };
@@ -952,10 +965,19 @@ export class JobService {
     }
   }
 
-  private buildUserSummary(user?: Users | null, jobStatus?: JobStatus | null) {
+  private buildUserSummary(
+    user?: Users | null,
+    jobStatus?: JobStatus | null,
+    jobUuid?: string | null,
+  ) {
     if (!user) return null;
     const userType = this.resolvePrimaryUserType(user.userTypes);
     const resolvedJobStatus = mapJobStatusToUserJobStatus(jobStatus);
+    const inProgressJobId =
+      jobUuid &&
+      [JobStatus.IN_PROGRESS, JobStatus.DISPUTED].includes(jobStatus)
+        ? jobUuid
+        : null;
     return {
       uuid: user.uuid,
       firstname: user.firstname ?? null,
@@ -967,19 +989,21 @@ export class JobService {
       userType,
       userTypes: user.userTypes ?? null,
       ...(resolvedJobStatus ? { jobStatus: resolvedJobStatus } : {}),
+      ...(inProgressJobId ? { inProgressJobId } : {}),
     };
   }
 
   private buildJobTimelineResponse(
     timeline: JobTimeline,
     jobStatus?: JobStatus | null,
+    jobUuid?: string | null,
   ) {
     return {
       uuid: timeline.uuid,
       event: timeline.event,
       createdAt: timeline.createdAt,
       updatedAt: timeline.updatedAt,
-      actor: this.buildUserSummary(timeline.actor, jobStatus),
+      actor: this.buildUserSummary(timeline.actor, jobStatus, jobUuid),
     };
   }
 

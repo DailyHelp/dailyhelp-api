@@ -151,48 +151,77 @@ export class UsersService {
   ) {}
 
   public async enrichUserWithJobStatus<
-    T extends { uuid?: string; jobStatus?: UserJobStatus } | null,
+    T extends {
+      uuid?: string;
+      jobStatus?: UserJobStatus;
+      inProgressJobId?: string;
+    } | null,
   >(user: T): Promise<T> {
     if (!user?.uuid) return user;
-    user.jobStatus =
-      (await this.findLatestJobStatusForUser(user.uuid)) ?? undefined;
+    const jobContext = await this.findLatestJobContextForUser(user.uuid);
+    user.jobStatus = jobContext.jobStatus ?? undefined;
+    user.inProgressJobId = jobContext.inProgressJobId ?? undefined;
     return user;
   }
 
-  private async findLatestJobStatusForUser(
+  private async findLatestJobContextForUser(
     userUuid: string,
-  ): Promise<UserJobStatus | null> {
-    return this.fetchPrioritizedJobStatus(
+  ): Promise<{
+    jobStatus: UserJobStatus | null;
+    inProgressJobId: string | null;
+  }> {
+    const job = await this.fetchPrioritizedJob(
       '(j.service_provider = ? OR j.service_requestor = ?)',
       [userUuid, userUuid],
     );
+    return this.mapJobToUserContext(job);
   }
 
-  private async findConversationJobStatus(
+  private async findConversationJobContext(
     serviceProviderUuid?: string,
     serviceRequestorUuid?: string,
-  ): Promise<UserJobStatus | null> {
-    if (!serviceProviderUuid || !serviceRequestorUuid) return null;
-    return this.fetchPrioritizedJobStatus(
+  ): Promise<{
+    jobStatus: UserJobStatus | null;
+    inProgressJobId: string | null;
+  }> {
+    if (!serviceProviderUuid || !serviceRequestorUuid) {
+      return { jobStatus: null, inProgressJobId: null };
+    }
+    const job = await this.fetchPrioritizedJob(
       'j.service_provider = ? AND j.service_requestor = ?',
       [serviceProviderUuid, serviceRequestorUuid],
     );
+    return this.mapJobToUserContext(job);
   }
 
-  private async fetchPrioritizedJobStatus(
+  private mapJobToUserContext(job?: { uuid: string; status: JobStatus } | null) {
+    const status = job?.status ?? null;
+    const inProgressJobId =
+      job &&
+      [JobStatus.IN_PROGRESS, JobStatus.DISPUTED].includes(status)
+        ? job.uuid
+        : null;
+    return {
+      jobStatus: mapJobStatusToUserJobStatus(status),
+      inProgressJobId,
+    };
+  }
+
+  private async fetchPrioritizedJob(
     whereClause: string,
     params: string[],
-  ): Promise<UserJobStatus | null> {
+  ): Promise<{ uuid: string; status: JobStatus } | null> {
     const rows = await this.em.getConnection().execute(
       `
-        SELECT j.status
+        SELECT j.uuid, j.status
         FROM jobs j
         WHERE ${whereClause}
           AND j.status IN (?, ?, ?, ?)
         ORDER BY
           CASE
-            WHEN j.status IN (?, ?, ?) THEN 0
+            WHEN j.status IN (?, ?) THEN 0
             WHEN j.status = ? THEN 1
+            WHEN j.status = ? THEN 2
             ELSE 2
           END,
           COALESCE(j.start_date, j.accepted_at, j.end_date, j.updated_at, j.created_at) DESC,
@@ -206,13 +235,13 @@ export class UsersService {
         JobStatus.IN_PROGRESS,
         JobStatus.COMPLETED,
         JobStatus.DISPUTED,
-        JobStatus.PENDING,
         JobStatus.IN_PROGRESS,
         JobStatus.DISPUTED,
+        JobStatus.PENDING,
         JobStatus.COMPLETED,
       ],
     );
-    return mapJobStatusToUserJobStatus(rows[0]?.status ?? null);
+    return rows[0] ?? null;
   }
 
   async findByEmailOrPhone(emailOrPhone: string) {
@@ -1722,7 +1751,7 @@ export class UsersService {
       user: { uuid: otherUuid },
     });
     const otherLastReadAt: Date | null = otherState?.lastReadAt ?? null;
-    const conversationJobStatus = await this.findConversationJobStatus(
+    const conversationJobContext = await this.findConversationJobContext(
       conversation.serviceProvider?.uuid,
       conversation.serviceRequestor?.uuid,
     );
@@ -1819,8 +1848,11 @@ export class UsersService {
           middlename: row[`${prefix}Middlename`],
           picture: row[`${prefix}Picture`],
           tier: row[`${prefix}Tier`],
-          ...(conversationJobStatus
-            ? { jobStatus: conversationJobStatus }
+          ...(conversationJobContext.jobStatus
+            ? { jobStatus: conversationJobContext.jobStatus }
+            : {}),
+          ...(conversationJobContext.inProgressJobId
+            ? { inProgressJobId: conversationJobContext.inProgressJobId }
             : {}),
         };
       };

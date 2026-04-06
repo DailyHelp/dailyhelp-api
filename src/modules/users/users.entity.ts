@@ -170,6 +170,14 @@ export class Users extends Timestamp {
   })
   @Property({ persist: false })
   jobStatus?: UserJobStatus;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: 'job-uuid',
+  })
+  @Property({ persist: false })
+  inProgressJobId?: string;
 }
 
 @Filter({
