@@ -165,6 +165,7 @@ export class AuthService {
     delete clonedUser.password;
     delete clonedUser.createdAt;
     delete clonedUser.updatedAt;
+    await this.usersService.enrichUserWithJobStatus(clonedUser as any);
     return {
       status: true,
       data: {
@@ -203,6 +204,7 @@ export class AuthService {
       phone: user.phone,
       userType: user.userTypes.split(',')[0] as UserType,
     };
+    await this.usersService.enrichUserWithJobStatus(user as any);
     return {
       status: true,
       data: {
@@ -259,6 +261,7 @@ export class AuthService {
       phone: user.phone,
       userType: user.userTypes.split(',')[0] as UserType,
     };
+    await this.usersService.enrichUserWithJobStatus(user as any);
     return {
       status: true,
       data: {

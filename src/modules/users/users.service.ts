@@ -60,6 +60,7 @@ import {
   PaymentType,
   TransactionStatus,
   TransactionType,
+  UserJobStatus,
   UserType,
 } from 'src/types';
 import axios, { AxiosResponse } from 'axios';
@@ -75,6 +76,7 @@ import {
   appendCondition,
   buildResponseDataWithPagination,
   generateOtp,
+  mapJobStatusToUserJobStatus,
 } from 'src/utils';
 import {
   Conversation,
@@ -148,20 +150,83 @@ export class UsersService {
     private readonly presence: PresenceService,
   ) {}
 
+  public async enrichUserWithJobStatus<
+    T extends { uuid?: string; jobStatus?: UserJobStatus } | null,
+  >(user: T): Promise<T> {
+    if (!user?.uuid) return user;
+    user.jobStatus =
+      (await this.findLatestJobStatusForUser(user.uuid)) ?? undefined;
+    return user;
+  }
+
+  private async findLatestJobStatusForUser(
+    userUuid: string,
+  ): Promise<UserJobStatus | null> {
+    return this.fetchPrioritizedJobStatus(
+      '(j.service_provider = ? OR j.service_requestor = ?)',
+      [userUuid, userUuid],
+    );
+  }
+
+  private async findConversationJobStatus(
+    serviceProviderUuid?: string,
+    serviceRequestorUuid?: string,
+  ): Promise<UserJobStatus | null> {
+    if (!serviceProviderUuid || !serviceRequestorUuid) return null;
+    return this.fetchPrioritizedJobStatus(
+      'j.service_provider = ? AND j.service_requestor = ?',
+      [serviceProviderUuid, serviceRequestorUuid],
+    );
+  }
+
+  private async fetchPrioritizedJobStatus(
+    whereClause: string,
+    params: string[],
+  ): Promise<UserJobStatus | null> {
+    const rows = await this.em.getConnection().execute(
+      `
+        SELECT j.status
+        FROM jobs j
+        WHERE ${whereClause}
+          AND j.status IN (?, ?, ?, ?)
+        ORDER BY
+          CASE
+            WHEN j.status IN (?, ?, ?) THEN 0
+            WHEN j.status = ? THEN 1
+            ELSE 2
+          END,
+          COALESCE(j.start_date, j.accepted_at, j.end_date, j.updated_at, j.created_at) DESC,
+          j.updated_at DESC,
+          j.created_at DESC
+        LIMIT 1
+      `,
+      [
+        ...params,
+        JobStatus.PENDING,
+        JobStatus.IN_PROGRESS,
+        JobStatus.COMPLETED,
+        JobStatus.DISPUTED,
+        JobStatus.PENDING,
+        JobStatus.IN_PROGRESS,
+        JobStatus.DISPUTED,
+        JobStatus.COMPLETED,
+      ],
+    );
+    return mapJobStatusToUserJobStatus(rows[0]?.status ?? null);
+  }
+
   async findByEmailOrPhone(emailOrPhone: string) {
-    let username: string;
+    let username = emailOrPhone;
     try {
       username = this.sharedService
         .validatePhoneNumber(emailOrPhone)
         .substring(1);
-    } catch (error) {
-      username = emailOrPhone;
-    } finally {
-      const user = await this.usersRepository.findOne({
-        $or: [{ email: username }, { phone: username }],
-      });
-      return { status: true, data: user };
-    }
+    } catch {}
+    const user = await this.usersRepository.findOne({
+      $or: [{ email: username }, { phone: username }],
+    });
+    await this.enrichUserWithJobStatus(user);
+    return { status: true, data: user };
   }
 
   async verifyIdentity(identity: VerifyIdentityDto, { uuid }: IAuthContext) {
@@ -390,6 +455,7 @@ export class UsersService {
   async fetchProviderDashboard({ uuid }: IAuthContext) {
     const user = await this.usersRepository.findOne({ uuid });
     if (!user) throw new NotFoundException('User not found');
+    await this.enrichUserWithJobStatus(user);
     const providerStats = await this.em.getConnection().execute(
       `
       WITH tx AS (
@@ -1656,6 +1722,10 @@ export class UsersService {
       user: { uuid: otherUuid },
     });
     const otherLastReadAt: Date | null = otherState?.lastReadAt ?? null;
+    const conversationJobStatus = await this.findConversationJobStatus(
+      conversation.serviceProvider?.uuid,
+      conversation.serviceRequestor?.uuid,
+    );
     const dataQuery = `
       SELECT
         m.uuid,
@@ -1749,6 +1819,9 @@ export class UsersService {
           middlename: row[`${prefix}Middlename`],
           picture: row[`${prefix}Picture`],
           tier: row[`${prefix}Tier`],
+          ...(conversationJobStatus
+            ? { jobStatus: conversationJobStatus }
+            : {}),
         };
       };
 
@@ -2272,6 +2345,7 @@ export class UsersService {
     delete clonedUser.password;
     delete clonedUser.createdAt;
     delete clonedUser.updatedAt;
+    await this.enrichUserWithJobStatus(clonedUser as any);
     return {
       status: true,
       data: {

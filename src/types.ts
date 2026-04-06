@@ -20,6 +20,8 @@ export enum JobStatus {
   CANCELED = 'CANCELED',
 }
 
+export type UserJobStatus = 'accepted' | 'in_progress' | 'completed';
+
 export enum PaymentPurpose {
   JOB_OFFER = 'JOB_OFFER',
   FUND_WALLET = 'FUND_WALLET',

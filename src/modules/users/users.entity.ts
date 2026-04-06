@@ -8,7 +8,12 @@ import {
 } from '@mikro-orm/core';
 import { Timestamp } from '../../base/timestamp.entity';
 import { SubCategory } from '../admin/admin.entities';
-import { AccountTier, IProviderOnboarding, UserType } from '../../types';
+import {
+  AccountTier,
+  IProviderOnboarding,
+  UserJobStatus,
+  UserType,
+} from '../../types';
 import { Location } from '../../entities/location.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -158,6 +163,13 @@ export class Users extends Timestamp {
 
   @Property({ nullable: true })
   suspensionReason: string;
+
+  @ApiProperty({
+    required: false,
+    enum: ['accepted', 'in_progress', 'completed'],
+  })
+  @Property({ persist: false })
+  jobStatus?: UserJobStatus;
 }
 
 @Filter({

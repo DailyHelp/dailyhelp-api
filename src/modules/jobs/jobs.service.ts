@@ -46,7 +46,11 @@ import { JobReport } from './job-reports.entity';
 import { AccountTierSetting } from '../admin/admin.entities';
 import { SocketGateway } from '../ws/socket.gateway';
 import { PresenceService } from '../ws/presence.service';
-import { buildResponseDataWithPagination, generateOtp } from 'src/utils';
+import {
+  buildResponseDataWithPagination,
+  generateOtp,
+  mapJobStatusToUserJobStatus,
+} from 'src/utils';
 import { RtcRole, RtcTokenBuilder } from 'agora-token';
 import { AgoraConfiguration } from 'src/config/configuration';
 
@@ -338,7 +342,9 @@ export class JobService {
     );
     return {
       status: true,
-      data: timelines.map((timeline) => this.buildJobTimelineResponse(timeline)),
+      data: timelines.map((timeline) =>
+        this.buildJobTimelineResponse(timeline, job.status),
+      ),
     };
   }
 
@@ -748,8 +754,11 @@ export class JobService {
         cancellationCategory: job.cancellationCategory,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
-        serviceProvider: this.buildUserSummary(job.serviceProvider),
-        serviceRequestor: this.buildUserSummary(job.serviceRequestor),
+        serviceProvider: this.buildUserSummary(job.serviceProvider, job.status),
+        serviceRequestor: this.buildUserSummary(
+          job.serviceRequestor,
+          job.status,
+        ),
         review: review
           ? {
               uuid: review.uuid,
@@ -757,8 +766,8 @@ export class JobService {
               review: review.review,
               createdAt: review.createdAt,
               updatedAt: review.updatedAt,
-              reviewedBy: this.buildUserSummary(review.reviewedBy),
-              reviewedFor: this.buildUserSummary(review.reviewedFor),
+              reviewedBy: this.buildUserSummary(review.reviewedBy, job.status),
+              reviewedFor: this.buildUserSummary(review.reviewedFor, job.status),
             }
           : null,
         dispute: job.dispute
@@ -783,7 +792,7 @@ export class JobService {
           : null,
       },
       timelines: timelines.map((timeline) =>
-        this.buildJobTimelineResponse(timeline),
+        this.buildJobTimelineResponse(timeline, job.status),
       ),
       conversation: conversationSummary,
     };
@@ -943,9 +952,10 @@ export class JobService {
     }
   }
 
-  private buildUserSummary(user?: Users | null) {
+  private buildUserSummary(user?: Users | null, jobStatus?: JobStatus | null) {
     if (!user) return null;
     const userType = this.resolvePrimaryUserType(user.userTypes);
+    const resolvedJobStatus = mapJobStatusToUserJobStatus(jobStatus);
     return {
       uuid: user.uuid,
       firstname: user.firstname ?? null,
@@ -956,16 +966,20 @@ export class JobService {
       phone: user.phone ?? null,
       userType,
       userTypes: user.userTypes ?? null,
+      ...(resolvedJobStatus ? { jobStatus: resolvedJobStatus } : {}),
     };
   }
 
-  private buildJobTimelineResponse(timeline: JobTimeline) {
+  private buildJobTimelineResponse(
+    timeline: JobTimeline,
+    jobStatus?: JobStatus | null,
+  ) {
     return {
       uuid: timeline.uuid,
       event: timeline.event,
       createdAt: timeline.createdAt,
       updatedAt: timeline.updatedAt,
-      actor: this.buildUserSummary(timeline.actor),
+      actor: this.buildUserSummary(timeline.actor, jobStatus),
     };
   }
 

@@ -2,6 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import otpGenerator from 'otp-generator';
 import { BasePaginatedResponseDto } from './base/dto';
+import { JobStatus, UserJobStatus } from './types';
 
 export const replacer = (i: number, arr: any, str: string) => {
   const len = arr.length;
@@ -86,4 +87,20 @@ export const buildFullName = (
     .map((part) => (typeof part === 'string' ? part.trim() : part))
     .filter((part): part is string => Boolean(part && part.length));
   return cleaned.length ? cleaned.join(' ') : null;
+};
+
+export const mapJobStatusToUserJobStatus = (
+  status?: JobStatus | null,
+): UserJobStatus | null => {
+  switch (status) {
+    case JobStatus.PENDING:
+      return 'accepted';
+    case JobStatus.IN_PROGRESS:
+    case JobStatus.DISPUTED:
+      return 'in_progress';
+    case JobStatus.COMPLETED:
+      return 'completed';
+    default:
+      return null;
+  }
 };
