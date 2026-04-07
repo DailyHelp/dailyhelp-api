@@ -10,6 +10,7 @@ env:
   APP_NAME: dailyhelp-api
   NODE_VERSION: 22
   DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+  VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
 
 jobs:
   deploy:
@@ -37,15 +38,37 @@ jobs:
           FILES=(dist package.json package-lock.json ecosystem.config.js notification_templates)
           tar -czf release.tar.gz "${FILES[@]}"
 
-      - name: Upload archive to VPS
-        uses: appleboy/scp-action@v0.1.7
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          source: release.tar.gz
-          target: /tmp/${{ env.APP_NAME }}-${{ github.sha }}/
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Trust VPS host key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -p "${{ env.VPS_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Prepare VPS upload directory
+        run: |
+          set -euo pipefail
+          ssh -p "${{ env.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            set -eu
+            command -v rsync >/dev/null 2>&1 || {
+              echo "rsync is not installed on the VPS." >&2
+              exit 1
+            }
+            mkdir -p "/tmp/${{ env.APP_NAME }}-${{ github.sha }}/"
+          '
+
+      - name: Upload archive to VPS
+        run: |
+          set -euo pipefail
+          rsync -az --progress -e "ssh -p ${{ env.VPS_PORT }}" \
+            release.tar.gz \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/${{ env.APP_NAME }}-${{ github.sha }}/release.tar.gz"
 
       - name: Deploy and reload with PM2
         uses: appleboy/ssh-action@v1.2.1
@@ -53,7 +76,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          port: ${{ env.VPS_PORT }}
           script: |
             set -eu
 
