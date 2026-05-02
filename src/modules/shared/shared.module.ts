@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import {
   QoreIDConfiguration,
-  SendgridConfiguration,
+  SmtpConfiguration,
   TermiiConfiguration,
 } from 'src/config/configuration';
 import { NotificationTemplates } from 'src/entities/notification-templates.entity';
@@ -11,7 +11,7 @@ import { SharedService } from './shared.service';
 
 @Module({
   imports: [
-    ConfigModule.forFeature(SendgridConfiguration),
+    ConfigModule.forFeature(SmtpConfiguration),
     ConfigModule.forFeature(TermiiConfiguration),
     ConfigModule.forFeature(QoreIDConfiguration),
     MikroOrmModule.forFeature({

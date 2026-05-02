@@ -11,7 +11,7 @@ import {
 import { ConfigType } from '@nestjs/config';
 import {
   QoreIDConfiguration,
-  SendgridConfiguration,
+  SmtpConfiguration,
   TermiiConfiguration,
 } from 'src/config/configuration';
 import { NotificationTemplates } from 'src/entities/notification-templates.entity';
@@ -19,6 +19,12 @@ import phone from 'phone';
 import { IEmailDto } from 'src/types';
 import { replacer } from 'src/utils';
 import axios from 'axios';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const nodemailer = require('nodemailer') as {
+  createTransport: (opts: any) => {
+    sendMail: (mail: any) => Promise<any>;
+  };
+};
 
 type MailAddress = {
   email: string;
@@ -28,14 +34,13 @@ type MailAddress = {
 @Injectable()
 export class SharedService {
   private readonly logger: Logger = new Logger(SharedService.name);
-  private readonly sendgridEndpoint = 'https://api.sendgrid.com/v3/mail/send';
-  private readonly defaultFrom = 'DailyHelp <no-reply@fonu.com>';
+  private readonly defaultFrom = 'DailyHelp <no-reply@dailyhelpint.org>';
 
   constructor(
     @InjectRepository(NotificationTemplates)
     private readonly notificationTemplatesRepository: EntityRepository<NotificationTemplates>,
-    @Inject(SendgridConfiguration.KEY)
-    private readonly sendgridConfig: ConfigType<typeof SendgridConfiguration>,
+    @Inject(SmtpConfiguration.KEY)
+    private readonly smtpConfig: ConfigType<typeof SmtpConfiguration>,
     @Inject(TermiiConfiguration.KEY)
     private readonly termiiConfig: ConfigType<typeof TermiiConfiguration>,
     @Inject(QoreIDConfiguration.KEY)
@@ -75,9 +80,13 @@ export class SharedService {
       );
   }
 
+  private formatAddress(addr: MailAddress): string {
+    return addr.name ? `"${addr.name}" <${addr.email}>` : addr.email;
+  }
+
   async sendEmail(email: IEmailDto) {
-    if (!this.sendgridConfig.apiKey) {
-      throw new InternalServerErrorException('SendGrid is not configured');
+    if (!this.smtpConfig.host || !this.smtpConfig.username) {
+      throw new InternalServerErrorException('SMTP is not configured');
     }
     const notificationTemplate =
       await this.notificationTemplatesRepository.findOne({
@@ -91,7 +100,7 @@ export class SharedService {
       ? replacer(0, Object.entries(email.data), notificationTemplate.body)
       : notificationTemplate.body;
     const fromAddress =
-      this.parseAddress(email.from ?? this.sendgridConfig.defaultFrom) ??
+      this.parseAddress(email.from ?? this.smtpConfig.from) ??
       this.parseAddress(this.defaultFrom);
     if (!fromAddress) {
       throw new InternalServerErrorException('Default sender email is not set');
@@ -104,41 +113,33 @@ export class SharedService {
       throw new BadRequestException('Recipient email is invalid');
     }
     const bccAddresses = this.parseAddressList(
-      email.bcc ?? this.sendgridConfig.defaultBcc ?? 'admin@dailyhelp.ng',
+      email.bcc ?? this.smtpConfig.defaultBcc ?? 'admin@dailyhelp.ng',
     );
-    const payload: Record<string, any> = {
-      personalizations: [
-        {
-          to: [toAddress],
-          ...(bccAddresses.length ? { bcc: bccAddresses } : {}),
-        },
-      ],
-      from: fromAddress,
-      subject: email.subject,
-      content: [
-        {
-          type: 'text/html',
-          value: html,
-        },
-      ],
-    };
+
+    const transporter = nodemailer.createTransport({
+      host: this.smtpConfig.host,
+      port: this.smtpConfig.port,
+      secure: this.smtpConfig.port === 465,
+      auth: {
+        user: this.smtpConfig.username,
+        pass: this.smtpConfig.password,
+      },
+    });
+
     try {
-      await axios.post(this.sendgridEndpoint, payload, {
-        headers: {
-          Authorization: `Bearer ${this.sendgridConfig.apiKey}`,
-          'Content-Type': 'application/json',
-        },
+      await transporter.sendMail({
+        from: this.formatAddress(fromAddress),
+        to: this.formatAddress(toAddress),
+        ...(bccAddresses.length
+          ? { bcc: bccAddresses.map(this.formatAddress).join(', ') }
+          : {}),
+        subject: email.subject,
+        html,
       });
     } catch (error) {
       const err = error as any;
-      const responseDetails =
-        err?.response?.data || err?.message || 'Unknown error';
       this.logger.error(
-        `Error sending email via SendGrid: ${
-          typeof responseDetails === 'string'
-            ? responseDetails
-            : JSON.stringify(responseDetails)
-        }`,
+        `Error sending email via SMTP: ${err?.message ?? 'Unknown error'}`,
       );
       throw new InternalServerErrorException('Unable to send email');
     }
