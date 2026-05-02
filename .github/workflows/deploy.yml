@@ -130,7 +130,11 @@ jobs:
             ln -sfn "$RELEASE_PATH" "$CURRENT_PATH"
 
             cd "$CURRENT_PATH"
-            pm2 startOrReload ecosystem.config.js --env production --only "$APP_NAME"
+
+            # Delete the existing PM2 process so the new one picks up the correct
+            # exec cwd (startOrReload keeps the old release path as cwd).
+            pm2 delete "$APP_NAME" 2>/dev/null || true
+            pm2 start ecosystem.config.js --env production --only "$APP_NAME"
             pm2 save
 
             cd "$DEPLOY_PATH/releases"

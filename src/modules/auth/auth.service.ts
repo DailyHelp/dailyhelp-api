@@ -177,7 +177,7 @@ export class AuthService {
     };
   }
 
-  async loginWithGoogle(idToken: string) {
+  async loginWithGoogle(idToken: string, type?: UserType) {
     const response = await axios.get(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`,
     );
@@ -186,11 +186,13 @@ export class AuthService {
     if (!email) throw new BadRequestException(`Could not retrieve email`);
     let user = await this.usersRepository.findOne({ email });
     if (!user) {
+      const resolvedType = type ?? UserType.CUSTOMER;
       const userModel = this.usersRepository.create({
         email,
         emailVerified: true,
         lastLoggedIn: new Date(),
         uuid: v4(),
+        userTypes: resolvedType,
       });
       user = userModel;
       this.em.persist(userModel);
@@ -216,7 +218,7 @@ export class AuthService {
     };
   }
 
-  async loginWithApple(idToken: string) {
+  async loginWithApple(idToken: string, type?: UserType) {
     const client = jwksClient({
       jwksUri: 'https://appleid.apple.com/auth/keys',
     });
@@ -243,11 +245,13 @@ export class AuthService {
     if (!email) throw new BadRequestException('Could not retrieve email');
     let user = await this.usersRepository.findOne({ email });
     if (!user) {
+      const resolvedType = type ?? UserType.CUSTOMER;
       const userModel = this.usersRepository.create({
         email,
         emailVerified: true,
         lastLoggedIn: new Date(),
         uuid: v4(),
+        userTypes: resolvedType,
       });
       user = userModel;
       this.em.persist(userModel);

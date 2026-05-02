@@ -1,6 +1,6 @@
-import { IsEmail, IsEnum, IsString, Length, ValidateIf } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, Length, ValidateIf } from 'class-validator';
 import { OTPActionType, UserType } from 'src/types';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SignupStepOneDto {
   @IsString()
@@ -43,6 +43,11 @@ export class LoginDTO {
 export class LoginWithGoogleDto {
   @IsString()
   idToken: string;
+
+  @ApiPropertyOptional({ enum: UserType, enumName: 'UserType', description: 'User type for new accounts. Defaults to CUSTOMER when omitted.' })
+  @IsOptional()
+  @IsEnum(UserType)
+  type?: UserType;
 }
 
 export class RefreshTokenDto {

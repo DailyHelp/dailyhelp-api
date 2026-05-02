@@ -81,8 +81,8 @@ export class AuthController {
     description: 'User logged in successfully',
     type: LoginResponseDto,
   })
-  async loginWithGoogle(@Body() { idToken }: LoginWithGoogleDto) {
-    return this.authService.loginWithGoogle(idToken);
+  async loginWithGoogle(@Body() { idToken, type }: LoginWithGoogleDto) {
+    return this.authService.loginWithGoogle(idToken, type);
   }
 
   @Post('apple')
@@ -90,8 +90,8 @@ export class AuthController {
     description: 'User logged in successfully',
     type: LoginResponseDto,
   })
-  async loginWithApple(@Body() { idToken }: LoginWithGoogleDto) {
-    return this.authService.loginWithApple(idToken);
+  async loginWithApple(@Body() { idToken, type }: LoginWithGoogleDto) {
+    return this.authService.loginWithApple(idToken, type);
   }
 
   @Post('refresh')
