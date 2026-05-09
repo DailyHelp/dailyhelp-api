@@ -260,6 +260,25 @@ export class UsersService {
     return rows[0] ?? null;
   }
 
+  private sanitizeIdentityLogPayload(payload: unknown): unknown {
+    if (Array.isArray(payload)) {
+      return payload.map((item) => this.sanitizeIdentityLogPayload(item));
+    }
+
+    if (payload && typeof payload === 'object') {
+      return Object.fromEntries(
+        Object.entries(payload as Record<string, unknown>)
+          .filter(([key]) => !['photo', 'photoUrl', 'imageUrl'].includes(key))
+          .map(([key, value]) => [
+            key,
+            this.sanitizeIdentityLogPayload(value),
+          ]),
+      );
+    }
+
+    return payload;
+  }
+
   private assertBvnBasicMatch(data?: QoreIdBvnBasicResponse) {
     const bvnCheck = data?.summary?.bvn_check;
     const fieldMatches = bvnCheck?.fieldMatches;
@@ -304,7 +323,7 @@ export class UsersService {
   ) {
     this.logger.log(
       `[verify-identity] Incoming request from mobile (userType=${userType}, uuid=${uuid}): ${JSON.stringify(
-        identity,
+        this.sanitizeIdentityLogPayload(identity),
       )}`,
     );
     const userExists = await this.usersRepository.findOne({ uuid });
@@ -313,7 +332,7 @@ export class UsersService {
     let ninResponse: AxiosResponse<any, any>;
     try {
       const token = await this.sharedService.getQoreIDToken();
-      [bvnResponse, ninResponse] = await Promise.all([
+      [ninResponse, bvnResponse] = await Promise.all([
         axios.post(
           `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/nin`,
           { idNumber: identity.nin, photoUrl: identity.photo },
@@ -327,18 +346,20 @@ export class UsersService {
       ]);
       this.logger.log(
         `[verify-identity] QoreID NIN response (userType=${userType}, uuid=${uuid}, status=${ninResponse?.status}): ${JSON.stringify(
-          ninResponse?.data,
+          this.sanitizeIdentityLogPayload(ninResponse?.data),
         )}`,
       );
       this.logger.log(
         `[verify-identity] QoreID BVN response (userType=${userType}, uuid=${uuid}, status=${bvnResponse?.status}): ${JSON.stringify(
-          bvnResponse?.data,
+          this.sanitizeIdentityLogPayload(bvnResponse?.data),
         )}`,
       );
     } catch (error) {
       this.logger.error(
         `[verify-identity] QoreID call failed (userType=${userType}, uuid=${uuid}, status=${error?.response?.status}): ${JSON.stringify(
-          error?.response?.data ?? error?.message,
+          this.sanitizeIdentityLogPayload(
+            error?.response?.data ?? error?.message,
+          ),
         )}`,
       );
       throw new InternalServerErrorException(error?.response?.data?.message);
