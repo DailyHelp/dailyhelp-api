@@ -15,7 +15,6 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -113,8 +112,6 @@ type QoreIdBvnBasicResponse = {
 
 @Injectable()
 export class UsersService {
-  private readonly logger: Logger = new Logger(UsersService.name);
-
   constructor(
     private readonly em: EntityManager,
     @InjectRepository(Users)
@@ -260,25 +257,6 @@ export class UsersService {
     return rows[0] ?? null;
   }
 
-  private sanitizeIdentityLogPayload(payload: unknown): unknown {
-    if (Array.isArray(payload)) {
-      return payload.map((item) => this.sanitizeIdentityLogPayload(item));
-    }
-
-    if (payload && typeof payload === 'object') {
-      return Object.fromEntries(
-        Object.entries(payload as Record<string, unknown>)
-          .filter(([key]) => !['photo', 'photoUrl', 'imageUrl'].includes(key))
-          .map(([key, value]) => [
-            key,
-            this.sanitizeIdentityLogPayload(value),
-          ]),
-      );
-    }
-
-    return payload;
-  }
-
   private assertBvnBasicMatch(data?: QoreIdBvnBasicResponse) {
     const bvnCheck = data?.summary?.bvn_check;
     const fieldMatches = bvnCheck?.fieldMatches;
@@ -317,15 +295,7 @@ export class UsersService {
     return { status: true, data: user };
   }
 
-  async verifyIdentity(
-    identity: VerifyIdentityDto,
-    { uuid, userType }: IAuthContext,
-  ) {
-    this.logger.log(
-      `[verify-identity] Incoming request from mobile (userType=${userType}, uuid=${uuid}): ${JSON.stringify(
-        this.sanitizeIdentityLogPayload(identity),
-      )}`,
-    );
+  async verifyIdentity(identity: VerifyIdentityDto, { uuid }: IAuthContext) {
     const userExists = await this.usersRepository.findOne({ uuid });
     if (!userExists) throw new NotFoundException(`User does not exist`);
     let bvnResponse: AxiosResponse<any, any>;
@@ -344,24 +314,7 @@ export class UsersService {
           { headers: { Authorization: `Bearer ${token}` } },
         ),
       ]);
-      this.logger.log(
-        `[verify-identity] QoreID NIN response (userType=${userType}, uuid=${uuid}, status=${ninResponse?.status}): ${JSON.stringify(
-          this.sanitizeIdentityLogPayload(ninResponse?.data),
-        )}`,
-      );
-      this.logger.log(
-        `[verify-identity] QoreID BVN response (userType=${userType}, uuid=${uuid}, status=${bvnResponse?.status}): ${JSON.stringify(
-          this.sanitizeIdentityLogPayload(bvnResponse?.data),
-        )}`,
-      );
     } catch (error) {
-      this.logger.error(
-        `[verify-identity] QoreID call failed (userType=${userType}, uuid=${uuid}, status=${error?.response?.status}): ${JSON.stringify(
-          this.sanitizeIdentityLogPayload(
-            error?.response?.data ?? error?.message,
-          ),
-        )}`,
-      );
       throw new InternalServerErrorException(error?.response?.data?.message);
     }
     this.assertBvnBasicMatch(bvnResponse?.data);
