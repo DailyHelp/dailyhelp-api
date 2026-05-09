@@ -15,6 +15,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -112,6 +113,8 @@ type QoreIdBvnBasicResponse = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger: Logger = new Logger(UsersService.name);
+
   constructor(
     private readonly em: EntityManager,
     @InjectRepository(Users)
@@ -295,7 +298,15 @@ export class UsersService {
     return { status: true, data: user };
   }
 
-  async verifyIdentity(identity: VerifyIdentityDto, { uuid }: IAuthContext) {
+  async verifyIdentity(
+    identity: VerifyIdentityDto,
+    { uuid, userType }: IAuthContext,
+  ) {
+    this.logger.log(
+      `[verify-identity] Incoming request from mobile (userType=${userType}, uuid=${uuid}): ${JSON.stringify(
+        identity,
+      )}`,
+    );
     const userExists = await this.usersRepository.findOne({ uuid });
     if (!userExists) throw new NotFoundException(`User does not exist`);
     let bvnResponse: AxiosResponse<any, any>;
@@ -314,8 +325,22 @@ export class UsersService {
           { headers: { Authorization: `Bearer ${token}` } },
         ),
       ]);
+      this.logger.log(
+        `[verify-identity] QoreID NIN response (userType=${userType}, uuid=${uuid}, status=${ninResponse?.status}): ${JSON.stringify(
+          ninResponse?.data,
+        )}`,
+      );
+      this.logger.log(
+        `[verify-identity] QoreID BVN response (userType=${userType}, uuid=${uuid}, status=${bvnResponse?.status}): ${JSON.stringify(
+          bvnResponse?.data,
+        )}`,
+      );
     } catch (error) {
-      console.log('Identity verification failed', error);
+      this.logger.error(
+        `[verify-identity] QoreID call failed (userType=${userType}, uuid=${uuid}, status=${error?.response?.status}): ${JSON.stringify(
+          error?.response?.data ?? error?.message,
+        )}`,
+      );
       throw new InternalServerErrorException(error?.response?.data?.message);
     }
     this.assertBvnBasicMatch(bvnResponse?.data);
