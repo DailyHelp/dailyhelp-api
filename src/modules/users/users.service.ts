@@ -97,6 +97,19 @@ import { SocketGateway } from '../ws/socket.gateway';
 import { ReadStateService } from '../ws/read-state.service';
 import { PresenceService } from '../ws/presence.service';
 
+type QoreIdBvnBasicResponse = {
+  summary?: {
+    bvn_check?: {
+      status?: string;
+      fieldMatches?: Record<string, boolean | undefined>;
+    };
+  };
+  status?: {
+    state?: string;
+    status?: string;
+  };
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -244,6 +257,30 @@ export class UsersService {
     return rows[0] ?? null;
   }
 
+  private assertBvnBasicMatch(data?: QoreIdBvnBasicResponse) {
+    const bvnCheck = data?.summary?.bvn_check;
+    const fieldMatches = bvnCheck?.fieldMatches;
+    const failedFields = ['firstname', 'lastname'].filter(
+      (field) => fieldMatches?.[field] !== true,
+    );
+    const isVerified =
+      data?.status?.state?.toLowerCase() === 'complete' &&
+      data?.status?.status?.toLowerCase() === 'verified';
+    const hasExactMatch = bvnCheck?.status?.toUpperCase() === 'EXACT_MATCH';
+
+    if (isVerified && hasExactMatch && failedFields.length === 0) return;
+
+    if (failedFields.length) {
+      throw new BadRequestException(
+        `BVN ${failedFields.join(' and ')} ${
+          failedFields.length === 1 ? 'does' : 'do'
+        } not match`,
+      );
+    }
+
+    throw new BadRequestException('BVN verification was not verified');
+  }
+
   async findByEmailOrPhone(emailOrPhone: string) {
     let username = emailOrPhone;
     try {
@@ -265,22 +302,22 @@ export class UsersService {
     let ninResponse: AxiosResponse<any, any>;
     try {
       const token = await this.sharedService.getQoreIDToken();
-      [bvnResponse, ninResponse] = await Promise.all([
+      [ninResponse, bvnResponse] = await Promise.all([
         axios.post(
           `${this.qoreidConfig.baseUrl}/v1/ng/identities/face-verification/nin`,
           { idNumber: identity.nin, photoUrl: identity.photo },
           { headers: { Authorization: `Bearer ${token}` } },
         ),
         axios.post(
-          `${this.qoreidConfig.baseUrl}/v1/ng/identities/bvn-match/${identity.bvn}`,
+          `${this.qoreidConfig.baseUrl}/v1/ng/identities/bvn-basic/${identity.bvn}`,
           { firstname: identity.firstname, lastname: identity.lastname },
           { headers: { Authorization: `Bearer ${token}` } },
         ),
       ]);
     } catch (error) {
-      console.log('Identity verification failed', error);
       throw new InternalServerErrorException(error?.response?.data?.message);
     }
+    this.assertBvnBasicMatch(bvnResponse?.data);
     userExists.firstname = identity.firstname;
     userExists.middlename = identity.middlename;
     userExists.lastname = identity.lastname;
@@ -1202,6 +1239,9 @@ export class UsersService {
     offer: SendOfferDto,
     { uuid }: IAuthContext,
   ) {
+    if (providerUuid === uuid) {
+      throw new ForbiddenException('You cannot send an offer to yourself');
+    }
     const providerExists = await this.usersRepository.findOne({
       uuid: providerUuid,
     });
