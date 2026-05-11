@@ -113,6 +113,10 @@ export class AuthService {
   async validateUser(email: string, password: string, deviceToken: string) {
     const user = (await this.usersService.findByEmailOrPhone(email))?.data;
     if (!user) throw new NotFoundException('User not found');
+    if (!user.password)
+      throw new UnauthorizedException(
+        'This account uses social login. Please sign in with Google or Apple.',
+      );
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (passwordMatch) {
       if (user.deletedAt)
@@ -400,7 +404,7 @@ export class AuthService {
     const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
     this.em.persist(otpModel);
     await this.em.flush();
-    return { status: true, data: pinId };
+    return { status: true, data: { pinId }, message: 'Send otp successful' };
   }
 
   async initiateResetPassword({ email }: ResetPasswordDto) {
@@ -429,6 +433,10 @@ export class AuthService {
   ) {
     const user = await this.usersRepository.findOne({ email });
     if (!user) throw new NotFoundException('User not found');
+    if (!user.password)
+      throw new BadRequestException(
+        'This account uses social login and has no password set. Use forgot password to create one.',
+      );
     const passwordMatch = await bcrypt.compare(oldPassword, user.password);
     if (!passwordMatch)
       throw new BadRequestException('Current password is incorrect');
