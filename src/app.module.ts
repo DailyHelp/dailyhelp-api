@@ -19,6 +19,7 @@ import CronModule from './modules/cron/cron.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { WsModule } from './modules/ws/ws.module';
+import { ContactModule } from './modules/contact/contact.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { WsModule } from './modules/ws/ws.module';
     JobsModule,
     IntegrationsModule,
     WsModule,
+    ContactModule,
   ],
   controllers: [AppController],
   providers: [

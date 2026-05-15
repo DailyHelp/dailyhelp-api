@@ -652,7 +652,9 @@ export class UsersService {
     hasLocation: boolean,
     notInPlaceholders: string,
     filtersSql: string,
-    allProvidersParams: any[],
+    allProvidersDataParams: any[],
+    allProvidersCountParams: any[],
+    searchOrderSql = '',
   ) {
     const baseProvidersQuery = `
       FROM users u
@@ -678,7 +680,11 @@ export class UsersService {
         ${locationSelect}
       ${baseProvidersQuery}
       GROUP BY u.uuid
-      ORDER BY ${hasLocation ? 'distance ASC,' : ''} RAND()
+      ORDER BY ${searchOrderSql}${hasLocation ? 'distance ASC,' : ''} ${
+        searchOrderSql
+          ? 'u.avg_rating DESC, completedJobs DESC, u.last_logged_in DESC,'
+          : ''
+      } RAND()
       LIMIT ? OFFSET ?
     `;
     const providersCountQuery = `
@@ -689,11 +695,8 @@ export class UsersService {
       ) AS count_subquery
     `;
     return Promise.all([
-      conn.execute(providersDataQuery, allProvidersParams),
-      conn.execute(
-        providersCountQuery,
-        allProvidersParams.slice(0, allProvidersParams.length - 2),
-      ),
+      conn.execute(providersDataQuery, allProvidersDataParams),
+      conn.execute(providersCountQuery, allProvidersCountParams),
     ]);
   }
 
@@ -712,7 +715,7 @@ export class UsersService {
     const hasLocation =
       user.defaultLocation?.lat != null && user.defaultLocation?.lng != null;
     const conn = this.em.getConnection();
-    const isSearchPage = filter && filter?.isSearchPage;
+    const isSearchPage = Boolean(filter?.isSearchPage || search);
     const topRatedProviders = isSearchPage
       ? []
       : await this.fetchTopRatedProviders(conn);
@@ -788,32 +791,84 @@ export class UsersService {
       filter?.engaged,
     );
     if (search) {
-      allProvidersParams.push(...Array(11).fill(`%${search.toLowerCase()}%`));
+      allProvidersParams.push(...Array(12).fill(`%${search}%`));
       allProvidersFiltersSql += `
         AND (
           LOWER(u.firstname) LIKE ? OR LOWER(u.lastname) LIKE ? OR LOWER(u.middlename) LIKE ? OR
           LOWER(mc.name) LIKE ? OR LOWER(r.name) LIKE ? OR LOWER(l.address) LIKE ? OR
           u.avg_rating LIKE ? OR u.offer_starting_price LIKE ? OR LOWER(u.email) LIKE ? OR
-          u.phone LIKE ? OR LOWER(u.gender) LIKE ?
+          u.phone LIKE ? OR LOWER(u.gender) LIKE ? OR LOWER(u.service_description) LIKE ?
         )
       `;
     }
     allProvidersParams.push(...notInUuids);
+    const searchOrderSql = search
+      ? `
+        CASE
+          WHEN LOWER(CONCAT_WS(' ', u.firstname, u.lastname)) = ? THEN 100
+          WHEN LOWER(CONCAT_WS(' ', u.firstname, u.middlename, u.lastname)) = ? THEN 100
+          WHEN LOWER(u.firstname) = ? THEN 95
+          WHEN LOWER(u.lastname) = ? THEN 90
+          WHEN LOWER(CONCAT_WS(' ', u.firstname, u.lastname)) LIKE ? THEN 85
+          WHEN LOWER(CONCAT_WS(' ', u.firstname, u.middlename, u.lastname)) LIKE ? THEN 85
+          WHEN LOWER(u.firstname) LIKE ? THEN 80
+          WHEN LOWER(u.lastname) LIKE ? THEN 75
+          WHEN LOWER(u.middlename) LIKE ? THEN 70
+          WHEN LOWER(r.name) LIKE ? THEN 60
+          WHEN LOWER(mc.name) LIKE ? THEN 55
+          WHEN LOWER(u.service_description) LIKE ? THEN 50
+          WHEN LOWER(l.address) LIKE ? THEN 40
+          WHEN LOWER(u.email) LIKE ? THEN 30
+          WHEN u.phone LIKE ? THEN 20
+          WHEN LOWER(u.gender) LIKE ? THEN 10
+          ELSE 0
+        END DESC,
+      `
+      : '';
+    const searchOrderParams = search
+      ? [
+          search,
+          search,
+          search,
+          search,
+          `${search}%`,
+          `${search}%`,
+          `${search}%`,
+          `${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+          `%${search}%`,
+        ]
+      : [];
+    const allProvidersCountParams = [...allProvidersParams];
+    const allProvidersDataParams = [];
     if (hasLocation) {
-      allProvidersParams.push(
+      allProvidersDataParams.push(
         user.defaultLocation?.lat,
         user.defaultLocation?.lng,
         user.defaultLocation?.lat,
       );
     }
-    allProvidersParams.push(Number(limit), Number(offset));
+    allProvidersDataParams.push(
+      ...allProvidersParams,
+      ...searchOrderParams,
+      Number(limit),
+      Number(offset),
+    );
     const [allProviders, totalProviders] = await this.fetchAllProviders(
       conn,
       locationSelect,
       hasLocation,
       notInPlaceholders,
       allProvidersFiltersSql,
-      allProvidersParams,
+      allProvidersDataParams,
+      allProvidersCountParams,
+      searchOrderSql,
     );
     return {
       status: true,

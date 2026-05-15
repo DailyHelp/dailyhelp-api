@@ -119,7 +119,7 @@ export class SharedService {
     const transporter = nodemailer.createTransport({
       host: this.smtpConfig.host,
       port: this.smtpConfig.port,
-      secure: this.smtpConfig.port === 465,
+      secure: [465, 2465].includes(this.smtpConfig.port),
       auth: {
         user: this.smtpConfig.username,
         pass: this.smtpConfig.password,
