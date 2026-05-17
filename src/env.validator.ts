@@ -42,6 +42,12 @@ class EnvironmentVariables {
   TERMII_BASE_URL: string;
   @IsString()
   TERMII_API_KEY: string;
+  @IsOptional()
+  @IsString()
+  TERMII_SENDER_ID?: string;
+  @IsOptional()
+  @IsString()
+  TERMII_SMS_CHANNEL?: string;
   @IsString()
   API_BASE_URL: string;
   @IsString()

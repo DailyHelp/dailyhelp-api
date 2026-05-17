@@ -56,6 +56,24 @@ export class SharedService {
     return phoneNumber;
   }
 
+  private getTermiiSmsUrl(): string {
+    const baseUrl = this.termiiConfig.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new InternalServerErrorException('Termii is not configured');
+    }
+
+    const normalizedBaseUrl = baseUrl
+      .replace(/\/+$/, '')
+      .replace(/\/api\/sms\/send$/, '')
+      .replace(/\/api$/, '');
+
+    return `${normalizedBaseUrl}/api/sms/send`;
+  }
+
+  private formatTermiiPhoneNumber(phoneNo: string): string {
+    return this.validatePhoneNumber(phoneNo).replace(/^\+/, '');
+  }
+
   private parseAddress(address?: string): MailAddress | null {
     if (!address) return null;
     const trimmed = address.trim();
@@ -152,23 +170,29 @@ export class SharedService {
   ) {
     if (phone) {
       let smsOtpResponse: any;
+      const smsUrl = this.getTermiiSmsUrl();
+      const recipient = this.formatTermiiPhoneNumber(phone);
       try {
-        smsOtpResponse = await axios.post(
-          `${this.termiiConfig.baseUrl}/api/sms/send`,
-          {
-            to: phone,
-            from: 'DailyHelp',
-            sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
-            type: 'plain',
-            channel: 'generic',
-            api_key: this.termiiConfig.apiKey,
-          },
-        );
+        smsOtpResponse = await axios.post(smsUrl, {
+          to: recipient,
+          from: this.termiiConfig.senderId,
+          sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
+          type: 'plain',
+          channel: this.termiiConfig.smsChannel,
+          api_key: this.termiiConfig.apiKey,
+        });
       } catch (error) {
+        const err = error as any;
+        const status = axios.isAxiosError(err)
+          ? err.response?.status
+          : undefined;
+        const responseData = axios.isAxiosError(err)
+          ? JSON.stringify(err.response?.data)
+          : undefined;
         this.logger.error(
-          `Error occurred while sending SMS OTP to: ${phone}. Error: ${error}`,
+          `Error occurred while sending SMS OTP to: ${recipient}. URL: ${smsUrl}. Status: ${status ?? 'n/a'}. Response: ${responseData ?? err?.message ?? 'Unknown error'}`,
         );
-        throw error;
+        throw new InternalServerErrorException('Unable to send SMS OTP');
       }
       if (smsOtpResponse.data.code !== 'ok') {
         throw new InternalServerErrorException(smsOtpResponse.data.message);
