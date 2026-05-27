@@ -9,135 +9,51 @@ on:
 env:
   APP_NAME: dailyhelp-api
   NODE_VERSION: 22
-  DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
-  VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+  RELEASE_ARCHIVE: dailyhelp-api-release.tar.gz
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Build
-        run: npm run build
+      - run: npm run build
 
-      - name: Create deploy archive
+      - name: Package release artifact
         run: |
-          set -euo pipefail
-          FILES=(dist package.json package-lock.json ecosystem.config.js notification_templates)
-          tar -czf release.tar.gz "${FILES[@]}"
+          tar --owner=0 --group=0 --mode='go-w' -czf "${RELEASE_ARCHIVE}" \
+            dist package.json package-lock.json ecosystem.config.js notification_templates
 
-      - name: Load SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: Trust VPS host key
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          SSH_PORT_RAW: ${{ secrets.DEV_SSH_PORT }}
         run: |
-          set -euo pipefail
           mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          ssh-keyscan -p "${{ env.VPS_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${SSH_PORT_RAW:-22}"
+          echo "SSH_PORT=$PORT" >> $GITHUB_ENV
+          echo "SSH_HOST=$SSH_HOST" >> $GITHUB_ENV
+          ssh-keyscan -t ed25519 -p "$PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Prepare VPS upload directory
+      - name: Deploy via wrapper
+        env:
+          SSH_USER: ${{ secrets.DEV_SSH_USER }}
         run: |
-          set -euo pipefail
-          ssh -p "${{ env.VPS_PORT }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
-            set -eu
-            command -v rsync >/dev/null 2>&1 || {
-              echo "rsync is not installed on the VPS." >&2
-              exit 1
-            }
-            mkdir -p "/tmp/${{ env.APP_NAME }}-${{ github.sha }}/"
-          '
+          RELEASE="release-$(date +%s)-${{ github.run_number }}-${{ github.sha }}"
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "deploy $APP_NAME $RELEASE" < "${RELEASE_ARCHIVE}"
 
-      - name: Upload archive to VPS
-        run: |
-          set -euo pipefail
-          rsync -az --progress -e "ssh -p ${{ env.VPS_PORT }}" \
-            release.tar.gz \
-            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/${{ env.APP_NAME }}-${{ github.sha }}/release.tar.gz"
-
-      - name: Deploy and reload with PM2
-        uses: appleboy/ssh-action@v1.2.1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ env.VPS_PORT }}
-          script: |
-            set -eu
-
-            APP_NAME="${{ env.APP_NAME }}"
-            RELEASE="${{ github.sha }}"
-            DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
-            ARCHIVE_DIR="/tmp/${APP_NAME}-${RELEASE}"
-            ARCHIVE_PATH="${ARCHIVE_DIR}/release.tar.gz"
-            RELEASE_PATH="${DEPLOY_PATH}/releases/${RELEASE}"
-            CURRENT_PATH="${DEPLOY_PATH}/current"
-            SA_PATH="${DEPLOY_PATH}/shared/dailyhelp-firebase-service-account.json"
-
-            if [ -z "$DEPLOY_PATH" ]; then
-              echo "Set the VPS_DEPLOY_PATH secret to the base deploy directory." >&2
-              exit 1
-            fi
-
-            mkdir -p "$DEPLOY_PATH/releases" "$DEPLOY_PATH/shared" "$DEPLOY_PATH/logs"
-            mkdir -p "$RELEASE_PATH"
-
-            tar -xzf "$ARCHIVE_PATH" -C "$RELEASE_PATH"
-
-            if [ -f "$DEPLOY_PATH/shared/.env" ]; then
-              ln -sfn "$DEPLOY_PATH/shared/.env" "$RELEASE_PATH/.env"
-            fi
-
-            if [ -f "$SA_PATH" ]; then
-              ln -sfn "$SA_PATH" "$RELEASE_PATH/dailyhelp-firebase-service-account.json"
-            else
-              echo "Missing shared Firebase service account file at $SA_PATH" >&2
-              exit 1
-            fi
-
-            cd "$RELEASE_PATH"
-
-            if ! command -v pm2 >/dev/null 2>&1; then
-              npm install -g pm2
-            fi
-
-            if ! command -v npm >/dev/null 2>&1; then
-              echo "npm not found; ensure Node.js is installed on the server." >&2
-              exit 1
-            fi
-
-            npm ci --omit=dev
-            if [ ! -d node_modules/express ]; then
-              echo "express not installed; install failed" >&2
-              exit 1
-            fi
-
-            ln -sfn "$RELEASE_PATH" "$CURRENT_PATH"
-
-            cd "$CURRENT_PATH"
-
-            # Delete the existing PM2 process so the new one picks up the correct
-            # exec cwd (startOrReload keeps the old release path as cwd).
-            pm2 delete "$APP_NAME" 2>/dev/null || true
-            pm2 start ecosystem.config.js --env production --only "$APP_NAME"
-            pm2 save
-
-            cd "$DEPLOY_PATH/releases"
-            ls -1dt */ 2>/dev/null | tail -n +4 | xargs -r rm -rf
-
-            rm -rf "$ARCHIVE_DIR"
+      - name: Tear down SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
