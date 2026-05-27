@@ -44,7 +44,7 @@ jobs:
           PORT="${SSH_PORT_RAW:-22}"
           echo "SSH_PORT=$PORT" >> $GITHUB_ENV
           echo "SSH_HOST=$SSH_HOST" >> $GITHUB_ENV
-          ssh-keyscan -t ed25519 -p "$PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -t ed25519 -p "$PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy via wrapper
         env:
