@@ -38,6 +38,8 @@ jobs:
           SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
           SSH_PORT_RAW: ${{ secrets.DEV_SSH_PORT }}
         run: |
+          : "${SSH_KEY:?DEV_SSH_KEY secret is not set}"
+          : "${SSH_HOST:?DEV_SSH_HOST secret is not set}"
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
