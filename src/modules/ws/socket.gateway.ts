@@ -414,6 +414,7 @@ export class SocketGateway {
     serviceProviderUuid: string;
     serviceRequestorUuid: string;
     status: string;
+    cancelledByUserType?: string | null;
   }) {
     if (payload.conversationUuid)
       this.server

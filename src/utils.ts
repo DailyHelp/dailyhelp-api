@@ -104,3 +104,56 @@ export const mapJobStatusToUserJobStatus = (
       return null;
   }
 };
+
+const URL_REGEX =
+  /\b(?:https?:\/\/|www\.)[^\s<>"']+|\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:com|net|org|io|co|me|app|dev|gg|xyz|info|biz|tv|us|uk|ng|africa|edu|gov|ai|in|cn|de|fr|es|it|jp|kr|br|ru|au|ca|nz|to|ly|sh|live|online|site|store|tech|click|link|chat|so)(?:\/[^\s<>"']*)?\b/gi;
+const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+const HANDLE_REGEX = /(^|\s)(@[A-Za-z0-9_]{3,})\b/g;
+const PHONE_BLOCK_REGEX = /[+(]?\d[\d\s().\-]{5,}\d/g;
+const DIGIT_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'oh',
+  'nought',
+  'naught',
+  'double',
+  'triple',
+];
+const DIGIT_WORD_ALT = DIGIT_WORDS.join('|');
+const DIGIT_WORD_SEQUENCE_REGEX = new RegExp(
+  `\\b(?:${DIGIT_WORD_ALT})(?:[\\s,.\\-]+(?:and[\\s,.\\-]+)?(?:${DIGIT_WORD_ALT})){4,}\\b`,
+  'gi',
+);
+const DIGIT_WORD_TOKEN_REGEX = new RegExp(`\\b(?:${DIGIT_WORD_ALT})\\b`, 'gi');
+
+export const sanitizeChatMessage = (input: string): string => {
+  if (!input) return input;
+  let output = input;
+
+  output = output.replace(EMAIL_REGEX, (m) => '*'.repeat(m.length));
+  output = output.replace(URL_REGEX, (m) => '*'.repeat(m.length));
+  output = output.replace(
+    HANDLE_REGEX,
+    (_m, lead: string, handle: string) => lead + '*'.repeat(handle.length),
+  );
+
+  output = output.replace(PHONE_BLOCK_REGEX, (block) => {
+    const digitCount = (block.match(/\d/g) || []).length;
+    if (digitCount < 7) return block;
+    return block.replace(/\d/g, '*');
+  });
+
+  output = output.replace(DIGIT_WORD_SEQUENCE_REGEX, (run) =>
+    run.replace(DIGIT_WORD_TOKEN_REGEX, '*'),
+  );
+
+  return output;
+};

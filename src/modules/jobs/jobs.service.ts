@@ -28,6 +28,7 @@ import {
   TransactionType,
   UserType,
   DisputeStatus,
+  PROVIDER_PAYOUT_RATE,
 } from 'src/types';
 import {
   CancelJobDto,
@@ -417,7 +418,7 @@ export class JobService {
     });
     if (!providerWallet)
       throw new NotFoundException('Provider wallet not found');
-    const payoutAmount = Math.max(0, Number(job.price) * 0.9 || 0);
+    const payoutAmount = Math.max(0, Number(job.price) * PROVIDER_PAYOUT_RATE || 0);
     providerWallet.totalBalance += payoutAmount;
     const transactionModel = this.transactionRepository.create({
       uuid: v4(),
@@ -448,6 +449,7 @@ export class JobService {
     dto: CancelJobDto,
     { uuid, userType }: IAuthContext,
   ) {
+    const cancelledByUserType = this.normalizeUserType(userType);
     const job = await this.jobRepository.findOne({
       uuid: jobUuid,
       ...(userType === UserType.CUSTOMER
@@ -467,6 +469,7 @@ export class JobService {
     job.cancellationReason = dto.reason ?? null;
     job.cancellationCategory = dto.reasonCategory ?? null;
     job.cancelledAt = new Date();
+    job.cancelledByUserType = cancelledByUserType;
     const requestorWallet = await this.walletRepository.findOne({
       user: { uuid: job.serviceRequestor?.uuid },
       userType: UserType.CUSTOMER,
@@ -498,6 +501,7 @@ export class JobService {
       serviceProviderUuid: job.serviceProvider?.uuid,
       serviceRequestorUuid: job.serviceRequestor?.uuid,
       status: job.status,
+      cancelledByUserType,
       ...job,
     });
     return { status: true };

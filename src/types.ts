@@ -115,6 +115,9 @@ export enum UserType {
   CUSTOMER = 'CUSTOMER',
 }
 
+export const PLATFORM_COMMISSION_RATE = 0.1;
+export const PROVIDER_PAYOUT_RATE = 1 - PLATFORM_COMMISSION_RATE;
+
 export interface IEmailDto {
   templateCode: string;
   to?: string;

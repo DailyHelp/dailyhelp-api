@@ -108,6 +108,10 @@ export class Job extends Timestamp {
 
   @Property({ nullable: true })
   cancellationCategory: string;
+
+  @ApiProperty({ enum: UserType, required: false, nullable: true })
+  @Enum({ items: () => UserType, nullable: true, fieldName: 'cancelled_by_user_type' })
+  cancelledByUserType: UserType | null;
 }
 
 @Filter({

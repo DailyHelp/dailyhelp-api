@@ -30,6 +30,7 @@ import {
   DisputeStatus,
   IAdminAuthContext,
   JobStatus,
+  PLATFORM_COMMISSION_RATE,
   ReportStatus,
   TransactionStatus,
   TransactionType,
@@ -111,7 +112,7 @@ export class AdminService {
     month: 'short',
     year: 'numeric',
   });
-  private readonly platformCommissionRate = 0.1;
+  private readonly platformCommissionRate = PLATFORM_COMMISSION_RATE;
 
   constructor(
     @InjectRepository(AdminUser)
@@ -2584,7 +2585,7 @@ export class AdminService {
       JobStatus.COMPLETED,
       start,
       end,
-      0.1,
+      PLATFORM_COMMISSION_RATE,
       provider.uuid,
     ];
 
@@ -2671,7 +2672,7 @@ export class AdminService {
             commissionRate:
               income > 0
                 ? +((commission / income) * 100).toFixed(2)
-                : +(0.1 * 100).toFixed(2),
+                : +(PLATFORM_COMMISSION_RATE * 100).toFixed(2),
             deductions: commission,
             yourEarnings: earnings,
           },

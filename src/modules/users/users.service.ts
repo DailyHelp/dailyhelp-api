@@ -58,6 +58,7 @@ import {
   PaymentMethod,
   PaymentPurpose,
   PaymentType,
+  PLATFORM_COMMISSION_RATE,
   TransactionStatus,
   TransactionType,
   UserJobStatus,
@@ -77,6 +78,7 @@ import {
   buildResponseDataWithPagination,
   generateOtp,
   mapJobStatusToUserJobStatus,
+  sanitizeChatMessage,
 } from 'src/utils';
 import {
   Conversation,
@@ -1253,8 +1255,11 @@ export class UsersService {
     if (!offerExists) throw new NotFoundException(`Offer does not exist`);
     if (offerExists.status !== OfferStatus.PENDING)
       throw new ForbiddenException(`Offer status cannot be updated`);
+    const sanitizedReason = dto.reason
+      ? sanitizeChatMessage(dto.reason)
+      : dto.reason;
     offerExists.status = OfferStatus.DECLINED;
-    offerExists.declinedReason = dto.reason;
+    offerExists.declinedReason = sanitizedReason;
     offerExists.declinedReasonCategory = dto.reasonCategory;
     const conversation = await this.conversationRepository.findOne({
       uuid: messageExists.conversation.uuid,
@@ -1272,7 +1277,7 @@ export class UsersService {
       to: this.usersRepository.getReference(messageExists.from?.uuid),
       type: MessageType.OFFER,
       offer: this.offerRepository.getReference(offerExists.uuid),
-      message: dto.reason,
+      message: sanitizedReason,
     });
     conversation.lastMessage = this.messageRepository.getReference(
       messageModel.uuid,
@@ -1430,8 +1435,9 @@ export class UsersService {
     dto: SendMessageDto,
     { uuid }: IAuthContext,
   ) {
-    const message = dto.message?.trim();
-    if (!message) throw new BadRequestException('Message cannot be empty');
+    const trimmed = dto.message?.trim();
+    if (!trimmed) throw new BadRequestException('Message cannot be empty');
+    const message = sanitizeChatMessage(trimmed);
     const conversationExists = await this.conversationRepository.findOne({
       uuid: conversationUuid,
     });
@@ -2036,7 +2042,7 @@ export class UsersService {
       JobStatus.COMPLETED,
       start,
       end,
-      0.1,
+      PLATFORM_COMMISSION_RATE,
       uuid,
     ];
     const offersSql = `
@@ -2100,7 +2106,7 @@ export class UsersService {
           commissionRate:
             income > 0
               ? +((commission / income) * 100).toFixed(2)
-              : +(0.1 * 100).toFixed(2),
+              : +(PLATFORM_COMMISSION_RATE * 100).toFixed(2),
           deductions: commission,
           yourEarnings: earnings,
         },
@@ -2208,11 +2214,21 @@ export class UsersService {
       if (paymentMethod === PaymentMethod.WALLET) {
         if (amountNaira <= 0)
           throw new BadRequestException('Offer amount must be greater than zero');
-        const wallet = await this.walletRepository.findOne({
+        let wallet = await this.walletRepository.findOne({
           user: { uuid },
           userType,
         });
-        if (!wallet) throw new NotFoundException('Wallet not found');
+        if (!wallet) {
+          wallet = this.walletRepository.create({
+            uuid: v4(),
+            totalBalance: 0,
+            availableBalance: 0,
+            user: this.usersRepository.getReference(uuid),
+            userType,
+          });
+          this.em.persist(wallet);
+          await this.em.flush();
+        }
         if (wallet.availableBalance < amountNaira)
           throw new ForbiddenException('Insufficient wallet balance');
 

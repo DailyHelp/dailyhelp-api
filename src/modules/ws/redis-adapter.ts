@@ -9,13 +9,20 @@ export class RedisIoAdapter extends IoAdapter {
 
   async connectToRedis(): Promise<void> {
     const url = process.env.REDIS_URL;
+    const timeoutMs = Number(process.env.REDIS_CONNECT_TIMEOUT_MS || 5000);
     if (!url) {
       this.logger.warn('REDIS_URL not set; using default in-memory socket adapter');
       return;
     }
 
     try {
-      const pubClient = createClient({ url });
+      const pubClient = createClient({
+        url,
+        socket: {
+          connectTimeout: timeoutMs,
+          reconnectStrategy: false,
+        },
+      });
       const subClient = pubClient.duplicate();
       await pubClient.connect();
       await subClient.connect();

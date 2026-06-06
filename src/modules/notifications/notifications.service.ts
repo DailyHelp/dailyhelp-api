@@ -121,6 +121,7 @@ export class NotificationsService {
       const responses = await Promise.allSettled(
         c.map((t) => admin.messaging().send(this.buildMessage(t, payload))),
       );
+      const invalidTokens: string[] = [];
       responses.forEach((result, index) => {
         if (result.status === 'fulfilled') {
           success += 1;
@@ -135,7 +136,23 @@ export class NotificationsService {
           `Push token ${token} failed → ${message}`,
           stack || (typeof reason === 'string' ? reason : undefined),
         );
+        // Auto-clear tokens FCM explicitly rejects as invalid
+        const invalidTokenErrors = [
+          'registration-token-not-registered',
+          'invalid-registration-token',
+          'invalid-argument',
+        ];
+        if (invalidTokenErrors.some((e) => reason?.code?.includes(e) || message?.toLowerCase().includes('not a valid fcm'))) {
+          invalidTokens.push(token);
+        }
       });
+      if (invalidTokens.length > 0) {
+        await this.usersRepo.nativeUpdate(
+          { deviceToken: { $in: invalidTokens } },
+          { deviceToken: null },
+        );
+        this.logger.log(`Cleared ${invalidTokens.length} invalid device token(s) from DB`);
+      }
     }
     this.logger.log(`Push sent → success=${success}, failure=${failure}`);
     return { success, failure };
