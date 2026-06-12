@@ -15,6 +15,8 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import {
   OfferStatus,
   PaymentPurpose,
+  PLATFORM_COMMISSION_RATE,
+  SERVICE_FEE_FLAT,
   TransactionStatus,
   TransactionType,
 } from 'src/types';
@@ -196,7 +198,7 @@ export class IntegrationsService {
       uuid: payment.offer?.uuid,
     });
     if (!offer) throw new NotFoundException(`Offer not found`);
-    if (offer.price !== payment.amount)
+    if (Math.round(Number(offer.price) * (1 + PLATFORM_COMMISSION_RATE)) + SERVICE_FEE_FLAT !== Number(payment.amount))
       throw new InternalServerErrorException(`Amount mismatch`);
     const conversation = await this.conversationRepository.findOne({
       uuid: payment.conversation?.uuid,

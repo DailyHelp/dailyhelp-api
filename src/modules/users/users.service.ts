@@ -59,6 +59,7 @@ import {
   PaymentPurpose,
   PaymentType,
   PLATFORM_COMMISSION_RATE,
+  SERVICE_FEE_FLAT,
   TransactionStatus,
   TransactionType,
   UserJobStatus,
@@ -2204,7 +2205,7 @@ export class UsersService {
           'A payment is already completed or in progress for this offer',
         );
 
-      amountNaira = Number(offer.price || 0);
+      amountNaira = Math.round(Number(offer.price || 0) * (1 + PLATFORM_COMMISSION_RATE)) + SERVICE_FEE_FLAT;
       amountKobo = Math.round(amountNaira * 100);
       offerRef = this.offerRepository.getReference(dto.offerUuid);
       conversationRef = this.conversationRepository.getReference(
