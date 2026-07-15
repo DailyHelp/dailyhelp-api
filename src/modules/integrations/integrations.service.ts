@@ -1,14 +1,13 @@
 import {
-  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigType } from '@nestjs/config';
 import { Request, Response } from 'express';
-import { PaystackConfiguration } from 'src/config/configuration';
-import crypto from 'crypto';
-import axios from 'axios';
+import {
+  NormalizedVerification,
+  PaymentGatewayService,
+} from '../payments/payment-gateway.service';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Conversation, Offer } from '../conversations/conversations.entity';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
@@ -31,8 +30,7 @@ import { SocketGateway } from '../ws/socket.gateway';
 @Injectable()
 export class IntegrationsService {
   constructor(
-    @Inject(PaystackConfiguration.KEY)
-    private readonly paystackConfig: ConfigType<typeof PaystackConfiguration>,
+    private readonly paymentGateway: PaymentGatewayService,
     @InjectRepository(Payment)
     private readonly paymentRepository: EntityRepository<Payment>,
     @InjectRepository(Wallet)
@@ -54,29 +52,48 @@ export class IntegrationsService {
   ) {}
 
   async handlePaystackWebhook(req: Request, res: Response) {
-    const hash = crypto
-      .createHmac('sha512', this.paystackConfig.secretKey)
-      .update(JSON.stringify(req.body))
-      .digest('hex');
-    if (hash !== req.headers['x-paystack-signature'])
+    if (!this.paymentGateway.verifyPaystackSignature(req))
       return res.status(400).send('Invalid signature');
-    const event = req.body?.event;
-    const data = req.body?.data;
-    switch (event) {
-      case 'charge.success':
-        const verified = await this.verifyWithPaystack(data.reference);
-        if (!verified.success) return res.status(200).send('Not successful');
-        await this.processPaystackPayment(verified.data);
-        return res.status(200).send('OK');
-      case 'transfer.success':
-      case 'transfer.failed':
-      case 'transfer.reversed':
-        await this.processPaystackTransfer(data);
-        return res.status(200).send('OK');
+    const parsed = this.paymentGateway.parsePaystackWebhook(req.body);
+    if (parsed.type === 'charge') {
+      const verified = await this.paymentGateway.verifyWithPaystack(
+        parsed.reference,
+      );
+      if (!verified.success) return res.status(200).send('Not successful');
+      await this.processCharge(verified);
+      return res.status(200).send('OK');
     }
+    if (parsed.type === 'transfer') {
+      await this.processTransferEvent(parsed);
+      return res.status(200).send('OK');
+    }
+    return res.status(200).send('OK');
   }
 
-  async processPaystackTransfer(data: any) {
+  async handleFlutterwaveWebhook(req: Request, res: Response) {
+    if (!this.paymentGateway.verifyFlutterwaveSignature(req))
+      return res.status(401).send('Invalid signature');
+    const parsed = this.paymentGateway.parseFlutterwaveWebhook(req.body);
+    if (parsed.type === 'charge') {
+      const verified = await this.paymentGateway.verifyWithFlutterwave(
+        parsed.reference,
+      );
+      if (!verified.success) return res.status(200).send('Not successful');
+      await this.processCharge(verified);
+      return res.status(200).send('OK');
+    }
+    if (parsed.type === 'transfer') {
+      await this.processTransferEvent(parsed);
+      return res.status(200).send('OK');
+    }
+    return res.status(200).send('OK');
+  }
+
+  async processTransferEvent(data: {
+    reference: string;
+    status: 'success' | 'failed';
+    amountNaira: number;
+  }) {
     const transaction = await this.transactionRepository.findOne({
       uuid: data.reference,
     });
@@ -87,30 +104,19 @@ export class IntegrationsService {
     switch (data.status) {
       case 'success':
         transaction.status = TransactionStatus.SUCCESS;
-        wallet.totalBalance -= Number(data.amount) / 100;
+        wallet.totalBalance -= Number(data.amountNaira);
         break;
       case 'failed':
-      case 'reversed':
         transaction.status = TransactionStatus.FAILED;
-        wallet.availableBalance += Number(data.amount) / 100;
+        wallet.availableBalance += Number(data.amountNaira);
         break;
     }
     await this.em.flush();
   }
 
-  async verifyWithPaystack(reference: string) {
-    const response = await axios.get(
-      `${this.paystackConfig.baseUrl}/transaction/verify/${encodeURIComponent(reference)}`,
-      { headers: { Authorization: `Bearer ${this.paystackConfig.secretKey}` } },
-    );
-    const data = response.data.data;
-    const ok = data?.status?.toLowerCase() === 'success';
-    return { success: ok, data };
-  }
-
-  async processPaystackPayment(data: any) {
+  async processCharge(v: NormalizedVerification) {
     const payment = await this.paymentRepository.findOne({
-      reference: data.reference,
+      reference: v.reference,
     });
     if (!payment) return;
     if (payment.status === 'success' || payment.status === 'processing') return;
@@ -124,9 +130,9 @@ export class IntegrationsService {
       if (Boolean(existingSettlement)) {
         const meta = payment.metadata ? JSON.parse(payment.metadata) : {};
         payment.status = 'failed';
-        payment.transactionId = String(data.id);
+        payment.transactionId = v.transactionId;
         payment.processedAt = new Date();
-        payment.channel = data.channel ?? data.payment_method;
+        payment.channel = v.channel;
         payment.metadata = JSON.stringify({
           ...meta,
           duplicatePayment: true,
@@ -135,21 +141,21 @@ export class IntegrationsService {
         return;
       }
     }
-    const paidAmount = Number(data.amount) / 100;
+    const paidAmount = Number(v.amountNaira);
     if (paidAmount !== Number(payment.amount)) {
       payment.status = 'failed';
       await this.em.flush();
       return;
     }
     payment.status = 'processing';
-    payment.transactionId = String(data.id);
+    payment.transactionId = v.transactionId;
     await this.em.flush();
     const purpose: PaymentPurpose =
       payment.metadata && JSON.parse(payment.metadata).purpose;
     if (purpose === PaymentPurpose.FUND_WALLET) {
-      await this.creditWallet(payment, data);
+      await this.creditWallet(payment, v);
     } else if (purpose === PaymentPurpose.JOB_OFFER) {
-      await this.acceptOfferAndCreateJob(payment, data);
+      await this.acceptOfferAndCreateJob(payment, v);
     } else {
       payment.status = 'failed';
       await this.em.flush();
@@ -160,7 +166,7 @@ export class IntegrationsService {
     await this.em.flush();
   }
 
-  private async creditWallet(payment: Payment, data: any) {
+  private async creditWallet(payment: Payment, v: NormalizedVerification) {
     const wallet = await this.walletRepository.findOne({
       user: { uuid: payment.user?.uuid },
       userType: payment.userType,
@@ -174,9 +180,9 @@ export class IntegrationsService {
     const currentMetadata = payment.metadata ? JSON.parse(payment.metadata) : {};
     payment.metadata = JSON.stringify({
       ...currentMetadata,
-      ...data,
+      ...v.raw,
     });
-    payment.channel = data.channel ?? data.payment_method;
+    payment.channel = v.channel;
     if (existingTransaction) return;
     wallet.availableBalance += Number(payment.amount);
     wallet.totalBalance += Number(payment.amount);
@@ -193,7 +199,10 @@ export class IntegrationsService {
     this.em.persist(transactionModel);
   }
 
-  private async acceptOfferAndCreateJob(payment: Payment, data: any) {
+  private async acceptOfferAndCreateJob(
+    payment: Payment,
+    v: NormalizedVerification,
+  ) {
     const offer = await this.offerRepository.findOne({
       uuid: payment.offer?.uuid,
     });
@@ -211,9 +220,9 @@ export class IntegrationsService {
     conversation.restricted = false;
     payment.metadata = JSON.stringify({
       ...JSON.parse(payment.metadata),
-      ...data,
+      ...v.raw,
     });
-    payment.channel = data.channel ?? data.payment_method;
+    payment.channel = v.channel;
     const jobUuid = v4();
     const jobModel = this.jobRepository.create({
       uuid: jobUuid,

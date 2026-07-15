@@ -70,6 +70,7 @@ import {
   PaystackConfiguration,
   QoreIDConfiguration,
 } from 'src/config/configuration';
+import { PaymentGatewayService } from '../payments/payment-gateway.service';
 import { ConfigType } from '@nestjs/config';
 import { v4 } from 'uuid';
 import { Location } from 'src/entities/location.entity';
@@ -160,6 +161,7 @@ export class UsersService {
     private readonly qoreidConfig: ConfigType<typeof QoreIDConfiguration>,
     @Inject(PaystackConfiguration.KEY)
     private readonly paystackConfig: ConfigType<typeof PaystackConfiguration>,
+    private readonly paymentGateway: PaymentGatewayService,
     private readonly jwtService: JwtService,
     private readonly ws: SocketGateway,
     private readonly readService: ReadStateService,
@@ -999,27 +1001,16 @@ export class UsersService {
     if (!bankAccount)
       throw new NotFoundException(`Bank account does not exist`);
     const transactionUuid = v4();
-    const response = await axios.post(
-      `${this.paystackConfig.baseUrl}/transfer`,
-      {
-        source: 'balance',
-        amount: dto.amount * 100,
-        recipient: bankAccount.recipientCode,
-        reference: transactionUuid,
-        reason: `Payout`,
+    await this.paymentGateway.createTransfer({
+      amountNaira: dto.amount,
+      reference: transactionUuid,
+      bank: {
+        accountNumber: bankAccount.accountNumber,
+        bankCode: bankAccount.bankCode,
+        accountName: bankAccount.accountName,
+        recipientCode: bankAccount.recipientCode,
       },
-      {
-        headers: {
-          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
-        },
-      },
-    );
-    const status = response.data.data.status;
-    if (status !== 'disabled') {
-      throw new InternalServerErrorException(
-        `Kindly contact admin to ensure that OTP is disabled for transfers on this account`,
-      );
-    }
+    });
     const transactionModel = this.transactionRepository.create({
       uuid: transactionUuid,
       type: TransactionType.DEBIT,
@@ -1041,22 +1032,11 @@ export class UsersService {
       user: { uuid },
     });
     if (duplicateExists) throw new ConflictException(`Record already exists`);
-    const response = await axios.post(
-      `${this.paystackConfig.baseUrl}/transferrecipient`,
-      {
-        type: 'nuban',
-        name: dto.accountName,
-        account_number: dto.accountNumber,
-        bank_code: dto.bankCode,
-        currency: 'NGN',
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
-        },
-      },
-    );
-    const recipientCode = response.data.data.recipient_code;
+    const recipientCode = await this.paymentGateway.createRecipient({
+      accountName: dto.accountName,
+      accountNumber: dto.accountNumber,
+      bankCode: dto.bankCode,
+    });
     const bankAccountModel = this.bankAccountRepository.create({
       uuid: v4(),
       accountNumber: dto.accountNumber,
@@ -1091,15 +1071,11 @@ export class UsersService {
   }
 
   async resolveBankAccount(dto: ResolveBankAccountDto) {
-    const response = await axios.get(
-      `${this.paystackConfig.baseUrl}/bank/resolve?account_number=${dto.accountNumber}&bank_code=${dto.bankCode}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
-        },
-      },
-    );
-    return { status: true, data: response.data };
+    const data = await this.paymentGateway.resolveAccount({
+      accountNumber: dto.accountNumber,
+      bankCode: dto.bankCode,
+    });
+    return { status: true, data };
   }
 
   async updateOffer(
@@ -2157,7 +2133,6 @@ export class UsersService {
     const paymentMethod = dto.paymentMethod ?? PaymentMethod.PAYSTACK;
 
     // Determine amount and validate references based on purpose
-    let amountKobo = 0;
     let amountNaira = 0;
     let offerRef: any = null;
     let conversationRef: any = null;
@@ -2206,7 +2181,6 @@ export class UsersService {
         );
 
       amountNaira = Math.round(Number(offer.price || 0) * (1 + PLATFORM_COMMISSION_RATE)) + SERVICE_FEE_FLAT;
-      amountKobo = Math.round(amountNaira * 100);
       offerRef = this.offerRepository.getReference(dto.offerUuid);
       conversationRef = this.conversationRepository.getReference(
         dto.conversationUuid,
@@ -2295,15 +2269,13 @@ export class UsersService {
       if (!dto.amount || dto.amount < 1)
         throw new BadRequestException('Amount is required to fund wallet');
       amountNaira = Number(dto.amount);
-      amountKobo = Math.round(amountNaira * 100);
     } else {
       throw new BadRequestException('Invalid payment purpose');
     }
 
-    const payload: Record<string, any> = {
+    const checkout = await this.paymentGateway.initializeCheckout({
       email,
-      amount: amountKobo,
-      currency: Currencies.NGN,
+      amountNaira,
       reference,
       metadata: {
         intentId: reference,
@@ -2314,20 +2286,7 @@ export class UsersService {
         userType,
         paymentMethod,
       },
-    };
-    if (this.paystackConfig.successRedirectUrl) {
-      payload.callback_url = this.paystackConfig.successRedirectUrl;
-    }
-
-    const initRes = await axios.post(
-      `${this.paystackConfig.baseUrl}/transaction/initialize`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${this.paystackConfig.secretKey}`,
-        },
-      },
-    );
+    });
 
     const paymentModel = this.paymentRepository.create({
       uuid: reference,
@@ -2348,12 +2307,11 @@ export class UsersService {
     });
     this.em.persist(paymentModel);
     await this.em.flush();
-    const { authorization_url, access_code } = initRes.data.data;
     return {
       status: true,
       data: {
-        authorizationUrl: authorization_url,
-        accessCode: access_code,
+        authorizationUrl: checkout.authorizationUrl,
+        accessCode: checkout.accessCode,
         reference,
         paymentMethod,
       },

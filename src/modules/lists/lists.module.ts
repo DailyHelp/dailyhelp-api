@@ -3,13 +3,12 @@ import { Module } from '@nestjs/common';
 import { MainCategory, ReasonCategory } from '../admin/admin.entities';
 import { ListsController } from './lists.controller';
 import { ListService } from './lists.service';
-import { ConfigModule } from '@nestjs/config';
-import { PaystackConfiguration } from 'src/config/configuration';
+import { PaymentModule } from '../payments/payment.module';
 
 @Module({
   imports: [
     MikroOrmModule.forFeature({ entities: [MainCategory, ReasonCategory] }),
-    ConfigModule.forFeature(PaystackConfiguration),
+    PaymentModule,
   ],
   controllers: [ListsController],
   providers: [ListService],

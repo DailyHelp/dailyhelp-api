@@ -223,7 +223,7 @@ export class BankAccount extends Timestamp {
   bankCode: string;
 
   @Property({ nullable: true })
-  recipientCode: string;
+  recipientCode?: string;
 
   @ManyToOne(() => Users, {
     fieldName: 'user',

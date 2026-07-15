@@ -3,6 +3,11 @@ import { TermiiConfig } from './types/termii.config';
 import { JwtAuthConfig } from './types/jwt-auth.config';
 import { QoreIDConfig } from './types/qoreid.config';
 import { PaystackConfig } from './types/paystack.config';
+import {
+  FlutterwaveConfig,
+  PaymentConfig,
+  PaymentGatewayName,
+} from './types/flutterwave.config';
 import { FirebaseAdminConfig } from './types/firebase.config';
 import { SmtpConfig } from './types/smtp.config';
 import { AgoraConfig } from './types/agora.config';
@@ -64,6 +69,40 @@ export const PaystackConfiguration = registerAs(
               : `${process.env.API_BASE_URL}/`,
           ).toString()
         : undefined,
+  }),
+);
+
+const buildRedirectUrl = (path?: string) =>
+  process.env.API_BASE_URL && path
+    ? new URL(
+        path,
+        process.env.API_BASE_URL.endsWith('/')
+          ? process.env.API_BASE_URL
+          : `${process.env.API_BASE_URL}/`,
+      ).toString()
+    : undefined;
+
+export const FlutterwaveConfiguration = registerAs(
+  'flutterwaveConfig',
+  (): FlutterwaveConfig => ({
+    baseUrl: process.env.FLW_BASE_URL || 'https://api.flutterwave.com/v3',
+    secretKey: process.env.FLW_SECRET_KEY,
+    publicKey: process.env.FLW_PUBLIC_KEY,
+    encryptionKey: process.env.FLW_ENCRYPTION_KEY,
+    secretHash: process.env.FLW_SECRET_HASH,
+    successRedirectUrl: buildRedirectUrl(
+      process.env.FLW_SUCCESS_REDIRECT_PATH ||
+        '/external-integrations/flutterwave/success',
+    ),
+  }),
+);
+
+export const PaymentConfiguration = registerAs(
+  'paymentConfig',
+  (): PaymentConfig => ({
+    activeGateway: (
+      process.env.ACTIVE_PAYMENT_GATEWAY || 'flutterwave'
+    ).toLowerCase() as PaymentGatewayName,
   }),
 );
 

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
-import { ConfigModule } from '@nestjs/config';
-import { PaystackConfiguration } from 'src/config/configuration';
+import { PaymentModule } from '../payments/payment.module';
 import { ExternalIntegrationsController } from './external-integrations.controller';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Conversation, Offer } from '../conversations/conversations.entity';
@@ -13,7 +12,7 @@ import { WsModule } from '../ws/ws.module';
 
 @Module({
   imports: [
-    ConfigModule.forFeature(PaystackConfiguration),
+    PaymentModule,
     MikroOrmModule.forFeature({
       entities: [
         Payment,

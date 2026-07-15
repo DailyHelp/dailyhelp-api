@@ -18,4 +18,17 @@ export class ExternalIntegrationsController {
       message: 'Paystack payment completed. You can close this page.',
     };
   }
+
+  @Post('flutterwave/webhook')
+  async handleFlutterwaveWebhook(@Req() req: Request, @Res() res: Response) {
+    return this.integrationsService.handleFlutterwaveWebhook(req, res);
+  }
+
+  @Get('flutterwave/success')
+  flutterwaveSuccessCallback() {
+    return {
+      status: true,
+      message: 'Flutterwave payment completed. You can close this page.',
+    };
+  }
 }

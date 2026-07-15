@@ -34,12 +34,14 @@ import { JobDispute } from '../jobs/job-dispute.entity';
 import { ProvidersController } from './providers.controller';
 import { Payment } from '../../entities/payment.entity';
 import { WsModule } from '../ws/ws.module';
+import { PaymentModule } from '../payments/payment.module';
 
 @Module({
   imports: [
     ConfigModule.forFeature(JwtAuthConfiguration),
     ConfigModule.forFeature(QoreIDConfiguration),
     ConfigModule.forFeature(PaystackConfiguration),
+    PaymentModule,
     MikroOrmModule.forFeature({
       entities: [
         Users,

@@ -52,6 +52,27 @@ class EnvironmentVariables {
   API_BASE_URL: string;
   @IsString()
   PAYSTACK_SUCCESS_REDIRECT_PATH: string;
+  @IsOptional()
+  @IsString()
+  ACTIVE_PAYMENT_GATEWAY?: string;
+  @IsOptional()
+  @IsString()
+  FLW_BASE_URL?: string;
+  @IsOptional()
+  @IsString()
+  FLW_PUBLIC_KEY?: string;
+  @IsOptional()
+  @IsString()
+  FLW_SECRET_KEY?: string;
+  @IsOptional()
+  @IsString()
+  FLW_ENCRYPTION_KEY?: string;
+  @IsOptional()
+  @IsString()
+  FLW_SECRET_HASH?: string;
+  @IsOptional()
+  @IsString()
+  FLW_SUCCESS_REDIRECT_PATH?: string;
   @IsString()
   AGORA_APP_ID: string;
   @IsString()

@@ -1,11 +1,9 @@
 import { InjectRepository } from '@mikro-orm/nestjs';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { MainCategory, ReasonCategory } from '../admin/admin.entities';
 import { EntityRepository } from '@mikro-orm/core';
 import { ReasonCategoryType } from 'src/types';
-import { PaystackConfiguration } from 'src/config/configuration';
-import { ConfigType } from '@nestjs/config';
-import axios from 'axios';
+import { PaymentGatewayService } from '../payments/payment-gateway.service';
 
 @Injectable()
 export class ListService {
@@ -14,8 +12,7 @@ export class ListService {
     private readonly mainCategoryRepository: EntityRepository<MainCategory>,
     @InjectRepository(ReasonCategory)
     private readonly reasonCategoryRepository: EntityRepository<ReasonCategory>,
-    @Inject(PaystackConfiguration.KEY)
-    private readonly paystackConfig: ConfigType<typeof PaystackConfiguration>,
+    private readonly paymentGateway: PaymentGatewayService,
   ) {}
 
   async fetchCategories() {
@@ -40,11 +37,7 @@ export class ListService {
   }
 
   async fetchBanks() {
-    const response = await axios.get(`${this.paystackConfig.baseUrl}/bank`, {
-      headers: {
-        Authorization: `Bearer ${this.paystackConfig.secretKey}`,
-      },
-    });
-    return response.data;
+    const banks = await this.paymentGateway.listBanks();
+    return { status: true, data: banks };
   }
 }
