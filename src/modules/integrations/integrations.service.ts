@@ -10,7 +10,7 @@ import {
 } from '../payments/payment-gateway.service';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Conversation, Offer } from '../conversations/conversations.entity';
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import { EntityManager, EntityRepository, LockMode } from '@mikro-orm/core';
 import {
   OfferStatus,
   PaymentPurpose,
@@ -115,64 +115,86 @@ export class IntegrationsService {
   }
 
   async processCharge(v: NormalizedVerification) {
-    const payment = await this.paymentRepository.findOne({
-      reference: v.reference,
-    });
-    if (!payment) return;
-    if (payment.status === 'success' || payment.status === 'processing') return;
-    const offerUuid = payment.offer?.uuid;
-    if (offerUuid) {
-      const existingSettlement = await this.paymentRepository.findOne({
-        offer: { uuid: offerUuid },
-        status: { $in: ['success', 'processing'] },
-        uuid: { $ne: payment.uuid },
-      });
-      if (Boolean(existingSettlement)) {
-        const meta = payment.metadata ? JSON.parse(payment.metadata) : {};
-        payment.status = 'failed';
-        payment.transactionId = v.transactionId;
-        payment.processedAt = new Date();
-        payment.channel = v.channel;
-        payment.metadata = JSON.stringify({
-          ...meta,
-          duplicatePayment: true,
+    // Settle the whole charge atomically. Either the payment, the offer/job (or
+    // wallet credit) all commit together, or nothing does. Previously the status
+    // was flipped to `processing` and committed BEFORE the offer/job work, so any
+    // failure downstream left a paid-but-unsettled order that could never recover
+    // (the early-return on `processing` blocked every webhook retry).
+    let jobPayload: any = null;
+    await this.em.transactional(async (em) => {
+      // Lock the payment row so concurrent webhook deliveries can't double-settle.
+      const payment = await em.findOne(
+        Payment,
+        { reference: v.reference },
+        { lockMode: LockMode.PESSIMISTIC_WRITE },
+      );
+      if (!payment) return;
+      if (payment.status === 'success') return;
+
+      const offerUuid = payment.offer?.uuid;
+      if (offerUuid) {
+        const existingSettlement = await em.findOne(Payment, {
+          offer: { uuid: offerUuid },
+          status: { $in: ['success', 'processing'] },
+          uuid: { $ne: payment.uuid },
         });
-        await this.em.flush();
+        if (existingSettlement) {
+          const meta = payment.metadata ? JSON.parse(payment.metadata) : {};
+          payment.status = 'failed';
+          payment.transactionId = v.transactionId;
+          payment.processedAt = new Date();
+          payment.channel = v.channel;
+          payment.metadata = JSON.stringify({
+            ...meta,
+            duplicatePayment: true,
+          });
+          return;
+        }
+      }
+
+      const paidAmount = Number(v.amountNaira);
+      if (paidAmount !== Number(payment.amount)) {
+        payment.status = 'failed';
         return;
       }
+
+      payment.transactionId = v.transactionId;
+      const purpose: PaymentPurpose =
+        payment.metadata && JSON.parse(payment.metadata).purpose;
+      if (purpose === PaymentPurpose.FUND_WALLET) {
+        await this.creditWallet(em, payment, v);
+      } else if (purpose === PaymentPurpose.JOB_OFFER) {
+        jobPayload = await this.acceptOfferAndCreateJob(em, payment, v);
+      } else {
+        payment.status = 'failed';
+        return;
+      }
+      payment.status = 'success';
+      payment.processedAt = new Date();
+    });
+
+    // Fire the realtime notification only after the settlement is durably
+    // committed, and never let a socket error roll back a completed payment.
+    if (jobPayload) {
+      try {
+        this.ws.jobCreated(jobPayload);
+      } catch (err) {
+        console.error('jobCreated socket emit failed after settlement', err);
+      }
     }
-    const paidAmount = Number(v.amountNaira);
-    if (paidAmount !== Number(payment.amount)) {
-      payment.status = 'failed';
-      await this.em.flush();
-      return;
-    }
-    payment.status = 'processing';
-    payment.transactionId = v.transactionId;
-    await this.em.flush();
-    const purpose: PaymentPurpose =
-      payment.metadata && JSON.parse(payment.metadata).purpose;
-    if (purpose === PaymentPurpose.FUND_WALLET) {
-      await this.creditWallet(payment, v);
-    } else if (purpose === PaymentPurpose.JOB_OFFER) {
-      await this.acceptOfferAndCreateJob(payment, v);
-    } else {
-      payment.status = 'failed';
-      await this.em.flush();
-      return;
-    }
-    payment.status = 'success';
-    payment.processedAt = new Date();
-    await this.em.flush();
   }
 
-  private async creditWallet(payment: Payment, v: NormalizedVerification) {
-    const wallet = await this.walletRepository.findOne({
+  private async creditWallet(
+    em: EntityManager,
+    payment: Payment,
+    v: NormalizedVerification,
+  ) {
+    const wallet = await em.findOne(Wallet, {
       user: { uuid: payment.user?.uuid },
       userType: payment.userType,
     });
     if (!wallet) throw new NotFoundException(`Wallet not found`);
-    const existingTransaction = await this.transactionRepository.findOne({
+    const existingTransaction = await em.findOne(Transaction, {
       payment: { uuid: payment.uuid },
       type: TransactionType.CREDIT,
       status: { $in: [TransactionStatus.SUCCESS, TransactionStatus.PENDING] },
@@ -186,30 +208,31 @@ export class IntegrationsService {
     if (existingTransaction) return;
     wallet.availableBalance += Number(payment.amount);
     wallet.totalBalance += Number(payment.amount);
-    const transactionModel = this.transactionRepository.create({
+    const transactionModel = em.create(Transaction, {
       uuid: v4(),
       type: TransactionType.CREDIT,
       status: TransactionStatus.SUCCESS,
       amount: payment.amount,
-      wallet: this.walletRepository.getReference(wallet.uuid),
-      payment: this.paymentRepository.getReference(payment.uuid),
+      wallet: em.getReference(Wallet, wallet.uuid),
+      payment: em.getReference(Payment, payment.uuid),
       remark: `Wallet Fund`,
       locked: false,
     });
-    this.em.persist(transactionModel);
+    em.persist(transactionModel);
   }
 
   private async acceptOfferAndCreateJob(
+    em: EntityManager,
     payment: Payment,
     v: NormalizedVerification,
   ) {
-    const offer = await this.offerRepository.findOne({
+    const offer = await em.findOne(Offer, {
       uuid: payment.offer?.uuid,
     });
     if (!offer) throw new NotFoundException(`Offer not found`);
     if (Math.round(Number(offer.price) * (1 + PLATFORM_COMMISSION_RATE)) + SERVICE_FEE_FLAT !== Number(payment.amount))
       throw new InternalServerErrorException(`Amount mismatch`);
-    const conversation = await this.conversationRepository.findOne({
+    const conversation = await em.findOne(Conversation, {
       uuid: payment.conversation?.uuid,
     });
     if (!conversation) throw new NotFoundException(`Conversation not found`);
@@ -224,12 +247,14 @@ export class IntegrationsService {
     });
     payment.channel = v.channel;
     const jobUuid = v4();
-    const jobModel = this.jobRepository.create({
+    const jobModel = em.create(Job, {
       uuid: jobUuid,
-      serviceProvider: this.usersRepository.getReference(
+      serviceProvider: em.getReference(
+        Users,
         conversation.serviceProvider?.uuid,
       ),
-      serviceRequestor: this.usersRepository.getReference(
+      serviceRequestor: em.getReference(
+        Users,
         conversation.serviceRequestor?.uuid,
       ),
       description:
@@ -238,25 +263,25 @@ export class IntegrationsService {
       price: offer.price,
       pictures: offer.pictures,
       code: generateOtp(4),
-      payment: this.paymentRepository.getReference(payment.uuid),
+      payment: em.getReference(Payment, payment.uuid),
       acceptedAt: new Date(),
     });
-    const jobTimelineModel = this.jobTimelineRepository.create({
+    const jobTimelineModel = em.create(JobTimeline, {
       uuid: v4(),
-      job: this.jobRepository.getReference(jobUuid),
+      job: em.getReference(Job, jobUuid),
       event: 'Offer Accepted',
-      actor: this.usersRepository.getReference(payment.user?.uuid),
+      actor: em.getReference(Users, payment.user?.uuid),
     });
-    this.em.persist(jobModel);
-    this.em.persist(jobTimelineModel);
-    this.ws.jobCreated({
+    em.persist(jobModel);
+    em.persist(jobTimelineModel);
+    return {
       uuid: jobModel.uuid,
       conversationUuid: conversation.uuid,
       serviceProviderUuid: conversation.serviceProvider?.uuid,
       serviceRequestorUuid: conversation.serviceRequestor?.uuid,
       price: offer.price,
       status: jobModel.status,
-      ...jobModel
-    });
+      ...jobModel,
+    };
   }
 }

@@ -416,7 +416,7 @@
         },
         "status": {
           "name": "status",
-          "type": "enum('PENDING','CANCELLED','ACCEPTED','DECLINED','COUNTERED')",
+          "type": "enum('PENDING','CANCELLED','ACCEPTED','PAID','DECLINED','COUNTERED')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
@@ -426,6 +426,7 @@
             "PENDING",
             "CANCELLED",
             "ACCEPTED",
+            "PAID",
             "DECLINED",
             "COUNTERED"
           ],
