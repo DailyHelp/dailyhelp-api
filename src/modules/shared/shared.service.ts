@@ -173,14 +173,22 @@ export class SharedService {
       const smsUrl = this.getTermiiSmsUrl();
       const recipient = this.formatTermiiPhoneNumber(phone);
       try {
-        smsOtpResponse = await axios.post(smsUrl, {
-          to: recipient,
-          from: this.termiiConfig.senderId,
-          sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
-          type: 'plain',
-          channel: this.termiiConfig.smsChannel,
-          api_key: this.termiiConfig.apiKey,
-        });
+        smsOtpResponse = await axios.post(
+          smsUrl,
+          {
+            to: recipient,
+            from: this.termiiConfig.senderId,
+            sms: `Your DailyHelp verification code is ${otp}. Valid for 10 mins, one-time use only.`,
+            type: 'plain',
+            channel: this.termiiConfig.smsChannel,
+            api_key: this.termiiConfig.apiKey,
+          },
+          // Fail fast if Termii is slow/unresponsive. Without this the request
+          // hangs indefinitely, which lets an upstream proxy or the client
+          // socket reset the connection and surfaces as "Network request
+          // failed" on the device instead of a clean, actionable error.
+          { timeout: 15000 },
+        );
       } catch (error) {
         const err = error as any;
         const status = axios.isAxiosError(err)

@@ -5,6 +5,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -35,6 +36,8 @@ import { Wallet } from '../wallet/wallet.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly em: EntityManager,
     @InjectRepository(Users)
@@ -376,9 +379,29 @@ export class AuthService {
         );
       }
     }
+    // Persist the OTP (and any phone change made above) before dispatching the
+    // notification so the code is valid the instant the client can enter it.
+    const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
+    this.em.persist(otpModel);
+    await this.em.flush();
+
     if (smsRecipient) {
-      await this.sharedService.sendOtp(otp, smsRecipient, {} as any);
+      // SMS goes through an external gateway that can take several seconds.
+      // Dispatch it off the response path so a slow/flaky provider can't stall
+      // the request (which previously surfaced as "Network request failed" on
+      // the device). The 15s axios timeout still bounds the background call;
+      // failures are logged and the user can use "Resend code".
+      const recipient = smsRecipient;
+      void this.sharedService
+        .sendOtp(otp, recipient, {} as any)
+        .catch((error) =>
+          this.logger.error(
+            `Failed to send OTP SMS (pinId=${pinId}): ${error?.message ?? error}`,
+          ),
+        );
     } else {
+      // Email dispatch reads a request-scoped notification template, so keep it
+      // awaited within the request lifecycle.
       if (otpActionType === OTPActionType.VERIFY_ACCOUNT) {
         await this.sharedService.sendOtp(otp, null, {
           templateCode: 'verify_account',
@@ -401,9 +424,6 @@ export class AuthService {
         });
       }
     }
-    const otpModel = this.otpRepository.create({ uuid: v4(), otp, pinId });
-    this.em.persist(otpModel);
-    await this.em.flush();
     return { status: true, data: { pinId }, message: 'Send otp successful' };
   }
 
