@@ -349,7 +349,11 @@ export class JobService {
     };
   }
 
-  async startJob(jobUuid: string, { uuid }: IAuthContext) {
+  async startJob(
+    jobUuid: string,
+    { uuid }: IAuthContext,
+    options?: { proceedWithoutVerification?: boolean },
+  ) {
     const job = await this.jobRepository.findOne({
       uuid: jobUuid,
       serviceRequestor: { uuid },
@@ -357,7 +361,11 @@ export class JobService {
     if (!job) throw new NotFoundException(`Job not found`);
     if (job.status !== JobStatus.PENDING)
       throw new ForbiddenException(`This job is not startable`);
-    if (!job.providerIdentityVerified)
+    // The customer can explicitly choose to start without the at-the-door face
+    // match, but only after acknowledging the safety warning on the client.
+    const startedWithoutVerification =
+      !job.providerIdentityVerified && !!options?.proceedWithoutVerification;
+    if (!job.providerIdentityVerified && !options?.proceedWithoutVerification)
       throw new ForbiddenException('Provider identity is not verified');
     const provider = await this.usersRepository.findOne({
       uuid: job.serviceProvider?.uuid,
@@ -370,7 +378,9 @@ export class JobService {
     const jobTimelineModel = this.jobTimelineRepository.create({
       uuid: v4(),
       job: this.jobRepository.getReference(jobUuid),
-      event: 'Job Started',
+      event: startedWithoutVerification
+        ? 'Job Started (identity not verified)'
+        : 'Job Started',
       actor: this.usersRepository.getReference(uuid),
     });
     this.em.persist(jobTimelineModel);

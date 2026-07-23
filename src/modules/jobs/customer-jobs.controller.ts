@@ -25,6 +25,7 @@ import {
   DisputeJobDto,
   JobQuery,
   RateServiceProviderDto,
+  StartJobDto,
   UpdateProviderIdentityVerificationDto,
   VerifyJobDto,
 } from './jobs.dto';
@@ -1079,8 +1080,12 @@ export class CustomerJobsController {
   }
 
   @Post(':uuid/start')
-  async startJob(@Param('uuid') uuid: string, @Req() request: Request) {
-    return this.jobService.startJob(uuid, request.user as any);
+  async startJob(
+    @Param('uuid') uuid: string,
+    @Body() body: StartJobDto,
+    @Req() request: Request,
+  ) {
+    return this.jobService.startJob(uuid, request.user as any, body);
   }
 
   @Post(':uuid/end')

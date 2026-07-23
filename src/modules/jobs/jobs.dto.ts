@@ -45,6 +45,17 @@ export class CancelJobDto {
   reasonCategory?: string;
 }
 
+export class StartJobDto {
+  @ApiProperty({
+    required: false,
+    description:
+      'Set to true to start the job even though the provider identity has not been confirmed at the door. The customer must explicitly acknowledge the safety warning.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  proceedWithoutVerification?: boolean;
+}
+
 export class ReportClientDto {
   @IsString()
   reportCategory: string;
