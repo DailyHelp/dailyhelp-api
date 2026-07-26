@@ -1412,9 +1412,23 @@ export class UsersService {
     dto: SendMessageDto,
     { uuid }: IAuthContext,
   ) {
+    const MAX_CHAT_IMAGES = 10;
+    const images = Array.isArray(dto.images)
+      ? dto.images
+          .map((img) => (typeof img === 'string' ? img.trim() : ''))
+          .filter(Boolean)
+      : [];
+    if (images.length > MAX_CHAT_IMAGES)
+      throw new BadRequestException(
+        `You can send at most ${MAX_CHAT_IMAGES} images per message`,
+      );
     const trimmed = dto.message?.trim();
-    if (!trimmed) throw new BadRequestException('Message cannot be empty');
-    const message = sanitizeChatMessage(trimmed);
+    if (!trimmed && images.length === 0)
+      throw new BadRequestException('Message cannot be empty');
+    // Caption (if any) is sanitized; text-only messages keep the original type.
+    const caption = trimmed ? sanitizeChatMessage(trimmed) : null;
+    const messageType =
+      images.length > 0 ? MessageType.IMAGE : MessageType.TEXT;
     const conversationExists = await this.conversationRepository.findOne({
       uuid: conversationUuid,
     });
@@ -1431,8 +1445,9 @@ export class UsersService {
       conversation: this.conversationRepository.getReference(conversationUuid),
       from: this.usersRepository.getReference(uuid),
       to: this.usersRepository.getReference(receiverUuid),
-      message,
-      type: MessageType.TEXT,
+      message: caption,
+      images: images.length > 0 ? images.join(',') : null,
+      type: messageType,
     });
     conversationExists.lastMessage = this.messageRepository.getReference(
       messageModel.uuid,
@@ -1440,14 +1455,15 @@ export class UsersService {
     this.em.persist(messageModel);
     await this.em.flush();
     this.ws.messageCreated({
+      ...messageModel,
       uuid: messageModel.uuid,
       conversationUuid: conversationExists.uuid,
       fromUuid: uuid,
       toUuid: receiverUuid,
-      message,
-      type: MessageType.TEXT,
+      message: caption,
+      images,
+      type: messageType,
       createdAt: messageModel.createdAt,
-      ...messageModel,
     });
     this.readService.markConversationRead(uuid, conversationExists.uuid);
     return { status: true };
@@ -1837,6 +1853,7 @@ export class UsersService {
       SELECT
         m.uuid,
         m.message,
+        m.images,
         m.type,
         m.status,
         m.created_at AS createdAt,
@@ -1963,6 +1980,9 @@ export class UsersService {
         uuid: row.uuid,
         conversation: { uuid: conversationUuid },
         message: row.message,
+        images: row.images
+          ? String(row.images).split(',').filter(Boolean)
+          : [],
         type: row.type,
         status: row.status,
         createdAt,

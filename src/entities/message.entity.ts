@@ -52,6 +52,10 @@ export class Message extends Timestamp {
   @Property({ nullable: true })
   message: string;
 
+  // Comma-separated list of image URLs for image messages (type = IMAGE).
+  @Property({ type: 'longtext', nullable: true })
+  images: string;
+
   @ApiProperty({ enum: MessageType })
   @Enum({ items: () => MessageType, default: MessageType.TEXT })
   type: MessageType;

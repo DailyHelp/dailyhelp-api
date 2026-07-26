@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -242,12 +243,22 @@ export class SendOfferDto {
 }
 
 export class SendMessageDto {
+  // Optional now: a message may be text-only, images-only, or images + caption.
+  // The service enforces that at least one of `message`/`images` is present.
+  @IsOptional()
   @IsString()
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @IsNotEmpty()
-  message: string;
+  message?: string;
+
+  // Up to 10 image URLs (already uploaded to storage by the client), WhatsApp/
+  // Messenger-style album limit.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  images?: string[];
 }
 
 export class ReportConversationDto {

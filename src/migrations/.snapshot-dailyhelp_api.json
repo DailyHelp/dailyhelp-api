@@ -3677,9 +3677,19 @@
           "length": 255,
           "mappedType": "string"
         },
+        "images": {
+          "name": "images",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "mappedType": "unknown",
+          "length": null
+        },
         "type": {
           "name": "type",
-          "type": "enum('TEXT','OFFER','OFFER_WITH_TEXT')",
+          "type": "enum('TEXT','OFFER','OFFER_WITH_TEXT','IMAGE')",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
@@ -3688,7 +3698,8 @@
           "enumItems": [
             "TEXT",
             "OFFER",
-            "OFFER_WITH_TEXT"
+            "OFFER_WITH_TEXT",
+            "IMAGE"
           ],
           "mappedType": "enum"
         },

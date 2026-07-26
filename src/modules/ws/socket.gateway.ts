@@ -224,15 +224,20 @@ export class SocketGateway {
     fromUuid: string;
     toUuid: string;
     message?: string;
+    images?: string[];
     type: string;
     createdAt: string | Date;
   }) {
+    const hasImages = Array.isArray(payload.images) && payload.images.length > 0;
+    const photoSnippet = hasImages
+      ? `📷 ${payload.images.length} photo${payload.images.length > 1 ? 's' : ''}`
+      : '';
     this.server
       .to(convRoom(payload.conversationUuid))
       .emit('message:created', payload);
     this.server.to(userRoom(payload.toUuid)).emit('inbox:badge', {
       conversationUuid: payload.conversationUuid,
-      lastMessageSnippet: (payload.message ?? '').slice(0, 120),
+      lastMessageSnippet: (payload.message || photoSnippet).slice(0, 120),
     });
 
     // Push notification to recipient
@@ -240,7 +245,7 @@ export class SocketGateway {
       [payload.toUuid],
       {
         title: 'New message',
-        body: payload.message || 'You have a new message',
+        body: payload.message || photoSnippet || 'You have a new message',
         data: {
           type: 'MESSAGE',
           payload: JSON.stringify(payload),
