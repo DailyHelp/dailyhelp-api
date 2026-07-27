@@ -108,6 +108,17 @@ export class Users extends Timestamp {
   })
   primaryJobRole: SubCategory;
 
+  // Optional "side role" — a provider's secondary job role, shown to seekers
+  // alongside the primary role.
+  @ManyToOne(() => SubCategory, {
+    fieldName: 'secondary_job_role',
+    referenceColumnName: 'uuid',
+    columnType: 'varchar(255)',
+    nullable: true,
+    eager: true,
+  })
+  secondaryJobRole: SubCategory;
+
   @Property({ nullable: true, type: 'longtext' })
   serviceDescription: string;
 

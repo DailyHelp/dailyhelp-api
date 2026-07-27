@@ -98,6 +98,7 @@ import { JobDispute } from '../jobs/job-dispute.entity';
 import bcrypt from 'bcryptjs';
 import { Payment } from '../../entities/payment.entity';
 import { SocketGateway } from '../ws/socket.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ReadStateService } from '../ws/read-state.service';
 import { PresenceService } from '../ws/presence.service';
 
@@ -166,6 +167,7 @@ export class UsersService {
     private readonly ws: SocketGateway,
     private readonly readService: ReadStateService,
     private readonly presence: PresenceService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   public async enrichUserWithJobStatus<
@@ -494,6 +496,19 @@ export class UsersService {
         userExists.primaryJobRole = null;
       }
     }
+    if (dto.secondarySubCategoryUuid !== undefined) {
+      if (dto.secondarySubCategoryUuid) {
+        const secondarySubCategory = await this.subCategoryRepository.findOne({
+          uuid: dto.secondarySubCategoryUuid,
+        });
+        if (!secondarySubCategory) {
+          throw new NotFoundException('Secondary sub category not found');
+        }
+        userExists.secondaryJobRole = secondarySubCategory;
+      } else {
+        userExists.secondaryJobRole = null;
+      }
+    }
     if (dto.serviceDescription !== undefined) {
       userExists.serviceDescription = dto.serviceDescription;
     }
@@ -581,11 +596,12 @@ export class UsersService {
 
   async fetchTopRatedProviders(conn: Connection) {
     const topRatedProviders = await conn.execute(`
-      SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
+      SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole, r2.name as secondaryJobRole,
       u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
       u.tier, u.picture, u.service_images as serviceImages
       FROM users u
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
+      LEFT JOIN sub_categories r2 on u.secondary_job_role = r2.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
       WHERE u.avg_rating IS NOT NULL
       AND u.primary_job_role IS NOT NULL
@@ -619,13 +635,14 @@ export class UsersService {
   ) {
     const recommendedProviders = await conn.execute(
       `
-      SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole,
+      SELECT u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating, u.service_description as serviceDescription, r.name as primaryJobRole, r2.name as secondaryJobRole,
       u.offer_starting_price as offerStartingPrice, u.availability, u.engaged, COUNT(j.uuid) as completedJobs,
       u.tier, u.picture, u.service_images as serviceImages,
       ${locationSelect}
       FROM users u
       LEFT JOIN locations l ON l.uuid = u.default_location
       LEFT JOIN sub_categories r on u.primary_job_role = r.uuid
+      LEFT JOIN sub_categories r2 on u.secondary_job_role = r2.uuid
       LEFT JOIN jobs j on j.service_provider = u.uuid and j.status = 'completed'
       WHERE u.availability = true AND u.identity_verified = true AND u.primary_job_role IS NOT NULL
       ${topRatedPlaceholders ? `AND u.uuid NOT IN (${topRatedPlaceholders})` : ''}
@@ -664,6 +681,7 @@ export class UsersService {
     const baseProvidersQuery = `
       FROM users u
       LEFT JOIN sub_categories r ON u.primary_job_role = r.uuid
+      LEFT JOIN sub_categories r2 ON u.secondary_job_role = r2.uuid
       LEFT JOIN main_categories mc ON r.main_category = mc.uuid
       LEFT JOIN jobs j ON j.service_provider = u.uuid AND j.status = 'completed'
       LEFT JOIN job_reviews jr ON jr.reviewed_for = u.uuid
@@ -678,7 +696,7 @@ export class UsersService {
     const providersDataQuery = `
       SELECT
         u.uuid, u.firstname, u.lastname, u.avg_rating as avgRating,
-        u.service_description as serviceDescription, r.name as primaryJobRole,
+        u.service_description as serviceDescription, r.name as primaryJobRole, r2.name as secondaryJobRole,
         u.offer_starting_price as offerStartingPrice, u.availability, u.engaged,
         COUNT(j.uuid) as completedJobs, COUNT(jr.uuid) as totalRatings,
         u.tier, u.picture, u.service_images as serviceImages,
@@ -1161,6 +1179,16 @@ export class UsersService {
       conversationUuid: messageExists.conversation?.uuid,
       ...offerExists,
     });
+    await this.notifications.record({
+      recipientUuid: messageExists.from?.uuid,
+      type: 'OFFER_ACCEPTED',
+      title: 'Offer accepted',
+      body: `Your ₦${offerExists.price} offer was accepted. Complete payment to book the job.`,
+      data: {
+        offerUuid: offerExists.uuid,
+        conversationUuid: messageExists.conversation?.uuid,
+      },
+    });
     return { status: true };
   }
 
@@ -1210,6 +1238,16 @@ export class UsersService {
       toUuid: messageExists.from?.uuid,
       oldOffer: offerExists,
       newOffer: offerModel,
+    });
+    await this.notifications.record({
+      recipientUuid: messageExists.from?.uuid,
+      type: 'OFFER_COUNTERED',
+      title: 'Offer countered',
+      body: `You received a counter offer of ₦${offerModel.price}.`,
+      data: {
+        offerUuid: offerModel.uuid,
+        conversationUuid: messageExists.conversation?.uuid,
+      },
     });
     this.readService.markConversationRead(
       uuid,
@@ -1266,6 +1304,16 @@ export class UsersService {
       conversationUuid: conversation.uuid,
       status: OfferStatus.DECLINED,
       ...offerExists,
+    });
+    await this.notifications.record({
+      recipientUuid: messageExists.from?.uuid,
+      type: 'OFFER_DECLINED',
+      title: 'Offer declined',
+      body: `Your ₦${offerExists.price} offer was declined.`,
+      data: {
+        offerUuid: offerExists.uuid,
+        conversationUuid: conversation.uuid,
+      },
     });
     this.readService.markConversationRead(uuid, conversation.uuid);
     return { status: true };
@@ -1380,6 +1428,16 @@ export class UsersService {
       price: offerModel.price,
       status: offerModel.status,
       ...offerModel,
+    });
+    await this.notifications.record({
+      recipientUuid: providerUuid,
+      type: 'OFFER_RECEIVED',
+      title: 'New offer',
+      body: `You received a ₦${offerModel.price} offer.`,
+      data: {
+        offerUuid: offerModel.uuid,
+        conversationUuid: conversationExists.uuid,
+      },
     });
     return { status: true };
   }
@@ -2463,7 +2521,11 @@ export class UsersService {
     };
     user.lastLoggedIn = new Date();
     await this.em.flush();
-    const clonedUser = { ...user, primaryJobRole: user.primaryJobRole?.name };
+    const clonedUser = {
+      ...user,
+      primaryJobRole: user.primaryJobRole?.name,
+      secondaryJobRole: user.secondaryJobRole?.name,
+    };
     delete clonedUser.password;
     delete clonedUser.createdAt;
     delete clonedUser.updatedAt;

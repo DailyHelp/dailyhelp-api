@@ -46,6 +46,7 @@ import { Conversation } from '../conversations/conversations.entity';
 import { JobReport } from './job-reports.entity';
 import { AccountTierSetting } from '../admin/admin.entities';
 import { SocketGateway } from '../ws/socket.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PresenceService } from '../ws/presence.service';
 import {
   buildResponseDataWithPagination,
@@ -82,6 +83,7 @@ export class JobService {
     @Inject(forwardRef(() => SocketGateway))
     private readonly ws: SocketGateway,
     private readonly presence: PresenceService,
+    private readonly notifications: NotificationsService,
     @Inject(AgoraConfiguration.KEY)
     private readonly agoraConfig: ConfigType<typeof AgoraConfiguration>,
   ) {}
@@ -392,6 +394,13 @@ export class JobService {
       status: job.status,
       ...job,
     });
+    await this.notifications.record({
+      recipientUuid: job.serviceProvider?.uuid,
+      type: 'JOB_STARTED',
+      title: 'Job started',
+      body: `Your job #${job.requestId} has been started.`,
+      data: { jobUuid: job.uuid },
+    });
     return { status: true };
   }
 
@@ -451,6 +460,22 @@ export class JobService {
       status: job.status,
       ...job,
     });
+    await this.notifications.record([
+      {
+        recipientUuid: job.serviceProvider?.uuid,
+        type: 'JOB_COMPLETED',
+        title: 'Service completed',
+        body: `Job #${job.requestId} has been marked complete. Your payout will be available shortly.`,
+        data: { jobUuid: job.uuid },
+      },
+      {
+        recipientUuid: job.serviceRequestor?.uuid,
+        type: 'JOB_COMPLETED',
+        title: 'Service completed',
+        body: `Your job #${job.requestId} is complete. Please leave a review.`,
+        data: { jobUuid: job.uuid },
+      },
+    ]);
     return { status: true };
   }
 
@@ -666,6 +691,17 @@ export class JobService {
       if (provider?.uuid) {
         await this.recalculateProviderTier(provider.uuid);
       }
+      // No existing push for reviews, so push this one.
+      await this.notifications.record({
+        recipientUuid: provider.uuid,
+        type: 'REVIEW_RECEIVED',
+        title: 'New review',
+        body: `You received a ${dto.rating}-star review${
+          tipAmount ? ` and a ₦${tipAmount} tip` : ''
+        }.`,
+        data: { jobUuid, reviewUuid },
+        push: true,
+      });
       const response = {
         status: true,
         data: {

@@ -1,16 +1,21 @@
 import { Module } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
+import { NotificationsController } from './notifications.controller';
 import { ConfigModule } from '@nestjs/config';
 import { FirebaseConfiguration } from 'src/config/configuration';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Users } from '../users/users.entity';
 import { Conversation } from '../conversations/conversations.entity';
+import { Notification } from '../../entities/notification.entity';
 
 @Module({
   imports: [
     ConfigModule.forFeature(FirebaseConfiguration),
-    MikroOrmModule.forFeature({ entities: [Users, Conversation] }),
+    MikroOrmModule.forFeature({
+      entities: [Users, Conversation, Notification],
+    }),
   ],
+  controllers: [NotificationsController],
   providers: [NotificationsService],
   exports: [NotificationsService],
 })

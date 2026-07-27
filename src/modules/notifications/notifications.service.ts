@@ -1,12 +1,27 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { FirebaseConfiguration } from 'src/config/configuration';
-import { EntityRepository } from '@mikro-orm/core';
+import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Users } from '../users/users.entity';
 import { Conversation } from '../conversations/conversations.entity';
+import { Notification } from '../../entities/notification.entity';
+import { PaginationInput } from 'src/base/dto';
+import { IAuthContext } from 'src/types';
+import { buildResponseDataWithPagination } from 'src/utils';
+import { v4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+
+export type NotificationInput = {
+  recipientUuid: string;
+  type: string;
+  title: string;
+  body?: string;
+  data?: Record<string, any>;
+  // When true, also send a push notification for this record.
+  push?: boolean;
+};
 
 // Lazy import to avoid hard crash if firebase-admin isn't installed yet
 let admin: any;
@@ -36,8 +51,114 @@ export class NotificationsService {
     private readonly usersRepo: EntityRepository<Users>,
     @InjectRepository(Conversation)
     private readonly convRepo: EntityRepository<Conversation>,
+    @InjectRepository(Notification)
+    private readonly notificationRepo: EntityRepository<Notification>,
+    private readonly em: EntityManager,
   ) {
     this.init();
+  }
+
+  /**
+   * Persist an in-app notification for a recipient (and optionally push it).
+   * Called from domain services right after their own flush, so it never
+   * blocks or rolls back the primary operation. Failures are swallowed and
+   * logged — a notification must never break the action that triggered it.
+   */
+  async record(input: NotificationInput | NotificationInput[]) {
+    const inputs = Array.isArray(input) ? input : [input];
+    try {
+      for (const n of inputs) {
+        if (!n.recipientUuid) continue;
+        const model = this.notificationRepo.create({
+          uuid: v4(),
+          recipient: this.usersRepo.getReference(n.recipientUuid),
+          type: n.type,
+          title: n.title,
+          body: n.body ?? null,
+          data: n.data ? JSON.stringify(n.data) : null,
+          readAt: null,
+        });
+        this.em.persist(model);
+      }
+      await this.em.flush();
+    } catch (err) {
+      this.logger.error(
+        `Failed to persist notification(s): ${(err as any)?.message ?? err}`,
+      );
+    }
+    // Fire pushes for any inputs that opted in (best-effort, non-blocking).
+    for (const n of inputs) {
+      if (n.push) {
+        void this.sendToUserUuids([n.recipientUuid], {
+          title: n.title,
+          body: n.body,
+          data: {
+            type: n.type,
+            ...(n.data
+              ? Object.fromEntries(
+                  Object.entries(n.data).map(([k, v]) => [k, String(v)]),
+                )
+              : {}),
+          },
+        }).catch(() => undefined);
+      }
+    }
+  }
+
+  async listNotifications(
+    pagination: PaginationInput,
+    { uuid }: IAuthContext,
+  ) {
+    const page = Math.max(1, Number(pagination?.page) || 1);
+    const limit = Math.max(1, Number(pagination?.limit) || 20);
+    const offset = (page - 1) * limit;
+    const [rows, total] = await Promise.all([
+      this.notificationRepo.find(
+        { recipient: { uuid } },
+        { limit, offset, orderBy: { createdAt: 'DESC' } },
+      ),
+      this.notificationRepo.count({ recipient: { uuid } }),
+    ]);
+    const data = rows.map((n) => ({
+      uuid: n.uuid,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      data: n.data ? JSON.parse(n.data) : null,
+      read: !!n.readAt,
+      readAt: n.readAt,
+      createdAt: n.createdAt,
+    }));
+    return buildResponseDataWithPagination(data, total, { page, limit });
+  }
+
+  async unreadCount({ uuid }: IAuthContext) {
+    const count = await this.notificationRepo.count({
+      recipient: { uuid },
+      readAt: null,
+    });
+    return { status: true, data: { count } };
+  }
+
+  async markAsRead(notificationUuid: string, { uuid }: IAuthContext) {
+    const notification = await this.notificationRepo.findOne({
+      uuid: notificationUuid,
+      recipient: { uuid },
+    });
+    if (!notification) throw new NotFoundException('Notification not found');
+    if (!notification.readAt) {
+      notification.readAt = new Date();
+      await this.em.flush();
+    }
+    return { status: true };
+  }
+
+  async markAllAsRead({ uuid }: IAuthContext) {
+    await this.notificationRepo.nativeUpdate(
+      { recipient: { uuid }, readAt: null },
+      { readAt: new Date() },
+    );
+    return { status: true };
   }
 
   private init() {

@@ -9,6 +9,7 @@ import { Job, JobTimeline } from '../jobs/jobs.entity';
 import { Users } from '../users/users.entity';
 import { Payment } from '../../entities/payment.entity';
 import { WsModule } from '../ws/ws.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WsModule } from '../ws/ws.module';
       ],
     }),
     WsModule,
+    NotificationsModule,
   ],
   providers: [IntegrationsService],
   controllers: [ExternalIntegrationsController],

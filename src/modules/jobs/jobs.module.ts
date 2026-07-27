@@ -14,6 +14,7 @@ import { WsModule } from '../ws/ws.module';
 import { AccountTierSetting } from '../admin/admin.entities';
 import { ConfigModule } from '@nestjs/config';
 import { AgoraConfiguration } from 'src/config/configuration';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AgoraConfiguration } from 'src/config/configuration';
       ],
     }),
     forwardRef(() => WsModule),
+    NotificationsModule,
   ],
   controllers: [CustomerJobsController, ProviderJobsController],
   providers: [JobService],

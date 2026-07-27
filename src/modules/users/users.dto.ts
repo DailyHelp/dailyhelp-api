@@ -108,6 +108,11 @@ export class SaveProviderDetails {
   @IsOptional()
   subCategoryUuid: string;
 
+  // Optional secondary ("side") job role.
+  @IsString()
+  @IsOptional()
+  secondarySubCategoryUuid: string;
+
   @IsString()
   @IsOptional()
   serviceDescription: string;
@@ -399,6 +404,9 @@ export class TopRatedProvider {
 
   @ApiProperty()
   primaryJobRole: string;
+
+  @ApiProperty()
+  secondaryJobRole: string;
 
   @ApiProperty()
   offerStartingPrice: number;

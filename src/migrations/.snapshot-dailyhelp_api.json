@@ -1086,6 +1086,16 @@
           "length": 255,
           "mappedType": "string"
         },
+        "secondary_job_role": {
+          "name": "secondary_job_role",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
         "service_description": {
           "name": "service_description",
           "type": "longtext",
@@ -1328,6 +1338,16 @@
           "constraint": true,
           "primary": true,
           "unique": true
+        },
+        {
+          "columnNames": [
+            "secondary_job_role"
+          ],
+          "composite": false,
+          "keyName": "users_secondary_job_role_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
         }
       ],
       "checks": [],
@@ -1364,6 +1384,20 @@
           "constraintName": "users_primary_job_role_foreign",
           "columnNames": [
             "primary_job_role"
+          ],
+          "localTableName": "users",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "sub_categories",
+          "createForeignKeyConstraint": true,
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "users_secondary_job_role_foreign": {
+          "constraintName": "users_secondary_job_role_foreign",
+          "columnNames": [
+            "secondary_job_role"
           ],
           "localTableName": "users",
           "referencedColumnNames": [
@@ -4793,6 +4827,153 @@
             "uuid"
           ],
           "referencedTableName": "payments",
+          "createForeignKeyConstraint": true,
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        }
+      },
+      "nativeEnums": {}
+    },
+    {
+      "name": "notifications",
+      "columns": {
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": null,
+          "default": "CURRENT_TIMESTAMP",
+          "mappedType": "datetime"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        },
+        "recipient": {
+          "name": "recipient",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "body": {
+          "name": "body",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "data": {
+          "name": "data",
+          "type": "longtext",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "unknown"
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "datetime",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": null,
+          "mappedType": "datetime"
+        }
+      },
+      "indexes": [
+        {
+          "columnNames": [
+            "recipient"
+          ],
+          "composite": false,
+          "keyName": "notifications_recipient_index",
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
+          "keyName": "PRIMARY",
+          "columnNames": [
+            "uuid"
+          ],
+          "composite": false,
+          "constraint": true,
+          "primary": true,
+          "unique": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "notifications_recipient_foreign": {
+          "constraintName": "notifications_recipient_foreign",
+          "columnNames": [
+            "recipient"
+          ],
+          "localTableName": "notifications",
+          "referencedColumnNames": [
+            "uuid"
+          ],
+          "referencedTableName": "users",
           "createForeignKeyConstraint": true,
           "deleteRule": "set null",
           "updateRule": "cascade"

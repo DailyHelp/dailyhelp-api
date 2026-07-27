@@ -34,6 +34,7 @@ import { JobDispute } from '../jobs/job-dispute.entity';
 import { ProvidersController } from './providers.controller';
 import { Payment } from '../../entities/payment.entity';
 import { WsModule } from '../ws/ws.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PaymentModule } from '../payments/payment.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { PaymentModule } from '../payments/payment.module';
     ConfigModule.forFeature(QoreIDConfiguration),
     ConfigModule.forFeature(PaystackConfiguration),
     PaymentModule,
+    NotificationsModule,
     MikroOrmModule.forFeature({
       entities: [
         Users,

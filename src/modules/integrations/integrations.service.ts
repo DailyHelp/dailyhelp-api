@@ -26,6 +26,7 @@ import { Users } from '../users/users.entity';
 import { generateOtp } from 'src/utils';
 import { Payment } from '../../entities/payment.entity';
 import { SocketGateway } from '../ws/socket.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class IntegrationsService {
@@ -49,6 +50,7 @@ export class IntegrationsService {
     private readonly usersRepository: EntityRepository<Users>,
     private readonly em: EntityManager,
     private readonly ws: SocketGateway,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async handlePaystackWebhook(req: Request, res: Response) {
@@ -181,6 +183,22 @@ export class IntegrationsService {
       } catch (err) {
         console.error('jobCreated socket emit failed after settlement', err);
       }
+      await this.notifications.record([
+        {
+          recipientUuid: jobPayload.serviceProviderUuid,
+          type: 'JOB_CREATED',
+          title: 'New job booked',
+          body: 'A customer paid for an offer — you have a new job.',
+          data: { jobUuid: jobPayload.uuid },
+        },
+        {
+          recipientUuid: jobPayload.serviceRequestorUuid,
+          type: 'JOB_CREATED',
+          title: 'Job booked',
+          body: 'Your payment was successful and your job is booked.',
+          data: { jobUuid: jobPayload.uuid },
+        },
+      ]);
     }
   }
 

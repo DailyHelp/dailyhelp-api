@@ -168,7 +168,11 @@ export class AuthService {
     const userModel = await this.usersRepository.findOne({ uuid: user.uuid });
     userModel.lastLoggedIn = new Date();
     await this.em.flush();
-    const clonedUser = { ...user, primaryJobRole: user.primaryJobRole?.name };
+    const clonedUser = {
+      ...user,
+      primaryJobRole: user.primaryJobRole?.name,
+      secondaryJobRole: user.secondaryJobRole?.name,
+    };
     delete clonedUser.password;
     delete clonedUser.createdAt;
     delete clonedUser.updatedAt;
