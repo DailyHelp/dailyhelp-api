@@ -6,4 +6,9 @@ export class AppController {
   getHello(): string {
     return 'Welcome to DailyHelp API!!!';
   }
+
+  @Get('health')
+  getHealth(): { status: string } {
+    return { status: 'ok' };
+  }
 }

@@ -16,6 +16,11 @@ module.exports = {
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production',
+        PORT: 8002,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 8002,
       },
       env_file: process.env.ENV_FILE || path.join(__dirname, '.env'),
       max_memory_restart: '500M',
